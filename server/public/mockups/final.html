@@ -7,18 +7,19 @@
   *{box-sizing:border-box} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt)}
   header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0}.mut{color:var(--mut)}.sp{flex:1}
-  main{padding:14px;max-width:1440px;margin:0 auto}
+  main{padding:14px;max-width:1720px;margin:0 auto}
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   .place{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px}.place b{font-size:15px}.place.first{border-color:var(--gold)}
   .layout{display:flex;gap:10px;align-items:flex-start}
   .left{flex:1;min-width:0}.right{width:288px;flex:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-  .pcol{flex:1;min-width:198px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol{flex:1;min-width:256px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.first{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .cam{height:54px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
   .phead{display:flex;align-items:baseline;justify-content:space-between}.phead .nm{font-weight:800}.phead .tot{font-size:19px;font-weight:800;color:var(--gold)}
   .subhead{color:var(--mut);font-size:11px;margin:2px 0 6px}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
+  .pcol table{table-layout:fixed}.pcol td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   thead th{color:var(--mut);font-weight:600;font-size:10px;letter-spacing:.03em;border-bottom:1px solid var(--line)}
   .right{text-align:right}
   .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
@@ -79,15 +80,15 @@ const medal=p=>['🥇','🥈','🥉','4','5'][p-1];
 
 document.getElementById('ribbon').innerHTML=ranked.map(p=>`<div class="place ${p.place===1?'first':''}">${medal(p.place)} <b>${p.name}</b> · ${p.total}</div>`).join('');
 
-const ptsCell=p=> p.st==='p'?p.pts : p.st==='dnp'?`0<span class="skip">пропуск</span>` : '—';
+const ptsCell=p=> p.st==='p'?p.pts : p.st==='dnp'?'0' : '—';
 document.getElementById('cols').innerHTML=players.map(pl=>`
   <div class="pcol ${pl.place===1?'first':''}">
     <div class="cam">камера</div>
     <div class="phead"><span class="nm">${medal(pl.place)} ${pl.name}</span><span class="tot">${pl.total}</span></div>
     <div class="subhead">осталось сыграть: ${pl.remaining}</div>
     <table>
-      <thead><tr><th>POS</th><th>PLAYER</th><th>TEAM</th><th class="right">COST</th><th class="right">PTS</th></tr></thead>
-      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
+      <thead><tr><th style="width:30px">POS</th><th>PLAYER</th><th style="width:40px">TEAM</th><th class="right" style="width:46px">COST</th><th class="right" style="width:38px">PTS</th></tr></thead>
+      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.st==='dnp'?'✗ ':''}${p.name}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
       <tr class="totrow"><td colspan="4">Итого</td><td class="right">${pl.base}</td></tr></tbody>
     </table>
     <hr class="subsep">
