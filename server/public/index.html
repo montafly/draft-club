@@ -34,8 +34,16 @@
   <span id="who" class="pill"></span>
   <span id="phase" class="pill"></span>
   <span id="turn" class="pill"></span>
+  <button class="sec" onclick="toggleHist()">История пиков</button>
   <span id="err" class="err"></span>
 </header>
+<div id="hist" style="display:none; position:fixed; inset:0; background:#000a; padding:40px; overflow:auto; z-index:10;">
+  <div class="card" style="max-width:600px; margin:0 auto;">
+    <button class="sec" style="float:right" onclick="toggleHist()">Закрыть</button>
+    <b>История пиков</b>
+    <div id="histBody"></div>
+  </div>
+</div>
 <main>
   <div>
     <div class="card" id="lobby"></div>
@@ -48,12 +56,13 @@
 const name = (sessionStorage.getItem('dc_name') || prompt('Твоё имя:') || 'Player').slice(0, 24);
 sessionStorage.setItem('dc_name', name);
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-let me = null, S = null;
+let me = null, S = null, POOL = [];
 
 ws.onopen = () => ws.send(JSON.stringify({ type: 'join', name }));
 ws.onmessage = (e) => {
   const m = JSON.parse(e.data);
-  if (m.type === 'joined') { me = m.you; document.getElementById('who').textContent = m.you ? `${name} (место ${m.you})` : `${name} (зритель)`; }
+  if (m.type === 'pool') { POOL = m.units; }
+  else if (m.type === 'joined') { me = m.you; document.getElementById('who').textContent = m.you ? `${name} (место ${m.you})` : `${name} (зритель)`; }
   else if (m.type === 'error') { showErr(m.message); }
   else if (m.type === 'state') { S = m.state; render(); }
 };
@@ -74,6 +83,23 @@ function render() {
   renderAction();
   renderClubs();
   renderBoard();
+  if (document.getElementById('hist').style.display === 'block') renderHist();
+}
+
+function toggleHist() {
+  const el = document.getElementById('hist');
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if (open) renderHist();
+}
+function renderHist() {
+  const body = document.getElementById('histBody');
+  if (!S || !S.started) { body.innerHTML = '<p>Драфт не начат</p>'; return; }
+  const picks = S.draft.picks || [];
+  if (!picks.length) { body.innerHTML = '<p>Пока пусто</p>'; return; }
+  body.innerHTML = '<table>' + picks.map(p =>
+    `<tr><td>${p.sub ? 'зам' : '#' + p.no}</td><td class="pos-${p.position}">${p.position}</td><td>${p.unitName}</td><td>${p.club}</td><td>→ ${p.winnerName}</td><td style="text-align:right">${p.price}</td></tr>`
+  ).join('') + '</table>';
 }
 
 function renderLobby() {
@@ -116,9 +142,10 @@ function renderAction() {
 function renderClubs() {
   const el = document.getElementById('clubs');
   if (!S.started) { el.innerHTML = ''; return; }
-  const cc = S.draft.clubCounts;
-  let h = '<b>Лимиты клубов (макс 5)</b><br>';
-  for (const club of Object.keys(cc).sort()) h += `<span class="${cc[club] >= 5 ? 'full' : ''}">${club} ${cc[club]}</span>`;
+  const cc = S.draft.clubCounts || {};
+  const clubs = [...new Set(POOL.map(u => u.club))].sort();
+  let h = '<b>Доступно по клубам (слотов из 5)</b><br>';
+  for (const club of clubs) { const left = 5 - (cc[club] || 0); h += `<span class="${left <= 0 ? 'full' : ''}">${club} ${left}</span>`; }
   el.innerHTML = h;
 }
 
@@ -129,11 +156,14 @@ function renderBoard() {
   let h = '';
   if (d.lot) { const u = d.lot.unit; const hb = d.managers.find(m => m.id === d.lot.highBidder)?.name;
     h += `<div class="card lot">НА ТОРГАХ: <b>${u.name}</b> <span class="pos-${u.position}">${u.position}</span> · ${u.club} — ставка <b>${d.lot.highBid}</b> (${hb})</div>`; }
-  for (const m of d.managers) {
+  // порядок согласно жеребьёвке (чтобы было видно, чьё слово следующее)
+  const byId = new Map(d.managers.map(m => [m.id, m]));
+  const ordered = (d.order || d.managers.map(m => m.id)).map(id => byId.get(id)).filter(Boolean);
+  for (const m of ordered) {
     const c = m.counts;
     h += `<div class="card mgr ${m.id === me ? 'me' : ''} ${m.id === d.actor ? 'act' : ''}">
       <b>${m.name}</b> ${m.finished ? '✓' : ''} — бюджет <b>${m.budget}</b>, макс.бид ${m.maxBid} · 1-${c.DEF}-${c.MID}-${c.FWD}${c.COACH ? ' +тренер' : ''} (${m.size}/12)${m.substitute ? ' · замена: ' + m.substitute.name : ''}
-      <table>${m.roster.map(u => `<tr><td class="pos-${u.position}">${u.position}</td><td>${u.name}</td><td>${u.club}</td></tr>`).join('')}</table>
+      <table>${m.roster.map(u => `<tr><td class="pos-${u.position}">${u.position}</td><td>${u.name}</td><td>${u.club}</td><td style="text-align:right">${u.price ?? ''}</td></tr>`).join('')}</table>
     </div>`;
   }
   el.innerHTML = h;

@@ -32,6 +32,8 @@ export class Draft {
     this.subOrder = [];
     this.subPtr = 0;
     this.log = [];
+    this.picks = [];   // хронология: {no, unitName, club, position, price, winnerId, winnerName, sub?}
+    this.lotNo = 0;
   }
 
   m(id) { return this.managers.get(id); }
@@ -83,7 +85,7 @@ export class Draft {
     if (openingBid > maxBid(m, this.config)) throw new Error('nominate: ставка > макс. бида');
 
     this.lot = { unit, highBid: openingBid, highBidder: managerId, passed: new Set(),
-                 lastIdx: this.orderIdx.get(managerId) };
+                 lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo };
     this.phase = 'bidding';
     this.log.push(`NOMINATE ${m.name} -> ${unit.name} @${openingBid}`);
     this._advance();
@@ -147,7 +149,10 @@ export class Draft {
     const lot = this.lot;
     const w = this.m(lot.highBidder);
     w.budget -= lot.highBid;
-    w.roster.push(lot.unit);
+    w.roster.push({ ...lot.unit, price: lot.highBid });
+    this.picks.push({ no: lot.no, unitName: lot.unit.name, club: lot.unit.club,
+                      position: lot.unit.position, price: lot.highBid,
+                      winnerId: w.id, winnerName: w.name });
     this.taken.add(lot.unit.id);
     this.clubCounts[lot.unit.club] = (this.clubCounts[lot.unit.club] || 0) + 1;
     this.log.push(`WIN ${w.name} <- ${lot.unit.name} @${lot.highBid} (budget ${w.budget})`);
@@ -184,9 +189,11 @@ export class Draft {
     if (unit.position === 'COACH') throw new Error('sub: тренера на замену нельзя');
     if ((this.clubCounts[unit.club] || 0) >= this.config.teamLimit) throw new Error('sub: клуб заблокирован');
     const m = this.m(managerId);
-    m.substitute = unit;
+    m.substitute = { ...unit, price: 0 };
     this.taken.add(unit.id);
     this.clubCounts[unit.club] = (this.clubCounts[unit.club] || 0) + 1;
+    this.picks.push({ no: null, sub: true, unitName: unit.name, club: unit.club,
+                      position: unit.position, price: 0, winnerId: m.id, winnerName: m.name });
     this.log.push(`SUB ${m.name} <- ${unit.name}`);
     this.subPtr++;
     if (this.subPtr >= this.subOrder.length) { this.phase = 'done'; this.actor = null; }

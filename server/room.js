@@ -86,15 +86,17 @@ export class Room {
       draft: {
         phase: d.phase,
         actor: d.actor,
+        order: d.order,
         lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder },
         clubCounts: d.clubCounts,
         taken: [...d.taken],
+        picks: d.picks,
         actorOptions: this._actorOptions(),
         managers: [...d.managers.values()].map((m) => ({
           id: m.id, name: m.name, budget: m.budget, maxBid: d.managerMaxBid(m.id),
           finished: m.finished, finishOrder: m.finishOrder, size: m.roster.length,
           counts: countPos(m.roster),
-          roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, position: u.position })),
+          roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, position: u.position, price: u.price })),
           substitute: m.substitute && { name: m.substitute.name, club: m.substitute.club, position: m.substitute.position },
         })),
       },
