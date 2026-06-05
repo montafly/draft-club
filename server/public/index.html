@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft Club</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; background: #0f1720; color: #e7edf3; }
+  header { background: #16202b; padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  h1 { font-size: 16px; margin: 0; }
+  .pill { background: #22303d; padding: 3px 8px; border-radius: 10px; }
+  .turn-me { background: #2e7d32; }
+  main { display: grid; grid-template-columns: 280px 1fr; gap: 12px; padding: 12px; }
+  .card { background: #16202b; border: 1px solid #25323f; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+  .mgr { border-left: 4px solid #34495e; }
+  .mgr.me { border-left-color: #2e7d32; }
+  .mgr.act { box-shadow: 0 0 0 2px #f1c40f33; }
+  .lot { font-size: 18px; }
+  button { background: #2e7d32; color: #fff; border: 0; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
+  button.sec { background: #34495e; }
+  button:disabled { opacity: .4; cursor: default; }
+  select, input { background: #0f1720; color: #e7edf3; border: 1px solid #34495e; border-radius: 6px; padding: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td { padding: 1px 4px; }
+  .pos-GK { color: #f1c40f } .pos-DEF { color: #5dade2 } .pos-MID { color: #58d68d } .pos-FWD { color: #ec7063 } .pos-COACH { color: #bb8fce }
+  .err { color: #ec7063; }
+  .clubs span { display: inline-block; background: #22303d; padding: 2px 6px; border-radius: 6px; margin: 2px; }
+  .clubs span.full { background: #7b241c; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Draft Club</h1>
+  <span id="who" class="pill"></span>
+  <span id="phase" class="pill"></span>
+  <span id="turn" class="pill"></span>
+  <span id="err" class="err"></span>
+</header>
+<main>
+  <div>
+    <div class="card" id="lobby"></div>
+    <div class="card" id="action"></div>
+    <div class="card clubs" id="clubs"></div>
+  </div>
+  <div id="board"></div>
+</main>
+<script>
+const name = (localStorage.getItem('dc_name') || prompt('Твоё имя:') || 'Player').slice(0, 24);
+localStorage.setItem('dc_name', name);
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+let me = null, S = null;
+
+ws.onopen = () => ws.send(JSON.stringify({ type: 'join', name }));
+ws.onmessage = (e) => {
+  const m = JSON.parse(e.data);
+  if (m.type === 'joined') { me = m.you; document.getElementById('who').textContent = m.you ? `${name} (место ${m.you})` : `${name} (зритель)`; }
+  else if (m.type === 'error') { showErr(m.message); }
+  else if (m.type === 'state') { S = m.state; render(); }
+};
+function send(o) { ws.send(JSON.stringify(o)); }
+function showErr(t) { const el = document.getElementById('err'); el.textContent = t; setTimeout(() => { if (el.textContent === t) el.textContent = ''; }, 4000); }
+
+function render() {
+  const d = S.draft;
+  document.getElementById('phase').textContent = S.started ? 'фаза: ' + d.phase : 'лобби';
+  const turnEl = document.getElementById('turn');
+  if (S.started && d.actor) {
+    const an = d.managers.find(x => x.id === d.actor)?.name;
+    turnEl.textContent = 'ход: ' + an;
+    turnEl.className = 'pill' + (d.actor === me ? ' turn-me' : '');
+  } else turnEl.textContent = '';
+
+  renderLobby();
+  renderAction();
+  renderClubs();
+  renderBoard();
+}
+
+function renderLobby() {
+  const el = document.getElementById('lobby');
+  if (S.started) { el.innerHTML = '<b>Игра идёт</b>'; return; }
+  let h = '<b>Лобби</b><table>';
+  for (const s of S.lobby.seats) h += `<tr><td>${s.id}</td><td>${s.name}</td><td>${s.ready ? '✓ готов' : '…'}</td><td>${s.connected ? '' : 'оффлайн'}</td></tr>`;
+  h += '</table>';
+  if (me) {
+    const myseat = S.lobby.seats.find(s => s.id === me);
+    h += `<p><button onclick='send({type:"ready",ready:${!(myseat && myseat.ready)}})'>${myseat && myseat.ready ? 'Не готов' : 'Готов'}</button>
+          <button class="sec" onclick='send({type:"start"})' ${S.lobby.startable ? '' : 'disabled'}>Старт</button></p>`;
+  } else h += '<p>Ты зритель</p>';
+  el.innerHTML = h;
+}
+
+function renderAction() {
+  const el = document.getElementById('action');
+  const d = S.draft;
+  if (!S.started || !d || d.actor !== me || d.phase === 'done') { el.innerHTML = d && d.phase === 'done' ? '<b>Драфт завершён</b>' : '<i>Не твой ход</i>'; return; }
+  const o = d.actorOptions;
+  if (d.phase === 'nominating') {
+    const opts = o.units.map(u => `<option value="${u.id}">${u.name} · ${u.club} · ${u.position}</option>`).join('');
+    el.innerHTML = `<b>Твой ход: выставить игрока</b><br>
+      <select id="nomU">${opts}</select><br>
+      старт.ставка <input id="nomB" type="number" min="1" max="${o.maxOpen}" value="1" style="width:70px"> (макс ${o.maxOpen})<br><br>
+      <button onclick='send({type:"nominate",unitId:+document.getElementById("nomU").value,openingBid:+document.getElementById("nomB").value})'>Выставить</button>`;
+  } else if (d.phase === 'bidding') {
+    el.innerHTML = `<b>Твой ход: ставка по ${d.lot.unit.name}</b><br>текущая ${d.lot.highBid}, мин ${o.minAmount}, твой макс ${o.maxAmount}<br><br>
+      <input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:70px">
+      <button onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid ? '' : 'disabled'}>Поднять</button>
+      <button class="sec" onclick='send({type:"pass"})'>Пас</button>`;
+  } else if (d.phase === 'substitutes') {
+    const opts = o.units.map(u => `<option value="${u.id}">${u.name} · ${u.club} · ${u.position}</option>`).join('');
+    el.innerHTML = `<b>Твой ход: выбрать замену</b><br><select id="subU">${opts}</select><br><br>
+      <button onclick='send({type:"pickSubstitute",unitId:+document.getElementById("subU").value})'>Взять замену</button>`;
+  }
+}
+
+function renderClubs() {
+  const el = document.getElementById('clubs');
+  if (!S.started) { el.innerHTML = ''; return; }
+  const cc = S.draft.clubCounts;
+  let h = '<b>Лимиты клубов (макс 5)</b><br>';
+  for (const club of Object.keys(cc).sort()) h += `<span class="${cc[club] >= 5 ? 'full' : ''}">${club} ${cc[club]}</span>`;
+  el.innerHTML = h;
+}
+
+function renderBoard() {
+  const el = document.getElementById('board');
+  if (!S.started) { el.innerHTML = '<div class="card">Ждём старта…</div>'; return; }
+  const d = S.draft;
+  let h = '';
+  if (d.lot) { const u = d.lot.unit; const hb = d.managers.find(m => m.id === d.lot.highBidder)?.name;
+    h += `<div class="card lot">НА ТОРГАХ: <b>${u.name}</b> <span class="pos-${u.position}">${u.position}</span> · ${u.club} — ставка <b>${d.lot.highBid}</b> (${hb})</div>`; }
+  for (const m of d.managers) {
+    const c = m.counts;
+    h += `<div class="card mgr ${m.id === me ? 'me' : ''} ${m.id === d.actor ? 'act' : ''}">
+      <b>${m.name}</b> ${m.finished ? '✓' : ''} — бюджет <b>${m.budget}</b>, макс.бид ${m.maxBid} · 1-${c.DEF}-${c.MID}-${c.FWD}${c.COACH ? ' +тренер' : ''} (${m.size}/12)${m.substitute ? ' · замена: ' + m.substitute.name : ''}
+      <table>${m.roster.map(u => `<tr><td class="pos-${u.position}">${u.position}</td><td>${u.name}</td><td>${u.club}</td></tr>`).join('')}</table>
+    </div>`;
+  }
+  el.innerHTML = h;
+}
+</script>
+</body>
+</html>

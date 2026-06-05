@@ -1,0 +1,14 @@
+{
+  "name": "draft-club-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Реалтайм-сервер драфта (2b): WS поверх движка",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node testclient.js"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}
