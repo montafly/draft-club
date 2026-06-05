@@ -1,0 +1,21 @@
+name: Draft Club collector
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # каждые 10 минут (публичный репо — Actions безлимит)
+  workflow_dispatch: {}       # ручной запуск из вкладки Actions
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: collect active matches
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SEASON_IDS: "1995,1900"   # World Cup + PL; меняй по сезону
+        run: python collect.py auto
