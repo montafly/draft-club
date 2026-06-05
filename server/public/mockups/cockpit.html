@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет: Кокпит</title>
+<style>
+  :root { --bg:#0d1419; --panel:#16212c; --line:#243240; --txt:#e7edf3; --mut:#8aa0b2; --acc:#27ae60; --gold:#e8c372; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; } .sp{flex:1} .muted{color:var(--mut)}
+  .grid { display:grid; grid-template-columns:300px 1fr 320px; gap:12px; padding:12px; height:calc(100vh - 52px); }
+  .col { display:flex; flex-direction:column; gap:12px; min-height:0; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .card h3 { margin:0 0 8px; font-size:12px; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; font-size:12px; } td,th { padding:2px 5px; text-align:left; } th{color:var(--mut);font-weight:600}
+  .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
+  .right{text-align:right}
+  .lotbox { text-align:center; padding:14px; }
+  .lotname { font-size:22px; font-weight:800; } .lotmeta{ color:var(--mut); margin:2px 0 10px; }
+  .bid { font-size:26px; font-weight:800; color:var(--gold); }
+  .actions { display:flex; gap:8px; justify-content:center; margin-top:12px; align-items:center; }
+  .btn { background:#22303d; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer; }
+  .btn.p{background:var(--acc);border-color:var(--acc)} .btn.r{background:#c0392b;border-color:#c0392b}
+  .actions input{width:64px;background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+  .clubs span{display:inline-block;background:#22303d;border-radius:6px;padding:2px 6px;margin:2px;font-size:11px}
+  .clubs span.full{background:#7b241c}
+  .odds td:first-child{font-weight:700}
+  .bar{height:6px;background:#0a0f14;border-radius:4px;overflow:hidden;margin-top:2px} .bar i{display:block;height:100%;background:var(--acc)}
+  .seatrow{display:flex;gap:6px;flex-wrap:wrap} .seat{background:#1b2733;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px}
+  .seat.act{border-color:var(--acc)} .seat .b{color:var(--gold)}
+  .scroll{overflow:auto}
+</style></head>
+<body>
+<header><h1>Draft Club <span class="muted">— макет «Кокпит»</span></h1><span class="muted">GW38 · фаза торгов · ход: Dave</span><span class="sp"></span><span class="muted">всё на одном экране, без переключений</span></header>
+<div class="grid">
+
+  <!-- ЛЕВО: твой состав -->
+  <div class="col">
+    <div class="card">
+      <h3>Твой состав · Alice</h3>
+      <div class="muted">бюджет <b style="color:var(--gold)">$35</b> · макс.бид <b>$24</b> · схема 1-4-3-3 · 6/12</div>
+      <table style="margin-top:6px">
+        <tr><td class="gk">GK</td><td>D. Henderson</td><td>NFO</td><td class="right">3</td></tr>
+        <tr><td class="def">DEF</td><td>G. Walker</td><td>MCI</td><td class="right">9</td></tr>
+        <tr><td class="def">DEF</td><td>V. van Dijk</td><td>LIV</td><td class="right">12</td></tr>
+        <tr><td class="def">DEF</td><td>W. Saliba</td><td>ARS</td><td class="right">7</td></tr>
+        <tr><td class="mid">MID</td><td>B. Saka</td><td>ARS</td><td class="right">14</td></tr>
+        <tr><td class="fwd">FWD</td><td>A. Isak</td><td>NEW</td><td class="right">11</td></tr>
+        <tr><td class="coa">TR</td><td>Coach ARS</td><td>ARS</td><td class="right">1</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Доступно по клубам (из 5)</h3>
+      <div class="clubs">
+        <span>ARS 2</span><span>AVL 4</span><span>BHA 5</span><span>BOU 3</span><span>BRE 4</span><span>CHE 1</span><span>CRY 3</span>
+        <span class="full">LIV 0</span><span>MCI 2</span><span>MUN 4</span><span>NEW 3</span><span class="full">TOT 0</span><span>WHU 5</span><span>WOL 4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ЦЕНТР: аукцион + коэф -->
+  <div class="col">
+    <div class="card lotbox">
+      <h3 style="text-align:left">На торгах</h3>
+      <div class="lotname"><span class="mid">●</span> M. Salah</div>
+      <div class="lotmeta">MID · Liverpool · номинировал Bob</div>
+      <div class="bid">$11</div><div class="muted">лидирует: Carol · мин. повышение $12</div>
+      <div class="actions"><button class="btn r">FOLD</button><input value="12"><button class="btn p">RAISE / BET</button></div>
+    </div>
+    <div class="card">
+      <h3>Коэффициенты · xG · клиншит (опора по пику)</h3>
+      <table class="odds">
+        <tr><th>Команда</th><th>П-победы</th><th></th><th class="right">xG</th><th class="right">CS%</th></tr>
+        <tr><td>LIV</td><td>58%</td><td style="width:90px"><div class="bar"><i style="width:58%"></i></div></td><td class="right">2.1</td><td class="right">41%</td></tr>
+        <tr><td>MCI</td><td>64%</td><td><div class="bar"><i style="width:64%"></i></div></td><td class="right">2.4</td><td class="right">45%</td></tr>
+        <tr><td>ARS</td><td>51%</td><td><div class="bar"><i style="width:51%"></i></div></td><td class="right">1.8</td><td class="right">38%</td></tr>
+        <tr><td>CHE</td><td>22%</td><td><div class="bar"><i style="width:22%"></i></div></td><td class="right">1.1</td><td class="right">33%</td></tr>
+        <tr><td>NEW</td><td>44%</td><td><div class="bar"><i style="width:44%"></i></div></td><td class="right">1.6</td><td class="right">36%</td></tr>
+      </table>
+      <p class="muted" style="margin:8px 0 0">Тянется из FanTeam (odds + expectedGoals), CS% по Пуассону. <a href="#" style="color:var(--acc)">история пиков</a></p>
+    </div>
+  </div>
+
+  <!-- ПРАВО: соперники + расписание -->
+  <div class="col">
+    <div class="card">
+      <h3>Соперники</h3>
+      <div class="seatrow">
+        <div class="seat"><b>Bob</b> 1-3-5-2 <span class="b">$63</span> · 8/12</div>
+        <div class="seat"><b>Carol</b> 1-5-3-2 <span class="b">$40</span> · 9/12</div>
+        <div class="seat act"><b>Dave</b> 1-4-4-2 <span class="b">$55</span> · ход</div>
+        <div class="seat"><b>Erin</b> 1-3-4-3 <span class="b">$43</span> · 8/12</div>
+      </div>
+      <table style="margin-top:8px">
+        <tr><th>Carol</th><th></th><th></th><th class="right">$</th></tr>
+        <tr><td class="gk">GK</td><td>Vicario</td><td>TOT</td><td class="right">5</td></tr>
+        <tr><td class="def">DEF</td><td>Gabriel</td><td>ARS</td><td class="right">8</td></tr>
+        <tr><td class="mid">MID</td><td>Palmer</td><td>CHE</td><td class="right">19</td></tr>
+        <tr><td class="muted" colspan="4">…</td></tr>
+      </table>
+    </div>
+    <div class="card scroll">
+      <h3>Расписание тура</h3>
+      <table>
+        <tr><td>Sun – Che</td><td class="muted right">Сб 15:00</td></tr>
+        <tr><td>Ars – Liv</td><td class="muted right">Сб 17:30</td></tr>
+        <tr><td>Mci – New</td><td class="muted right">Вс 16:00</td></tr>
+        <tr><td>Tot – Bha</td><td class="muted right">Вс 16:00</td></tr>
+        <tr><td>Eve – Wol</td><td class="muted right">Вс 18:30</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+<p class="muted" style="text-align:center;margin:0 0 10px">Макет «Кокпит» · всё видно сразу, максимум контроля. <a href="index.html" style="color:var(--acc)">← к списку макетов</a></p>
+</body></html>

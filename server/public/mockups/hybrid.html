@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет: Гибрид</title>
+<style>
+  :root { --bg:#0d1419; --panel:#16212c; --line:#243240; --txt:#e7edf3; --mut:#8aa0b2; --acc:#27ae60; --gold:#e8c372; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; } .sp{flex:1} .muted{color:var(--mut)}
+  .btn { background:#22303d; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 12px; cursor:pointer; }
+  .btn.p{background:var(--acc);border-color:var(--acc)} .btn.r{background:#c0392b;border-color:#c0392b}
+  main{padding:12px; max-width:1200px; margin:0 auto;}
+
+  /* СЦЕНА сверху */
+  .stage{ background:linear-gradient(180deg,#143b29,#0f2b1e); border:1px solid #0c2a1c; border-radius:12px; padding:12px 16px; }
+  .seats{ display:flex; justify-content:space-between; gap:10px; }
+  .seat{ text-align:center; width:130px; }
+  .cam{ width:120px; height:64px; border-radius:8px; margin:0 auto 4px; background:#0a0f14; border:1px dashed #34495e; display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;}
+  .seat.act .cam{ border-color:var(--acc); border-style:solid; }
+  .seat .nm{font-weight:700} .seat .b{color:var(--gold)}
+  .center{ display:flex; align-items:center; justify-content:center; gap:18px; margin:12px 0 4px; }
+  .card{ width:120px; height:160px; border-radius:12px; padding:10px; color:#1b1206; background:linear-gradient(160deg,#f3d79a,#b8893f); box-shadow:0 8px 20px #0008; position:relative;}
+  .card .num{position:absolute;top:6px;left:10px;font-size:24px;font-weight:800}.card .pos{position:absolute;top:40px;left:11px;font-weight:800;font-size:12px}
+  .card .photo{width:64px;height:64px;border-radius:50%;margin:30px auto 6px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .card .nm{font-weight:800;font-size:14px;text-align:center}.card .club{font-size:10px;text-align:center;opacity:.8}
+  .lotinfo .bid{font-size:24px;font-weight:800;color:var(--gold)} .lotinfo .mut{color:#bcd}
+  .actions{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .actions input{width:60px;background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px;text-align:center}
+
+  /* ПАНЕЛИ снизу */
+  .panels{ display:grid; grid-template-columns:1fr 1fr 1.1fr; gap:12px; margin-top:12px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  table{width:100%;border-collapse:collapse;font-size:12px} td,th{padding:2px 5px;text-align:left} th{color:var(--mut);font-weight:600}
+  .right{text-align:right}
+  .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
+  .bar{height:6px;background:#0a0f14;border-radius:4px;overflow:hidden;margin-top:2px}.bar i{display:block;height:100%;background:var(--acc)}
+  .tabs{display:flex;gap:6px;margin-bottom:8px}.tab{padding:3px 9px;border-radius:7px;background:#22303d;cursor:pointer;font-size:11px}.tab.on{background:var(--acc)}
+</style></head>
+<body>
+<header><h1>Draft Club <span class="muted">— макет «Гибрид»</span></h1><span class="muted">GW38 · фаза торгов</span><span class="sp"></span><button class="btn">Расписание</button><button class="btn">История пиков</button></header>
+<main>
+  <div class="stage">
+    <div class="seats">
+      <div class="seat"><div class="cam">камера</div><div class="nm">Alice (ты)</div><div class="b">$35</div></div>
+      <div class="seat"><div class="cam">камера</div><div class="nm">Bob</div><div class="b">$63</div></div>
+      <div class="seat"><div class="cam">камера</div><div class="nm">Carol</div><div class="b">$40</div></div>
+      <div class="seat act"><div class="cam">камера</div><div class="nm">Dave · ход</div><div class="b">$55</div></div>
+      <div class="seat"><div class="cam">камера</div><div class="nm">Erin</div><div class="b">$43</div></div>
+    </div>
+    <div class="center">
+      <div class="card"><div class="num">11</div><div class="pos">MID</div><div class="photo">⚽</div><div class="nm">M. Salah</div><div class="club">Liverpool</div></div>
+      <div class="lotinfo">
+        <div class="mut">На торгах · номинировал Bob</div>
+        <div class="bid">$11</div><div class="mut">лидирует Carol · мин $12</div>
+        <div class="actions"><button class="btn r">FOLD</button><input value="12"><button class="btn p">RAISE / BET</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <h3>Твой состав · Alice · $35 · макс $24</h3>
+      <table>
+        <tr><td class="gk">GK</td><td>D. Henderson</td><td>NFO</td><td class="right">3</td></tr>
+        <tr><td class="def">DEF</td><td>G. Walker</td><td>MCI</td><td class="right">9</td></tr>
+        <tr><td class="def">DEF</td><td>V. van Dijk</td><td>LIV</td><td class="right">12</td></tr>
+        <tr><td class="mid">MID</td><td>B. Saka</td><td>ARS</td><td class="right">14</td></tr>
+        <tr><td class="fwd">FWD</td><td>A. Isak</td><td>NEW</td><td class="right">11</td></tr>
+        <tr><td class="coa">TR</td><td>Coach ARS</td><td>ARS</td><td class="right">1</td></tr>
+        <tr><td class="muted" colspan="4">1-4-3-3 · 6/12</td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="tabs"><span class="tab on">Соперники</span><span class="tab">Лимиты клубов</span></div>
+      <table>
+        <tr><th></th><th>Схема</th><th class="right">$</th><th class="right">Закр.</th></tr>
+        <tr><td>Bob</td><td>1-3-5-2</td><td class="right">63</td><td class="right">8/12</td></tr>
+        <tr><td>Carol</td><td>1-5-3-2</td><td class="right">40</td><td class="right">9/12</td></tr>
+        <tr><td>Dave</td><td>1-4-4-2</td><td class="right">55</td><td class="right">7/12</td></tr>
+        <tr><td>Erin</td><td>1-3-4-3</td><td class="right">43</td><td class="right">8/12</td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Коэф · xG · клиншит</h3>
+      <table>
+        <tr><th>Кл.</th><th>Победа</th><th></th><th class="right">xG</th><th class="right">CS</th></tr>
+        <tr><td>LIV</td><td>58%</td><td style="width:70px"><div class="bar"><i style="width:58%"></i></div></td><td class="right">2.1</td><td class="right">41%</td></tr>
+        <tr><td>MCI</td><td>64%</td><td><div class="bar"><i style="width:64%"></i></div></td><td class="right">2.4</td><td class="right">45%</td></tr>
+        <tr><td>CHE</td><td>22%</td><td><div class="bar"><i style="width:22%"></i></div></td><td class="right">1.1</td><td class="right">33%</td></tr>
+        <tr><td>ARS</td><td>51%</td><td><div class="bar"><i style="width:51%"></i></div></td><td class="right">1.8</td><td class="right">38%</td></tr>
+      </table>
+    </div>
+  </div>
+  <p class="muted" style="text-align:center">Макет «Гибрид» · сцена сверху для атмосферы, плотные данные снизу. <a href="index.html" style="color:var(--acc)">← к списку макетов</a></p>
+</main>
+</body></html>
