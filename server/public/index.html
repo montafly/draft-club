@@ -45,8 +45,8 @@
   <div id="board"></div>
 </main>
 <script>
-const name = (localStorage.getItem('dc_name') || prompt('Твоё имя:') || 'Player').slice(0, 24);
-localStorage.setItem('dc_name', name);
+const name = (sessionStorage.getItem('dc_name') || prompt('Твоё имя:') || 'Player').slice(0, 24);
+sessionStorage.setItem('dc_name', name);
 const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
 let me = null, S = null;
 
