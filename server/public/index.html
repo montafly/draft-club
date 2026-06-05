@@ -3,193 +3,207 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Draft Club</title>
 <style>
-  :root { --bg:#0d1419; --panel:#16212c; --line:#243240; --txt:#e7edf3; --mut:#8aa0b2; --acc:#27ae60; --gold:#e8c372; }
-  * { box-sizing:border-box; }
-  html,body { height:100%; }
-  body { margin:0; font:13px/1.4 system-ui,sans-serif; background:var(--bg); color:var(--txt); display:flex; flex-direction:column; }
-  header { display:flex; align-items:center; gap:12px; padding:9px 14px; background:var(--panel); border-bottom:1px solid var(--line); }
-  header h1 { font-size:15px; margin:0; } .sp{flex:1} .muted{color:var(--mut)}
-  .pill{background:#22303d;padding:3px 9px;border-radius:10px} .pill.me{background:var(--acc)}
-  .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
-  .btn.p{background:var(--acc);border-color:var(--acc)} .btn.r{background:#c0392b;border-color:#c0392b}
-  .btn:disabled{opacity:.4;cursor:default}
-  input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px}
-
-  /* верхняя полоса мест + вебки */
-  .seats{ display:flex; gap:8px; padding:8px 14px; background:#101a23; border-bottom:1px solid var(--line); overflow-x:auto; }
-  .seat{ min-width:128px; background:#1b2733; border:1px solid var(--line); border-radius:10px; padding:6px; text-align:center; }
-  .seat.act{ border-color:var(--acc); box-shadow:0 0 0 1px var(--acc) inset; }
-  .seat.me .nm{ color:var(--gold); }
-  .cam{ height:48px; border-radius:6px; background:#0a0f14; border:1px dashed #34495e; display:flex; align-items:center; justify-content:center; color:#5d7488; font-size:10px; margin-bottom:4px; }
-  .seat .nm{ font-weight:700; } .seat .b{ color:var(--gold); } .seat .st{ color:var(--mut); font-size:11px; }
-
-  .grid{ flex:1; display:grid; grid-template-columns:300px 1fr 330px; gap:10px; padding:10px; min-height:0; }
-  .col{ display:flex; flex-direction:column; gap:10px; min-height:0; overflow:auto; }
-  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; }
-  .card h3{ margin:0 0 8px; font-size:12px; color:var(--mut); text-transform:uppercase; letter-spacing:.04em; }
-  table{ width:100%; border-collapse:collapse; font-size:12px; } td,th{ padding:2px 5px; text-align:left; } th{color:var(--mut);font-weight:600}
-  .right{text-align:right}
-  .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
-  .clubs span{display:inline-block;background:#22303d;border-radius:6px;padding:2px 6px;margin:2px;font-size:11px}
-  .clubs span.full{background:#7b241c}
-  .lotname{font-size:20px;font-weight:800} .bid{font-size:24px;font-weight:800;color:var(--gold)}
-  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
-  .stub{color:var(--mut);font-style:italic}
-  .opp{border-left:3px solid #34495e;padding-left:6px;margin-bottom:8px} .opp.act{border-left-color:var(--acc)}
-  .err{color:#ec7063}
+  :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372;--miss:#ec7063}
+  *{box-sizing:border-box} html,body{height:100%} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt);display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;margin:0}.sp{flex:1}.mut{color:var(--mut)}
+  .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}
+  .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
+  input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px}
+  main{flex:1;overflow:auto;padding:12px}.wrap{max-width:1720px;margin:0 auto}
+  .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:230px;flex:none}
+  .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
+  .cam{height:48px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
+  .phead .nm{font-weight:800}
+  .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+  .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
+  .form{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.seg{font-size:11px;border-radius:5px;padding:1px 6px;font-weight:600}
+  .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#3a3320;color:var(--gold)}.seg.ok{background:#22303d}.needline{font-size:10px;color:var(--miss)}
+  table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
+  .pcol table{table-layout:fixed}.pcol td:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  thead th{color:var(--mut);font-weight:600;font-size:10px;border-bottom:1px solid var(--line)}
+  .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
+  .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}
+  .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
+  .lotcard{display:flex;gap:12px;align-items:center}
+  .card{width:84px;height:112px;border-radius:10px;padding:8px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f);position:relative;flex:none}
+  .card .pos{position:absolute;top:28px;left:9px;font-weight:800;font-size:11px}.card .ph{width:44px;height:44px;border-radius:50%;margin:18px auto 4px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center}
+  .card .nm{font-weight:800;font-size:12px;text-align:center}.card .cl{font-size:9px;text-align:center;opacity:.8}
+  .bid{font-size:22px;font-weight:800;color:var(--gold)}
+  .bids{margin-top:8px}.bids .b{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1d2935}
+  .st-high{color:var(--gold);font-weight:700}.st-act{color:var(--acc)}.st-pass{color:var(--mut)}.st-in{color:var(--txt)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1;min-width:110px}
+  .plist{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
+  .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
+  .err{color:var(--miss)}
   #hist{display:none;position:fixed;inset:0;background:#000a;padding:40px;overflow:auto;z-index:10}
 </style></head>
 <body>
 <header>
   <h1>Draft Club</h1>
-  <span id="who" class="pill"></span>
-  <span id="phase" class="pill"></span>
-  <span id="turn" class="pill"></span>
-  <span class="sp"></span>
-  <button class="btn" onclick="toggleHist()">История пиков</button>
-  <span id="err" class="err"></span>
+  <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
+  <span class="sp"></span><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
 </header>
-<div class="seats" id="seats"></div>
-<div class="grid">
-  <div class="col">
-    <div class="card" id="mysquad"></div>
-    <div class="card clubs" id="clubs"></div>
+<main><div class="wrap">
+  <div class="ribbon" id="ribbon"></div>
+  <div class="layout">
+    <div class="left">
+      <div class="cols" id="cols"></div>
+      <div id="bottom"></div>
+    </div>
+    <div class="right"><div class="clubs"><h3>Клубы · слоты (из 5)</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Коэф/xG/CS подключим из FanTeam отдельным шагом.</p></div></div>
   </div>
-  <div class="col">
-    <div class="card" id="center"></div>
-    <div class="card" id="odds"></div>
-  </div>
-  <div class="col">
-    <div class="card" id="opponents"></div>
-    <div class="card" id="schedule"></div>
-  </div>
-</div>
-<div id="hist"><div class="card" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
+</div></main>
+<div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
 <script>
-const name = (sessionStorage.getItem('dc_name') || prompt('Твоё имя:') || 'Player').slice(0,24);
-sessionStorage.setItem('dc_name', name);
-const ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null, S=null, POOL=[];
-
-ws.onopen = () => ws.send(JSON.stringify({type:'join',name}));
-ws.onmessage = (e) => { const m=JSON.parse(e.data);
-  if(m.type==='pool') POOL=m.units;
-  else if(m.type==='joined'){ me=m.you; document.getElementById('who').textContent = m.you?`${name} · место ${m.you}`:`${name} · зритель`; }
-  else if(m.type==='error') showErr(m.message);
-  else if(m.type==='state'){ S=m.state; render(); }
-};
-function send(o){ ws.send(JSON.stringify(o)); }
-function showErr(t){ const el=document.getElementById('err'); el.textContent=t; setTimeout(()=>{ if(el.textContent===t) el.textContent=''; },4000); }
-const fmt = c => `1-${c.DEF}-${c.MID}-${c.FWD}${c.COACH?' +тр':''}`;
+const LIM={GK:[1,1],DEF:[3,5],MID:[3,5],FWD:[1,3],COACH:[1,1]};
+const POSORD=['GK','DEF','MID','FWD','COACH'];
+const posShort=p=>p==='COACH'?'TR':p;
+const name=(sessionStorage.getItem('dc_name')||prompt('Твоё имя:')||'Player').slice(0,24);
+sessionStorage.setItem('dc_name',name);
+const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+let me=null,S=null,POOL=[];
+ws.onopen=()=>ws.send(JSON.stringify({type:'join',name}));
+ws.onmessage=e=>{const m=JSON.parse(e.data);
+  if(m.type==='pool')POOL=m.units;
+  else if(m.type==='joined'){me=m.you;document.getElementById('who').textContent=m.you?`${name} · место ${m.you}`:`${name} · зритель`;}
+  else if(m.type==='error')showErr(m.message);
+  else if(m.type==='state'){S=m.state;render();}};
+function send(o){ws.send(JSON.stringify(o));}
+function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
+function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
+function formBlock(c){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const cls=(c[k]||0)<mn?'need':(c[k]||0)>=mx?'full':'ok';return `<span class="seg ${cls}">${posShort(k)} ${c[k]||0}</span>`;}).join('');
+  const needs=POSORD.filter(k=>(c[k]||0)<LIM[k][0]).map(k=>`${LIM[k][0]-(c[k]||0)} ${posShort(k)}`);
+  return `<div class="form">${seg}${needs.length?`<span class="needline">нужно: +${needs.join(', +')}</span>`:'<span class="needline" style="color:var(--acc)">минимумы собраны</span>'}</div>`;}
 
 function render(){
-  const d = S.draft;
-  document.getElementById('phase').textContent = S.started ? 'фаза: '+d.phase : 'лобби';
-  const t = document.getElementById('turn');
-  if(S.started && d.actor){ const an=d.managers.find(x=>x.id===d.actor)?.name; t.textContent='ход: '+an; t.className='pill'+(d.actor===me?' me':''); }
-  else t.textContent='';
-  renderSeats(); renderMySquad(); renderClubs(); renderCenter(); renderOpponents(); renderOdds(); renderSchedule();
-  if(document.getElementById('hist').style.display==='block') renderHist();
-}
-
-function ordered(){ const d=S.draft; const by=new Map(d.managers.map(m=>[m.id,m])); return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean); }
-
-function renderSeats(){
-  const el=document.getElementById('seats');
-  if(!S.started){
-    el.innerHTML = S.lobby.seats.map(s=>`<div class="seat ${s.id===me?'me':''}"><div class="cam">камера</div><div class="nm">${s.name}</div><div class="st">${s.ready?'✓ готов':'…'}</div></div>`).join('') || '<span class="muted">ждём игроков…</span>';
-    return;
-  }
   const d=S.draft;
-  el.innerHTML = ordered().map(m=>`<div class="seat ${m.id===d.actor?'act':''} ${m.id===me?'me':''}">
-    <div class="cam">камера</div><div class="nm">${m.name}${m.finished?' ✓':''}</div>
-    <div class="b">$${m.budget}</div><div class="st">${fmt(m.counts)} · ${m.size}/12</div></div>`).join('');
+  document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
+  const t=document.getElementById('turn');
+  if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
+  renderRibbon();renderCols();renderBottom();renderClubs();
+  if(document.getElementById('hist').style.display==='block')renderHist();
 }
-
-function renderMySquad(){
-  const el=document.getElementById('mysquad');
+function renderRibbon(){
+  const el=document.getElementById('ribbon');
+  if(!S.started){el.innerHTML=S.lobby.seats.map(s=>`<div class="chip ${s.id===me?'me':''}"><b>${s.name}</b> · ${s.ready?'✓ готов':'…'}</div>`).join('')||'<span class="mut">ждём игроков…</span>';return;}
   const d=S.draft;
-  const m = S.started ? d.managers.find(x=>x.id===me) : null;
-  if(!m){ el.innerHTML='<h3>Твой состав</h3><span class="muted">появится после старта</span>'; return; }
-  el.innerHTML = `<h3>Твой состав · ${m.name}</h3>
-    <div class="muted">бюджет <b style="color:var(--gold)">$${m.budget}</b> · макс.бид <b>$${m.maxBid}</b> · ${fmt(m.counts)} · ${m.size}/12${m.substitute?'<br>замена: '+m.substitute.name:''}</div>
-    <table style="margin-top:6px">${m.roster.map(u=>`<tr><td class="${u.position.toLowerCase()}">${u.position}</td><td>${u.name}</td><td>${u.club}</td><td class="right">${u.price??''}</td></tr>`).join('')}</table>`;
+  el.innerHTML=ordered().map(m=>`<div class="chip ${m.id===d.actor?'act':''} ${m.id===me?'me':''}"><b>${m.name}</b>${m.finished?' ✓':''} · ${m.size}/12 · <span class="b">$${m.budget}</span>${m.id===d.actor?' · ход':''}</div>`).join('');
 }
-
+function renderCols(){
+  const el=document.getElementById('cols');
+  if(!S.started){el.innerHTML='<div class="pcol mut">Составы появятся после старта.</div>';return;}
+  const d=S.draft;
+  el.innerHTML=ordered().map(m=>`
+    <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''}">
+      <div class="cam">камера</div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}${m.finished?' ✓':''}</span></div>
+      <div class="stats">
+        <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
+        <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
+        <div class="sb"><div class="lbl">Пики</div><div class="val">${m.size}/12</div></div>
+      </div>
+      ${formBlock(m.counts)}
+      <table><thead><tr><th style="width:18px">#</th><th style="width:28px">POS</th><th>PLAYER</th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th></tr></thead>
+      <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.name}</td><td>${u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
+      ${m.substitute?`<tr><td colspan="5" style="border-top:2px dashed #34495e;color:var(--mut)"><span style="background:#3a2d52;border-radius:5px;padding:0 5px;font-size:10px">SUB</span> ${posShort(m.substitute.position)} ${m.substitute.name} · ${m.substitute.club}</td></tr>`:''}</tbody></table>
+    </div>`).join('');
+}
 function renderClubs(){
   const el=document.getElementById('clubs');
-  if(!S.started){ el.innerHTML='<h3>Доступно по клубам</h3><span class="muted">—</span>'; return; }
-  const cc=S.draft.clubCounts||{}; const clubs=[...new Set(POOL.map(u=>u.club))].sort();
-  el.innerHTML='<h3>Доступно по клубам (из 5)</h3>'+clubs.map(c=>{const left=5-(cc[c]||0);return `<span class="${left<=0?'full':''}">${c} ${left}</span>`;}).join('');
+  if(!S.started){el.innerHTML='<span class="mut">—</span>';return;}
+  const cc=S.draft.clubCounts||{};const clubs=[...new Set(POOL.map(u=>u.club))].sort();
+  el.innerHTML='<table>'+clubs.map(c=>{const left=5-(cc[c]||0);return `<tr class="${left<=0?'full':''}"><td>${c}</td><td class="right">${left}</td></tr>`;}).join('')+'</table>';
 }
 
-function renderCenter(){
-  const el=document.getElementById('center'); const d=S.draft;
+function renderBottom(){
+  const el=document.getElementById('bottom');const d=S.draft;
   if(!S.started){
-    const myseat=S.lobby.seats.find(s=>s.id===me);
-    el.innerHTML=`<h3>Лобби</h3><p class="muted">Все заходят, жмут «Готов», затем «Старт» (жеребьёвка очереди — автоматически).</p>`+
-      (me?`<div class="actions"><button class="btn" onclick='send({type:"ready",ready:${!(myseat&&myseat.ready)}})'>${myseat&&myseat.ready?'Не готов':'Готов'}</button>
-        <button class="btn p" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт</button></div>`:'<p class="muted">Ты зритель</p>');
+    const ms=S.lobby.seats.find(s=>s.id===me);
+    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Старт».</p>`+
+      (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
+      <button class="btn p" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт</button>`:'<span class="mut">Ты зритель</span>')+`</div>`;
     return;
   }
-  if(d.phase==='done'){ el.innerHTML='<h3>Аукцион</h3><b>Драфт завершён.</b><p class="muted">Очки посчитаются по итогам матчей.</p>'; return; }
-  let h='<h3>На торгах</h3>';
-  if(d.lot){ const u=d.lot.unit; const hb=d.managers.find(m=>m.id===d.lot.highBidder)?.name;
-    h+=`<div class="lotname"><span class="${u.position.toLowerCase()}">●</span> ${u.name}</div>
-        <div class="muted">${u.position} · ${u.club}</div>
-        <div class="bid">$${d.lot.highBid}</div><div class="muted">лидирует: ${hb}</div>`;
-  } else h+='<div class="muted">ожидается номинация</div>';
-  h+=renderActions(d);
-  el.innerHTML=h;
+  if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки посчитаются по итогам матчей.</div>';return;}
+  // лот + ставки
+  let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
+  if(d.lot){const u=d.lot.unit;const hb=d.managers.find(m=>m.id===d.lot.highBidder)?.name;
+    lotH+=`<div class="lotcard"><div class="card"><div class="pos">${posShort(u.position)}</div><div class="ph">⚽</div><div class="nm">${u.name}</div><div class="cl">${u.club}</div></div>
+      <div><div class="bid">$${d.lot.highBid}</div><div class="mut">лидирует ${hb}</div>${actionBox(d)}</div></div>
+      <div class="bids">${ordered().map(m=>{let s,c;
+        if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
+        else if((d.lot.passed||[]).includes(m.id)){s='выбыл';c='st-pass';}
+        else if(m.id===d.actor){s='ходит';c='st-act';}
+        else if(m.finished){s='—';c='st-pass';}
+        else {s='в торгах';c='st-in';}
+        return `<div class="b"><span>${m.name}</span><span class="${c}">${s}</span></div>`;}).join('')}</div>`;
+  } else if(d.phase==='substitutes') lotH+='<span class="mut">Каждый участник по очереди (по порядку завершения) выбирает замену.</span>';
+  else lotH+='<div class="mut">ожидается номинация</div>'+actionBox(d);
+  lotH+='</div>';
+  let nomH='<div class="panel">'+nomPanel(d)+'</div>';
+  el.innerHTML='<div class="bottom">'+lotH+nomH+'</div>';
+  if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub');
 }
-
-function renderActions(d){
-  if(d.actor!==me) return `<div class="muted" style="margin-top:10px">Ход игрока: <b>${d.managers.find(m=>m.id===d.actor)?.name}</b></div>`;
+function actionBox(d){
+  if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
+  return `<div style="margin-top:8px"><button class="btn r" onclick='send({type:"pass"})'>FOLD</button>
+    <input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:58px">
+    <button class="btn p" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button></div>`;
+}
+function nomPanel(d){
+  const mine=d.actor===me;
   if(d.phase==='nominating'){
-    return `<div class="actions"><b>Твой ход — выставить игрока:</b><br>
-      <select id="nomU">${o.units.map(u=>`<option value="${u.id}">${u.name} · ${u.club} · ${u.position}</option>`).join('')}</select>
-      старт <input id="nomB" type="number" min="1" max="${o.maxOpen}" value="1" style="width:64px"> (макс ${o.maxOpen})
-      <button class="btn p" onclick='send({type:"nominate",unitId:+nomU.value,openingBid:+nomB.value})'>Выставить</button></div>`;
-  }
-  if(d.phase==='bidding'){
-    return `<div class="actions"><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:64px">
-      <button class="btn p" onclick='send({type:"bid",amount:+bidA.value})' ${o.canBid?'':'disabled'}>Поднять (мин ${o.minAmount})</button>
-      <button class="btn r" onclick='send({type:"pass"})'>Пас</button></div>`;
+    if(!mine)return `<h3>Выставление</h3><span class="mut">Сейчас выставляет ${d.managers.find(m=>m.id===d.actor)?.name}.</span>`;
+    return `<h3>Выставить игрока на торги</h3>`+filterUI('nominate');
   }
   if(d.phase==='substitutes'){
-    return `<div class="actions"><b>Выбери замену:</b>
-      <select id="subU">${o.units.map(u=>`<option value="${u.id}">${u.name} · ${u.club} · ${u.position}</option>`).join('')}</select>
-      <button class="btn p" onclick='send({type:"pickSubstitute",unitId:+subU.value})'>Взять замену</button></div>`;
+    if(!mine)return `<h3>Замены</h3><span class="mut">Замену выбирает ${d.managers.find(m=>m.id===d.actor)?.name}.</span>`;
+    return `<h3>Выбрать замену</h3>`+filterUI('sub');
   }
+  if(d.phase==='bidding')return `<h3>Идут торги</h3><span class="mut">Реагируй слева: RAISE или FOLD.</span>`;
   return '';
 }
-
-function renderOpponents(){
-  const el=document.getElementById('opponents');
-  if(!S.started){ el.innerHTML='<h3>Соперники</h3><span class="muted">—</span>'; return; }
-  const d=S.draft;
-  const opps=ordered().filter(m=>m.id!==me);
-  el.innerHTML='<h3>Соперники</h3>'+opps.map(m=>`<div class="opp ${m.id===d.actor?'act':''}">
-    <b>${m.name}</b> ${m.finished?'✓':''} · $${m.budget} · ${fmt(m.counts)} · ${m.size}/12${m.substitute?' · зам '+m.substitute.name:''}
-    <table>${m.roster.map(u=>`<tr><td class="${u.position.toLowerCase()}">${u.position}</td><td>${u.name}</td><td>${u.club}</td><td class="right">${u.price??''}</td></tr>`).join('')}</table>
-  </div>`).join('');
+function filterUI(mode){
+  const units=S.draft.actorOptions.units||[];
+  const teams=[...new Set(units.map(u=>u.club))].sort();
+  const poss=[...new Set(units.map(u=>u.position))];
+  return `<div class="filters">
+    <input id="fq" placeholder="поиск по фамилии…" oninput="renderNom('${mode}')">
+    <select id="ft" onchange="renderNom('${mode}')"><option value="">все клубы</option>${teams.map(t=>`<option>${t}</option>`).join('')}</select>
+    <select id="fp" onchange="renderNom('${mode}')"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}">${posShort(p)}</option>`).join('')}</select>
+  </div><div class="plist" id="plist"></div><div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`;
 }
-
-function renderOdds(){
-  document.getElementById('odds').innerHTML='<h3>Коэффициенты · xG · клиншит</h3><p class="stub">Заглушка. Подключим из FanTeam (odds + expectedGoals → win%, CS% по Пуассону) на data-шаге — будет опорой для пика.</p>';
+function renderNom(mode){
+  const units=S.draft.actorOptions.units||[];
+  const q=(document.getElementById('fq')?.value||'').toLowerCase();
+  const t=document.getElementById('ft')?.value||'';const p=document.getElementById('fp')?.value||'';
+  const list=units.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
+  const el=document.getElementById('plist');if(!el)return;
+  el.innerHTML=list.slice(0,80).map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.name} · ${u.club}</div>`).join('')||'<div class="pitem mut">ничего не найдено</div>';
 }
-function renderSchedule(){
-  document.getElementById('schedule').innerHTML='<h3>Расписание тура</h3><p class="stub">Заглушка. Подтянем матчи тура (команды + время) из того же API.</p>';
+let selId=null;
+function selectPlayer(id,mode){
+  selId=id;const u=(S.draft.actorOptions.units||[]).find(x=>x.id===id);const sel=document.getElementById('sel');
+  if(mode==='nominate'){
+    const mx=S.draft.actorOptions.maxOpen;
+    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
+      <button class="btn p" onclick='send({type:"nominate",unitId:${id},openingBid:+document.getElementById("open").value})'>Подтвердить выставление</button>`;
+  }else{
+    sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club}
+      <button class="btn p" onclick='send({type:"pickSubstitute",unitId:${id}})'>Подтвердить замену</button>`;
+  }
 }
-
-function toggleHist(){ const el=document.getElementById('hist'); const open=el.style.display==='none'||!el.style.display; el.style.display=open?'block':'none'; if(open) renderHist(); }
-function renderHist(){
-  const b=document.getElementById('histBody');
-  if(!S||!S.started){ b.innerHTML='<p>Драфт не начат</p>'; return; }
-  const p=S.draft.picks||[];
-  b.innerHTML = p.length ? '<table>'+p.map(x=>`<tr><td>${x.sub?'зам':'#'+x.no}</td><td class="${x.position.toLowerCase()}">${x.position}</td><td>${x.unitName}</td><td>${x.club}</td><td>→ ${x.winnerName}</td><td class="right">${x.price}</td></tr>`).join('')+'</table>' : '<p>Пока пусто</p>';
-}
+function toggleHist(){const el=document.getElementById('hist');const open=el.style.display==='none'||!el.style.display;el.style.display=open?'block':'none';if(open)renderHist();}
+function renderHist(){const b=document.getElementById('histBody');if(!S||!S.started){b.innerHTML='<p>Драфт не начат</p>';return;}
+  const p=S.draft.picks||[];b.innerHTML=p.length?'<table>'+p.map(x=>`<tr><td>${x.sub?'зам':'#'+x.no}</td><td class="${x.position.toLowerCase()}">${posShort(x.position)}</td><td>${x.unitName}</td><td>${x.club}</td><td>→ ${x.winnerName}</td><td class="right">$${x.price}</td></tr>`).join('')+'</table>':'<p>Пока пусто</p>';}
 </script>
 </body></html>
