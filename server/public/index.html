@@ -117,7 +117,7 @@ async function onAuthed(){
 }
 async function doRegister(){const email=document.getElementById('aemail').value.trim(),pass=document.getElementById('apass').value;
   if(!email||!pass){document.getElementById('amsg').textContent='введи email и пароль';return;}
-  const {error}=await sb.auth.signUp({email,password:pass}); document.getElementById('amsg').textContent=error?error.message:'Регистрация создана. Проверь почту, подтверди — затем войди.';}
+  const {error}=await sb.auth.signUp({email,password:pass,options:{emailRedirectTo:location.origin+'/'}}); document.getElementById('amsg').textContent=error?error.message:'Регистрация создана. Проверь почту, подтверди — затем войди.';}
 async function doLogin(){const email=document.getElementById('aemail').value.trim(),pass=document.getElementById('apass').value;
   const {error}=await sb.auth.signInWithPassword({email,password:pass}); if(error) document.getElementById('amsg').textContent=error.message;}
 async function doLogout(){await sb.auth.signOut(); location.href='/';}
