@@ -301,6 +301,7 @@ def build_pool(season_id: int, rnd: int, out: str = "server/pool.json"):
     POSMAP = {"goalkeeper": "GK", "defender": "DEF", "midfielder": "MID", "forward": "FWD"}
     d = fetch(f"real_matches?season_id={season_id}&round={rnd}")
     teams = {t["id"]: t.get("name", str(t["id"])) for t in d.get("realTeams", [])}
+    abbrs = {t["id"]: (t.get("abbr") or str(t.get("name", ""))[:3].upper()) for t in d.get("realTeams", [])}
     units, seen = [], set()
     # игроки — из составов всех матчей тура
     for m in d.get("realMatches", []):
@@ -315,10 +316,11 @@ def build_pool(season_id: int, rnd: int, out: str = "server/pool.json"):
             seen.add(pid)
             p = mem.get("realPlayer", {}) or {}
             nm = p.get("lastName") or p.get("firstName") or str(pid)
-            units.append({"id": pid, "name": nm, "club": teams.get(mem["realTeamId"], str(mem["realTeamId"])), "position": pos})
+            tid = mem["realTeamId"]
+            units.append({"id": pid, "name": nm, "club": teams.get(tid, str(tid)), "code": abbrs.get(tid, ""), "position": pos})
     # тренеры — по одному на клуб (ручной справочник; имя клуба пока заглушка)
     for tid, tname in teams.items():
-        units.append({"id": -int(tid), "name": f"Coach {tname}", "club": tname, "position": "COACH"})
+        units.append({"id": -int(tid), "name": f"Coach {tname}", "club": tname, "code": abbrs.get(tid, ""), "position": "COACH"})
     # коэффициенты по клубам
     clubodds = []
     for m in d.get("realMatches", []):

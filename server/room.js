@@ -105,8 +105,8 @@ export class Room {
           id: m.id, name: m.name, budget: m.budget, maxBid: d.managerMaxBid(m.id),
           finished: m.finished, finishOrder: m.finishOrder, size: m.roster.length,
           counts: countPos(m.roster),
-          roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, position: u.position, price: u.price })),
-          substitute: m.substitute && { name: m.substitute.name, club: m.substitute.club, position: m.substitute.position },
+          roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, code: u.code, position: u.position, price: u.price })),
+          substitute: m.substitute && { name: m.substitute.name, club: m.substitute.club, code: m.substitute.code, position: m.substitute.position },
         })),
       },
     };
