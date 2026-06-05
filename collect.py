@@ -210,19 +210,59 @@ def collect_round(season_id: int, rnd: int, only_active: bool = False):
     print(f"season {season_id} round {rnd}: матчей записано {len(mrows)}, строк игроков {total}")
 
 
+def collect_match(match_id: int):
+    """Собрать один матч по его detail (для дотягивания поздней валидации)."""
+    detail = fetch(f"real_matches/{match_id}")
+    rm = detail.get("realMatch") or {}
+    if not rm:
+        return 0
+    teams = {t["id"]: t.get("name", t["id"]) for t in detail.get("realTeams", [])}
+    ids = (rm.get("realTeamIds") or [None, None])[:2]
+    sc = (rm.get("score") or [None, None])[:2]
+    now = datetime.now(timezone.utc).isoformat()
+    db.upsert("dc_matches", [{
+        "match_id": rm.get("id", match_id), "season_id": rm.get("seasonId"),
+        "round": rm.get("gameweek"), "home_team_id": ids[0], "away_team_id": ids[1],
+        "home_team": teams.get(ids[0]), "away_team": teams.get(ids[1]),
+        "start_time": rm.get("startTime"), "status": rm.get("status"),
+        "score_home": sc[0], "score_away": sc[1], "updated_at": now,
+    }], on_conflict="match_id")
+    prows = player_rows(match_id, rm.get("status"), detail, now)
+    db.upsert("dc_player_match", prows, on_conflict="match_id,player_id")
+    return len(prows)
+
+
 def collect_auto(season_ids: list[int], window_hours: int = 6):
-    """Авто-режим для cron: по каждому сезону берём матчи, начавшиеся за последние
-    window_hours и ещё не завалидированные (status != confirmed), и пишем их.
-    Будущие (pending, ещё не начались) и уже финальные (confirmed) пропускаем."""
+    """Авто-режим для cron:
+    1) дотягивает незавершённые матчи из БД (ловит позднюю валидацию вне окна);
+    2) находит активные по сезонам (status=live всегда + pending около старта).
+    confirmed/cancelled пропускаем."""
     now = datetime.now(timezone.utc)
     lo, hi = now - timedelta(hours=window_hours), now + timedelta(minutes=5)
     iso = now.isoformat()
+    # 1) перепроверка незавершённых из нашей БД
+    try:
+        pend = db.select("dc_matches", "select=match_id&and=(status.neq.confirmed,status.neq.cancelled)&limit=200")
+        for r in pend:
+            try:
+                collect_match(r["match_id"])
+            except Exception as e:
+                print(f"recheck {r['match_id']}: {e}")
+        if pend:
+            print(f"перепроверено незавершённых из БД: {len(pend)}")
+    except Exception as e:
+        print("recheck error:", e)
+    # 2) обнаружение активных по сезонам
     for sid in season_ids:
         d = fetch(f"real_matches?season_id={sid}")
         teams = {t["id"]: t.get("name", t["id"]) for t in d.get("realTeams", [])}
         active = []
         for m in d.get("realMatches", []):
-            if m.get("status") == "confirmed":
+            stx = m.get("status")
+            if stx in ("confirmed", "cancelled"):
+                continue
+            if stx == "live":
+                active.append(m)
                 continue
             st = m.get("startTime")
             try:

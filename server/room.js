@@ -40,7 +40,7 @@ export class Room {
     if (!this.startable()) throw new Error('start: не все готовы / мало игроков');
     const players = this.seats.map((s) => ({ id: s.id, name: s.name }));
     const order = players.map((p) => p.id).sort(() => Math.random() - 0.5); // жеребьёвка
-    this.draft = new Draft(this.pool, players, order, this.config);
+    this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now });
     this.draft.start();
   }
 

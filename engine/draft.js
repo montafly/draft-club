@@ -10,8 +10,9 @@ export class Draft {
    * @param {Array<number>} order  порядок (массив id участников) — жеребьёвка снаружи
    * @param {object} config
    */
-  constructor(units, players, order, config = DEFAULT_CONFIG) {
+  constructor(units, players, order, config = DEFAULT_CONFIG, opts = {}) {
     this.config = config;
+    this.now = opts.now || (() => 0);   // инъекция времени (сервер: Date.now; тесты: 0)
     this.units = new Map(units.map((u) => [u.id, u]));
     this.taken = new Set();
     this.clubCounts = {};
@@ -85,7 +86,8 @@ export class Draft {
     if (openingBid > maxBid(m, this.config)) throw new Error('nominate: ставка > макс. бида');
 
     this.lot = { unit, highBid: openingBid, highBidder: managerId, passed: new Set(),
-                 lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo };
+                 lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo,
+                 startAt: this.now(), bids: 1 };
     this.phase = 'bidding';
     this.log.push(`NOMINATE ${m.name} -> ${unit.name} @${openingBid}`);
     this._advance();
@@ -104,6 +106,7 @@ export class Draft {
     lot.highBid = amount;
     lot.highBidder = managerId;
     lot.lastIdx = this.orderIdx.get(managerId);
+    lot.bids++;
     this.log.push(`BID ${m.name} @${amount}`);
     this._advance();
     return this.state();
@@ -152,7 +155,8 @@ export class Draft {
     w.roster.push({ ...lot.unit, price: lot.highBid });
     this.picks.push({ no: lot.no, unitName: lot.unit.name, club: lot.unit.club,
                       position: lot.unit.position, price: lot.highBid,
-                      winnerId: w.id, winnerName: w.name });
+                      winnerId: w.id, winnerName: w.name,
+                      bids: lot.bids, durationMs: this.now() - lot.startAt });
     this.taken.add(lot.unit.id);
     this.clubCounts[lot.unit.club] = (this.clubCounts[lot.unit.club] || 0) + 1;
     this.log.push(`WIN ${w.name} <- ${lot.unit.name} @${lot.highBid} (budget ${w.budget})`);
