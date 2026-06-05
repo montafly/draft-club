@@ -17,10 +17,15 @@ import json
 import math
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import db
+
+REQUEST_DELAY = 0.5   # пауза между запросами к FanTeam (вежливый троттлинг)
+MAX_RETRIES = 6       # ретраи на 429 с нарастающим бэкоффом
 
 API = "https://fanteam-game.api.scoutgg.net"
 HEADERS = {
@@ -35,9 +40,23 @@ HEADERS = {
 
 
 def fetch(path: str) -> dict:
-    req = urllib.request.Request(f"{API}/{path}", headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read().decode("utf-8"))
+    url = f"{API}/{path}"
+    for attempt in range(MAX_RETRIES):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            if REQUEST_DELAY:
+                time.sleep(REQUEST_DELAY)
+            return data
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < MAX_RETRIES - 1:
+                wait = 5 * (attempt + 1)  # 5,10,15,20,25с
+                print(f"  429, жду {wait}с и повторяю...")
+                time.sleep(wait)
+                continue
+            raise
+    raise RuntimeError("unreachable")
 
 
 def compute_points(s: dict, pos: str) -> float:
@@ -236,10 +255,24 @@ def collect_auto(season_ids: list[int], window_hours: int = 6):
         print(f"season {sid}: активных матчей {len(active)}, строк игроков {total}")
 
 
+def collect_season(season_id: int, r1: int = 1, r2: int = 38):
+    """Бэкфилл всего сезона: туры r1..r2 последовательно с троттлингом."""
+    for rnd in range(r1, r2 + 1):
+        try:
+            collect_round(season_id, rnd)
+        except Exception as e:
+            print(f"round {rnd}: ОШИБКА {e}")
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     if not args:
         validate()
+    elif args[0] == "season":
+        sid = int(args[1])
+        r1 = int(args[2]) if len(args) > 2 else 1
+        r2 = int(args[3]) if len(args) > 3 else 38
+        collect_season(sid, r1, r2)
     elif args[0] == "match":
         print_match(int(args[1]))
     elif args[0] == "round":
