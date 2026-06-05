@@ -21,13 +21,13 @@ export class Room {
     this.draft = null;
   }
 
-  join(name) {
-    // переподключение по имени
-    const existing = this.seats.find((s) => s.name === name);
-    if (existing) { existing.connected = true; return existing.id; }
+  join(userId, name) {
+    // переподключение по аккаунту (userId)
+    const existing = this.seats.find((s) => s.userId === userId);
+    if (existing) { existing.connected = true; existing.name = name; return existing.id; }
     if (this.seats.length >= this.maxSeats) return null; // спектатор
     const id = this.seats.length + 1;
-    this.seats.push({ id, name, ready: false, connected: true });
+    this.seats.push({ id, userId, name, ready: false, connected: true });
     return id;
   }
 
