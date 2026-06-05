@@ -3,60 +3,68 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Макет: итоговая картинка</title>
 <style>
-  :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372}
+  :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372;--miss:#ec7063}
   *{box-sizing:border-box} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt)}
   header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0}.mut{color:var(--mut)}.sp{flex:1}
-  main{padding:14px;max-width:1320px;margin:0 auto}
+  main{padding:14px;max-width:1440px;margin:0 auto}
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  .place{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px}
-  .place b{font-size:15px}.place.first{border-color:var(--gold)}
-  .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
-  .pcol{min-width:236px;flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .place{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px}.place b{font-size:15px}.place.first{border-color:var(--gold)}
+  .layout{display:flex;gap:10px;align-items:flex-start}
+  .left{flex:1;min-width:0}.right{width:288px;flex:none}
+  .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .pcol{flex:1;min-width:198px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.first{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
-  .cam{height:58px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
-  .phead{display:flex;align-items:baseline;justify-content:space-between}.phead .nm{font-weight:800}.phead .tot{font-size:20px;font-weight:800;color:var(--gold)}
-  .sub-mut{color:var(--mut);font-size:11px;margin:2px 0 6px}
-  table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}th{color:var(--mut);font-weight:600}
+  .cam{height:54px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
+  .phead{display:flex;align-items:baseline;justify-content:space-between}.phead .nm{font-weight:800}.phead .tot{font-size:19px;font-weight:800;color:var(--gold)}
+  .subhead{color:var(--mut);font-size:11px;margin:2px 0 6px}
+  table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
+  thead th{color:var(--mut);font-weight:600;font-size:10px;letter-spacing:.03em;border-bottom:1px solid var(--line)}
   .right{text-align:right}
   .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
+  tr.dnp{color:var(--miss)} tr.dnp .skip{font-size:9px;background:#5b1f1a;color:#ffd;border-radius:4px;padding:0 4px;margin-left:3px}
+  tr.up{color:#5d7488}
   .totrow td{border-top:1px solid var(--line);font-weight:700}
   .subsep{border:0;border-top:2px dashed #34495e;margin:6px 0}
-  .subrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:2px 4px;border-radius:6px}
-  .subrow.on{background:#1d3a28;border:1px solid var(--acc)} .subrow.off{color:var(--mut)}
-  .tag{font-size:10px;background:#22303d;border-radius:5px;padding:1px 5px;margin-right:4px}
-  .tag.sub{background:#3a2d52}.tag.on{background:var(--acc);color:#06210f}
-  .clubs{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
-  .clubs h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
-  .clubs table{font-size:12px}.clubs th{cursor:pointer;user-select:none}.clubs th:hover{color:var(--txt)}
-  .clubs tr.full{opacity:.45;text-decoration:line-through}
-  .bar{height:6px;background:#0a0f14;border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}
+  .subrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 4px;border-radius:6px}
+  .subrow.on{background:#1d3a28;border:1px solid var(--acc)}.subrow.off{color:var(--mut)}
+  .tag{font-size:10px;background:#22303d;border-radius:5px;padding:1px 5px;margin-right:4px}.tag.sub{background:#3a2d52}.tag.on{background:var(--acc);color:#06210f}
+  .bids{margin-top:10px;border:1px dashed #34495e;border-radius:10px;padding:8px;color:var(--mut);font-size:12px}
+  .clubs{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .clubs th{cursor:pointer;user-select:none}.clubs tr.full{opacity:.4;text-decoration:line-through}
   a{color:var(--acc)}
 </style></head>
 <body>
-<header><h1>Draft Club <span class="mut">— макет «итоговая картинка»</span></h1><span class="mut">GW38 · все матчи сыграны</span><span class="sp"></span><a href="index.html">← к макетам</a></header>
+<header><h1>Draft Club <span class="mut">— макет «итоговая картинка»</span></h1><span class="mut">GW38</span><span class="sp"></span><a href="index.html">← к макетам</a></header>
 <main>
   <div class="ribbon" id="ribbon"></div>
-  <div class="cols" id="cols"></div>
-  <div class="clubs">
-    <h3>Команды · коэффициенты · xG · клиншит · слоты (лимит 5) — таблица-опора драфта</h3>
-    <table id="ctab"><thead><tr>
-      <th data-k="club">Клуб</th><th data-k="win" class="right">П-победы</th><th class="right">шкала</th>
-      <th data-k="xg" class="right">xG ▼</th><th data-k="cs" class="right">CS%</th><th data-k="left" class="right">слотов</th>
-    </tr></thead><tbody></tbody></table>
-    <p class="mut" style="margin:8px 0 0">Сорт по умолчанию — xG ↓ (клик по заголовку меняет). Исчерпанные клубы (0 слотов) — серым/зачёркнуты: брать нельзя.</p>
+  <div class="layout">
+    <div class="left">
+      <div class="cols" id="cols"></div>
+      <div class="bids">Здесь в режиме <b>драфта</b> — блок ставок (RAISE / FOLD / сумма). В итоговой картинке не нужен; нужность в процессе торгов уточним.</div>
+    </div>
+    <div class="right">
+      <div class="clubs">
+        <h3>Команды · коэф · xG · CS · слоты</h3>
+        <table id="ctab"><thead><tr>
+          <th data-k="club">КЛУБ</th><th data-k="win" class="right">П%</th><th data-k="xg" class="right">xG ▼</th><th data-k="cs" class="right">CS%</th><th data-k="left" class="right">СЛОТ</th>
+        </tr></thead><tbody></tbody></table>
+        <p class="mut" style="margin:8px 0 0;font-size:11px">Сорт по xG ↓ (клик по заголовку меняет). Исчерпанные клубы (0) — серым/зачёркнуты.</p>
+      </div>
+    </div>
   </div>
-  <p class="mut" style="text-align:center">Заглушки данных. Камеры — плейсхолдеры. Под каждым игроком — его состав+очки; замена под чертой; кто сыграл — учтён.</p>
+  <p class="mut" style="text-align:center;margin-top:12px">Заглушки. <b style="color:var(--miss)">Красным</b> — пропуск (матч прошёл, игрок не вышел). <span style="color:#5d7488">Серым</span> — матч ещё не сыгран (осталось сыграть).</p>
 </main>
 <script>
-// --- данные-заглушки ---
-const P = (pos,name,club,price,pts,played=true)=>({pos,name,club,price,pts,played});
+// st: 'p' сыграл · 'dnp' пропуск (матч прошёл, не вышел) · 'up' матч ещё не сыгран
+const P=(pos,name,club,price,pts,st='p')=>({pos,name,club,price,pts,st});
 const players=[
-  {name:'Bob',squad:[P('GK','Sels','NFO',3,6),P('DEF','Gabriel','ARS',8,9),P('DEF','Saliba','ARS',7,7),P('DEF','Mukiele','SUN',2,1,false),P('MID','Palmer','CHE',19,14),P('MID','Mbeumo','MUN',9,12),P('MID','Rogers','AVL',6,8),P('MID','Sarr','CRY',5,6),P('MID','Anthony','BUR',4,2,false),P('FWD','Isak','NEW',18,16),P('FWD','Wood','NFO',7,9),P('COA','Coach LIV','LIV',4,12)],sub:P('DEF','Andersen','FUL',0,7),subOn:true},
-  {name:'Carol',squad:[P('GK','Vicario','TOT',5,8),P('DEF','Gabriel M','MCI',9,6),P('DEF','Konsa','AVL',5,7),P('DEF','Dorgu','MUN',4,4),P('DEF','Mings','AVL',6,9),P('MID','Saka','ARS',16,11),P('MID','Eze','CRY',8,7),P('MID','Gakpo','LIV',9,10),P('FWD','Mateta','CRY',11,8),P('FWD','Watkins','AVL',12,9),P('COA','Coach MCI','MCI',5,14),P('GK','—','—',0,0)].slice(0,12),sub:P('MID','Kluivert','BOU',0,5),subOn:false},
-  {name:'Alice (ты)',squad:[P('GK','Henderson','NFO',3,2,false),P('DEF','Walker','MCI',9,6),P('DEF','van Dijk','LIV',12,9),P('DEF','Burn','NEW',5,7),P('MID','Saka','ARS',14,10),P('MID','Szoboszlai','LIV',13,12),P('MID','Gravenberch','LIV',7,8),P('FWD','Isak','NEW',11,5,false),P('FWD','Cunha','MUN',9,7),P('FWD','Jackson','CHE',8,6),P('MID','Rice','ARS',10,6),P('COA','Coach ARS','ARS',1,9)],sub:P('GK','Pickford','EVE',0,8),subOn:true},
-  {name:'Dave',squad:[P('GK','Raya','ARS',6,9),P('DEF','White','ARS',5,5),P('DEF','Trippier','NEW',6,6),P('DEF','Robertson','LIV',7,7),P('MID','Foden','MCI',12,11),P('MID','Maddison','TOT',9,8),P('MID','Bowen','WHU',8,9),P('MID','Doku','MCI',7,6),P('FWD','Haaland','MCI',22,17),P('FWD','Solanke','TOT',10,5,false),P('COA','Coach NEW','NEW',2,6),P('DEF','Hall','NEW',3,4)],sub:P('FWD','Evanilson','BOU',0,4),subOn:false},
-  {name:'Erin',squad:[P('GK','Pope','NEW',4,5),P('DEF','Konate','LIV',6,6),P('DEF','Colwill','CHE',5,4),P('DEF','Munoz','CRY',5,8),P('MID','Rogers','AVL',7,7),P('MID','Garnacho','MUN',8,6),P('MID','Johnson','TOT',6,5),P('MID','Semenyo','BOU',6,9),P('FWD','Wissa','BRE',9,8),P('FWD','Marmoush','MCI',9,4,false),P('COA','Coach CHE','CHE',3,8),P('MID','Gibbs-White','NFO',7,7)],sub:P('DEF','Tarkowski','EVE',0,6),subOn:false},
+  {name:'Bob',squad:[P('GK','Sels','NFO',3,6),P('DEF','Gabriel','ARS',8,9),P('DEF','Saliba','ARS',7,7),P('DEF','Mukiele','SUN',2,0,'dnp'),P('MID','Palmer','CHE',19,14),P('MID','Mbeumo','MUN',9,12),P('MID','Rogers','AVL',6,8),P('MID','Sarr','CRY',5,6),P('MID','Anthony','BUR',4,0,'dnp'),P('FWD','Isak','NEW',18,16),P('FWD','Wood','NFO',7,9),P('COA','Coach LIV','LIV',4,12)],sub:P('DEF','Andersen','FUL',0,7),subOn:true},
+  {name:'Carol',squad:[P('GK','Vicario','TOT',5,8),P('DEF','Gabriel M','MCI',9,6),P('DEF','Konsa','AVL',5,7),P('DEF','Dorgu','MUN',4,4),P('DEF','Mings','AVL',6,9),P('MID','Saka','ARS',16,11),P('MID','Eze','CRY',8,7),P('MID','Gakpo','LIV',9,10),P('FWD','Mateta','CRY',11,8),P('FWD','Watkins','AVL',12,null,'up'),P('COA','Coach MCI','MCI',5,14),P('MID','Wharton','CRY',6,5)],sub:P('MID','Kluivert','BOU',0,5),subOn:false},
+  {name:'Alice (ты)',squad:[P('GK','Henderson','NFO',3,0,'dnp'),P('DEF','Walker','MCI',9,6),P('DEF','van Dijk','LIV',12,9),P('DEF','Burn','NEW',5,7),P('MID','Saka','ARS',14,10),P('MID','Szoboszlai','LIV',13,12),P('MID','Gravenberch','LIV',7,8),P('FWD','Isak','NEW',11,null,'up'),P('FWD','Cunha','MUN',9,7),P('FWD','Jackson','CHE',8,6),P('MID','Rice','ARS',10,6),P('COA','Coach ARS','ARS',1,9)],sub:P('GK','Pickford','EVE',0,8),subOn:true},
+  {name:'Dave',squad:[P('GK','Raya','ARS',6,9),P('DEF','White','ARS',5,5),P('DEF','Trippier','NEW',6,6),P('DEF','Robertson','LIV',7,7),P('MID','Foden','MCI',12,11),P('MID','Maddison','TOT',9,8),P('MID','Bowen','WHU',8,9),P('MID','Doku','MCI',7,6),P('FWD','Haaland','MCI',22,17),P('FWD','Solanke','TOT',10,0,'dnp'),P('COA','Coach NEW','NEW',2,6),P('DEF','Hall','NEW',3,4)],sub:P('FWD','Evanilson','BOU',0,4),subOn:false},
+  {name:'Erin',squad:[P('GK','Pope','NEW',4,5),P('DEF','Konate','LIV',6,6),P('DEF','Colwill','CHE',5,4),P('DEF','Munoz','CRY',5,8),P('MID','Rogers','AVL',7,7),P('MID','Garnacho','MUN',8,6),P('MID','Johnson','TOT',6,5),P('MID','Semenyo','BOU',6,9),P('FWD','Wissa','BRE',9,8),P('FWD','Marmoush','MCI',9,null,'up'),P('COA','Coach CHE','CHE',3,8),P('MID','Gibbs-White','NFO',7,7)],sub:P('DEF','Tarkowski','EVE',0,6),subOn:false},
 ];
 const clubs=[
   ['MCI',64,2.4,45,2],['LIV',58,2.1,41,0],['ARS',51,1.8,38,1],['NEW',44,1.6,36,3],['CHE',40,1.5,33,4],
@@ -64,42 +72,39 @@ const clubs=[
   ['BRE',28,1.1,25,4],['WHU',26,1.1,24,5],['FUL',24,1.0,26,4],['EVE',22,1.0,30,5],['NFO',21,0.9,28,2],
   ['WOL',18,0.9,22,4],['SUN',17,0.8,24,4],['BUR',16,0.8,23,3],['LEE',15,0.7,21,4],['BHA',26,1.1,27,5],
 ];
-const sum = sq => Math.round(sq.reduce((a,p)=>a+(p.pts||0),0)*10)/10;
-players.forEach(pl=>{ pl.base=sum(pl.squad); pl.total=Math.round((pl.base+(pl.subOn?pl.sub.pts:0))*10)/10; pl.remaining=pl.squad.filter(p=>!p.played).length; });
-const ranked=[...players].sort((a,b)=>b.total-a.total); ranked.forEach((p,i)=>p.place=i+1);
-
+const sum=sq=>Math.round(sq.reduce((a,p)=>a+(p.pts||0),0)*10)/10;
+players.forEach(pl=>{pl.base=sum(pl.squad);pl.total=Math.round((pl.base+(pl.subOn?pl.sub.pts:0))*10)/10;pl.remaining=pl.squad.filter(p=>p.st==='up').length;});
+const ranked=[...players].sort((a,b)=>b.total-a.total);ranked.forEach((p,i)=>p.place=i+1);
 const medal=p=>['🥇','🥈','🥉','4','5'][p-1];
-document.getElementById('ribbon').innerHTML = ranked.map(p=>`<div class="place ${p.place===1?'first':''}">${medal(p.place)} <b>${p.name}</b> · ${p.total}</div>`).join('');
 
-document.getElementById('cols').innerHTML = players.map(pl=>`
+document.getElementById('ribbon').innerHTML=ranked.map(p=>`<div class="place ${p.place===1?'first':''}">${medal(p.place)} <b>${p.name}</b> · ${p.total}</div>`).join('');
+
+const ptsCell=p=> p.st==='p'?p.pts : p.st==='dnp'?`0<span class="skip">пропуск</span>` : '—';
+document.getElementById('cols').innerHTML=players.map(pl=>`
   <div class="pcol ${pl.place===1?'first':''}">
     <div class="cam">камера</div>
     <div class="phead"><span class="nm">${medal(pl.place)} ${pl.name}</span><span class="tot">${pl.total}</span></div>
-    <div class="sub-mut">осталось сыграть: ${pl.remaining}</div>
-    <table>${pl.squad.map(p=>`<tr><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td>${p.club}</td><td class="right">${p.price}</td><td class="right" style="${p.played?'':'color:#5d7488'}">${p.played?p.pts:'—'}</td></tr>`).join('')}
-      <tr class="totrow"><td colspan="4">Итого</td><td class="right">${pl.base}</td></tr>
+    <div class="subhead">осталось сыграть: ${pl.remaining}</div>
+    <table>
+      <thead><tr><th>POS</th><th>PLAYER</th><th>TEAM</th><th class="right">COST</th><th class="right">PTS</th></tr></thead>
+      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
+      <tr class="totrow"><td colspan="4">Итого</td><td class="right">${pl.base}</td></tr></tbody>
     </table>
     <hr class="subsep">
     <div class="subrow ${pl.subOn?'on':'off'}">
       <span><span class="tag sub">SUB</span><span class="${pl.sub.pos.toLowerCase()}">${pl.sub.pos}</span> ${pl.sub.name} · ${pl.sub.club}</span>
-      <span>${pl.subOn?`<span class="tag on">в зачёте +${pl.sub.pts}</span>`:`не сыграла (${pl.sub.pts})`}</span>
+      <span>${pl.subOn?`<span class="tag on">+${pl.sub.pts} в зачёте</span>`:`не сыграла (${pl.sub.pts})`}</span>
     </div>
   </div>`).join('');
 
-// --- сортируемая таблица клубов ---
-let sortK='xg', sortDir=-1;
+let sortK='xg',sortDir=-1;
 function renderClubs(){
   const idx={club:0,win:1,xg:2,cs:3,left:4};
   const rows=[...clubs].sort((a,b)=>{const i=idx[sortK];return (a[i]>b[i]?1:a[i]<b[i]?-1:0)*sortDir;});
-  document.querySelector('#ctab tbody').innerHTML = rows.map(c=>`<tr class="${c[4]<=0?'full':''}">
-    <td>${c[0]}</td><td class="right">${c[1]}%</td><td><div class="bar"><i style="width:${c[1]}%"></i></div></td>
-    <td class="right">${c[2]}</td><td class="right">${c[3]}%</td><td class="right">${c[4]}</td></tr>`).join('');
+  document.querySelector('#ctab tbody').innerHTML=rows.map(c=>`<tr class="${c[4]<=0?'full':''}"><td>${c[0]}</td><td class="right">${c[1]}%</td><td class="right">${c[2]}</td><td class="right">${c[3]}%</td><td class="right">${c[4]}</td></tr>`).join('');
 }
-document.querySelectorAll('#ctab th[data-k]').forEach(th=>th.onclick=()=>{
-  const k=th.dataset.k; sortDir = (sortK===k)? -sortDir : -1; sortK=k;
-  document.querySelectorAll('#ctab th').forEach(h=>h.textContent=h.textContent.replace(/[ ▲▼]+$/,''));
-  th.textContent += sortDir<0?' ▼':' ▲'; renderClubs();
-});
+document.querySelectorAll('#ctab th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortDir=(sortK===k)?-sortDir:-1;sortK=k;
+  document.querySelectorAll('#ctab th').forEach(h=>h.textContent=h.textContent.replace(/[ ▲▼]+$/,''));th.textContent+=sortDir<0?' ▼':' ▲';renderClubs();});
 renderClubs();
 </script>
 </body></html>
