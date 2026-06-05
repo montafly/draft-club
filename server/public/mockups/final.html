@@ -55,7 +55,7 @@
       </div>
     </div>
   </div>
-  <p class="mut" style="text-align:center;margin-top:12px">Заглушки. <b style="color:var(--miss)">Красным</b> — пропуск (матч прошёл, игрок не вышел). <span style="color:#5d7488">Серым</span> — матч ещё не сыгран (осталось сыграть).</p>
+  <p class="mut" style="text-align:center;margin-top:12px">Заглушки. Статус: <span style="color:var(--acc)">✓</span> сыграл · <span style="color:var(--miss)">✗</span> пропуск (матч прошёл, не вышел) · <span style="color:#8aa0b2">🕓</span> ждёт матч (осталось сыграть).</p>
 </main>
 <script>
 // st: 'p' сыграл · 'dnp' пропуск (матч прошёл, не вышел) · 'up' матч ещё не сыгран
@@ -81,15 +81,16 @@ const medal=p=>['🥇','🥈','🥉','4','5'][p-1];
 document.getElementById('ribbon').innerHTML=ranked.map(p=>`<div class="place ${p.place===1?'first':''}">${medal(p.place)} <b>${p.name}</b> · ${p.total}</div>`).join('');
 
 const ptsCell=p=> p.st==='p'?p.pts : p.st==='dnp'?'0' : '—';
+const stIcon=st=> st==='p'?'<span style="color:var(--acc)">✓</span>' : st==='dnp'?'<span style="color:var(--miss)">✗</span>' : '<span style="color:#8aa0b2">🕓</span>';
 document.getElementById('cols').innerHTML=players.map(pl=>`
   <div class="pcol ${pl.place===1?'first':''}">
     <div class="cam">камера</div>
     <div class="phead"><span class="nm">${medal(pl.place)} ${pl.name}</span><span class="tot">${pl.total}</span></div>
     <div class="subhead">осталось сыграть: ${pl.remaining}</div>
     <table>
-      <thead><tr><th style="width:30px">POS</th><th>PLAYER</th><th style="width:40px">TEAM</th><th class="right" style="width:46px">COST</th><th class="right" style="width:38px">PTS</th></tr></thead>
-      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.st==='dnp'?'✗ ':''}${p.name}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
-      <tr class="totrow"><td colspan="4">Итого</td><td class="right">${pl.base}</td></tr></tbody>
+      <thead><tr><th style="width:30px">POS</th><th>PLAYER</th><th style="width:22px"></th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th><th class="right" style="width:36px">PTS</th></tr></thead>
+      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td style="text-align:center">${stIcon(p.st)}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
+      <tr class="totrow"><td colspan="5">Итого</td><td class="right">${pl.base}</td></tr></tbody>
     </table>
     <hr class="subsep">
     <div class="subrow ${pl.subOn?'on':'off'}">

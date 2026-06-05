@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет: драфт в процессе</title>
+<style>
+  :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372;--miss:#ec7063}
+  *{box-sizing:border-box} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;margin:0}.mut{color:var(--mut)}.sp{flex:1}
+  main{padding:14px;max-width:1720px;margin:0 auto}
+  .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px}.chip.act{border-color:var(--acc)} .chip b{font-size:14px} .chip .b{color:var(--gold)}
+  .layout{display:flex;gap:10px;align-items:flex-start}
+  .left{flex:1;min-width:0}.right{width:288px;flex:none}
+  .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .cam{height:50px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
+  .phead{display:flex;align-items:baseline;justify-content:space-between}.phead .nm{font-weight:800}.phead .bd{color:var(--gold);font-weight:700}
+  .subhead{color:var(--mut);font-size:11px;margin:2px 0 6px}
+  table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
+  .pcol table{table-layout:fixed}.pcol td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  thead th{color:var(--mut);font-weight:600;font-size:10px;border-bottom:1px solid var(--line)}
+  .right{text-align:right}
+  .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
+  .clubs{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .clubs th{cursor:pointer;user-select:none}.clubs tr.full{opacity:.4;text-decoration:line-through}
+  /* нижняя зона */
+  .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .lotcard{display:flex;gap:12px;align-items:center}
+  .card{width:88px;height:118px;border-radius:10px;padding:8px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f);position:relative;flex:none}
+  .card .pos{position:absolute;top:30px;left:9px;font-weight:800;font-size:11px}.card .num{position:absolute;top:5px;left:9px;font-size:20px;font-weight:800}
+  .card .ph{width:48px;height:48px;border-radius:50%;margin:24px auto 4px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center}
+  .card .nm{font-weight:800;font-size:12px;text-align:center}.card .cl{font-size:9px;text-align:center;opacity:.8}
+  .bid{font-size:22px;font-weight:800;color:var(--gold)}
+  .bids{margin-top:8px}.bids .b{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1d2935}
+  .st-in{color:var(--acc)}.st-pass{color:var(--mut)}.st-auto{color:#7d8a96;font-style:italic}.st-high{color:var(--gold);font-weight:700}
+  .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}
+  input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .plist{max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
+  .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
+  a{color:var(--acc)}
+</style></head>
+<body>
+<header><h1>Draft Club <span class="mut">— макет «драфт в процессе»</span></h1><span class="mut">GW38 · идёт драфт · ход: Dave</span><span class="sp"></span><a href="index.html">← к макетам</a></header>
+<main>
+  <div class="ribbon" id="ribbon"></div>
+  <div class="layout">
+    <div class="left">
+      <div class="cols" id="cols"></div>
+      <div class="bottom">
+        <div class="panel">
+          <h3>Текущий лот · ставки</h3>
+          <div class="lotcard">
+            <div class="card"><div class="num">11</div><div class="pos">MID</div><div class="ph">⚽</div><div class="nm">M. Salah</div><div class="cl">Liverpool</div></div>
+            <div>
+              <div class="mut">номинировал Bob</div>
+              <div class="bid">$11</div><div class="mut">лидирует Carol · мин. повышение $12</div>
+              <div style="margin-top:8px"><button class="btn r">FOLD (пас)</button> <input type="number" value="12" style="width:58px"> <button class="btn p">RAISE / BET</button></div>
+              <div class="mut" style="font-size:11px;margin-top:4px">(кнопки активны, когда твой ход — сейчас ход Dave)</div>
+            </div>
+          </div>
+          <div class="bids">
+            <div class="b"><span>Bob</span><span class="st-pass">спасовал</span></div>
+            <div class="b"><span>Carol</span><span class="st-high">$11 · лидер</span></div>
+            <div class="b"><span>Alice (ты)</span><span class="st-pass">спасовал</span></div>
+            <div class="b"><span>Dave</span><span class="st-in">в торгах · ход</span></div>
+            <div class="b"><span>Erin</span><span class="st-auto">автопас (5 полузащ.)</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Выставить игрока на торги (когда твой ход)</h3>
+          <div class="filters">
+            <input id="q" placeholder="поиск по фамилии…" style="flex:1;min-width:120px">
+            <select id="team"><option value="">все клубы</option></select>
+            <select id="pos"><option value="">все позиции</option><option>GK</option><option>DEF</option><option>MID</option><option>FWD</option><option>COACH</option></select>
+          </div>
+          <div class="plist" id="plist"></div>
+          <div class="sel" id="sel"><span class="mut">Выбери игрока из списка — затем подтвердишь выставление.</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="clubs">
+        <h3>Команды · коэф · xG · CS · слоты</h3>
+        <table id="ctab"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">П%</th><th data-k="xg" class="right">xG ▼</th><th data-k="cs" class="right">CS%</th><th data-k="left" class="right">СЛОТ</th></tr></thead><tbody></tbody></table>
+        <p class="mut" style="margin:8px 0 0;font-size:11px">Сорт по xG ↓ (клик меняет). Исчерпанные (0) — серым.</p>
+      </div>
+    </div>
+  </div>
+  <p class="mut" style="text-align:center;margin-top:12px">Заглушки. Состав без очков (матчи ещё не сыграны). Внизу — состояние торгов + выбор номинации по фильтрам с живым поиском и подтверждением.</p>
+</main>
+<script>
+const SUR=['Walker','Silva','Saka','Rice','Foden','Palmer','Watkins','Mount','Toney','Maddison','Bowen','Eze','Dunk','Stones','Trippier','Gakpo','Nunez','Diaz','Salah','Jota','Odegaard','Havertz','Jesus','White','Gabriel','Doku','Alvarez','Dias','Garnacho','Hojlund','Isak','Wilson','Solanke','Johnson','Romero','Mbeumo','Wissa','Collins'];
+const TEAMS=['ARS','CHE','LIV','MCI','MUN','NEW','TOT','AVL'];
+const ROSTER={name:'',};
+const teams=TEAMS;
+// мини-составы участников (идёт драфт, разное число пиков)
+const mk=(arr)=>arr.map(a=>({pos:a[0],name:a[1],club:a[2],cost:a[3]}));
+const players=[
+  {name:'Bob',budget:63,max:52,squad:mk([['GK','Sels','NFO',3],['DEF','Gabriel','ARS',8],['DEF','Saliba','ARS',7],['MID','Palmer','CHE',19],['MID','Mbeumo','MUN',9],['FWD','Isak','NEW',18],['FWD','Wood','NFO',7],['COA','Coach LIV','LIV',4]])},
+  {name:'Carol',budget:40,max:31,squad:mk([['GK','Vicario','TOT',5],['DEF','Konsa','AVL',5],['DEF','Mings','AVL',6],['DEF','Dorgu','MUN',4],['DEF','Gabriel M','MCI',9],['MID','Saka','ARS',16],['MID','Eze','CRY',8],['FWD','Mateta','CRY',11],['COA','Coach MCI','MCI',5]])},
+  {name:'Alice (ты)',budget:35,max:24,squad:mk([['GK','Henderson','NFO',3],['DEF','Walker','MCI',9],['DEF','van Dijk','LIV',12],['MID','Saka','ARS',14],['FWD','Cunha','MUN',9],['COA','Coach ARS','ARS',1]])},
+  {name:'Dave',budget:55,max:47,squad:mk([['GK','Raya','ARS',6],['DEF','White','ARS',5],['DEF','Robertson','LIV',7],['MID','Foden','MCI',12],['MID','Bowen','WHU',8],['FWD','Haaland','MCI',22],['DEF','Hall','NEW',3]]),act:true},
+  {name:'Erin',budget:43,max:35,squad:mk([['GK','Pope','NEW',4],['DEF','Konate','LIV',6],['DEF','Munoz','CRY',5],['MID','Rogers','AVL',7],['MID','Garnacho','MUN',8],['MID','Semenyo','BOU',6],['MID','Johnson','TOT',6],['MID','Gibbs-White','NFO',7]])},
+];
+const fmt=sq=>{const c={GK:0,DEF:0,MID:0,FWD:0,COA:0};sq.forEach(p=>c[p.pos]++);return `1-${c.DEF}-${c.MID}-${c.FWD}${c.COA?' +тр':''}`;};
+document.getElementById('ribbon').innerHTML=players.map(p=>`<div class="chip ${p.act?'act':''}"><b>${p.name}</b> · ${p.squad.length}/12 · <span class="b">$${p.budget}</span>${p.act?' · ход':''}</div>`).join('');
+document.getElementById('cols').innerHTML=players.map(p=>`
+  <div class="pcol ${p.act?'act':''}">
+    <div class="cam">камера</div>
+    <div class="phead"><span class="nm">${p.name}${p.act?' · ход':''}</span><span class="bd">$${p.budget}</span></div>
+    <div class="subhead">макс.бид $${p.max} · ${fmt(p.squad)} · ${p.squad.length}/12</div>
+    <table>
+      <thead><tr><th style="width:30px">POS</th><th>PLAYER</th><th style="width:40px">TEAM</th><th class="right" style="width:46px">COST</th></tr></thead>
+      <tbody>${p.squad.map(u=>`<tr><td class="${u.pos.toLowerCase()}">${u.pos}</td><td>${u.name}</td><td>${u.club}</td><td class="right">$${u.cost}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`).join('');
+
+// --- пул для выбора номинации ---
+const POS={GK:1,DEF:4,MID:4,FWD:2,COACH:1};
+let pid=1; const pool=[];
+TEAMS.forEach(t=>{let s=0;for(const [pos,n] of Object.entries(POS)){for(let i=0;i<n;i++){pool.push({id:pid++,pos,name:pos==='COACH'?('Coach '+t):(SUR[(pid+s)%SUR.length]),club:t,cost:1+((pid*7)%18)});s++;}}});
+const qEl=document.getElementById('q'),teamEl=document.getElementById('team'),posEl=document.getElementById('pos'),listEl=document.getElementById('plist'),selEl=document.getElementById('sel');
+TEAMS.forEach(t=>{const o=document.createElement('option');o.textContent=t;teamEl.appendChild(o);});
+let selected=null;
+function renderNom(){
+  const q=qEl.value.toLowerCase(),t=teamEl.value,p=posEl.value;
+  const list=pool.filter(x=>(!t||x.club===t)&&(!p||x.pos===p)&&(!q||x.name.toLowerCase().includes(q)));
+  listEl.innerHTML=list.slice(0,60).map(x=>`<div class="pitem" onclick="selectPlayer(${x.id})"><span class="${x.pos.toLowerCase()}">${x.pos}</span> &nbsp;${x.name} · ${x.club} · $${x.cost}</div>`).join('')||'<div class="pitem mut">ничего не найдено</div>';
+}
+function selectPlayer(id){ selected=pool.find(x=>x.id===id);
+  selEl.innerHTML=`Выбран: <b class="${selected.pos.toLowerCase()}">${selected.pos}</b> ${selected.name} · ${selected.club} · старт <input id="open" type="number" min="1" value="1" style="width:54px"> <button class="btn p" onclick="confirmNom()">Подтвердить выставление</button> <button class="btn" onclick="selEl.innerHTML='<span class=&quot;mut&quot;>Выбери игрока…</span>'">отмена</button>`;
+}
+function confirmNom(){ alert('Выставлен на торги: '+selected.name+' ('+selected.pos+' · '+selected.club+') за $'+document.getElementById('open').value+'.\n\nВ реальном клиенте это уйдёт на сервер как nominate.'); }
+[qEl,teamEl,posEl].forEach(el=>el.addEventListener('input',renderNom));
+renderNom();
+
+// --- таблица клубов ---
+const clubs=[['MCI',64,2.4,45,2],['LIV',58,2.1,41,0],['ARS',51,1.8,38,1],['NEW',44,1.6,36,3],['CHE',40,1.5,33,4],['AVL',38,1.5,31,4],['TOT',36,1.4,30,0],['MUN',34,1.3,29,3],['BOU',30,1.2,27,5],['CRY',29,1.2,28,3],['BRE',28,1.1,25,4],['WHU',26,1.1,24,5],['FUL',24,1.0,26,4],['EVE',22,1.0,30,5],['NFO',21,0.9,28,2],['WOL',18,0.9,22,4],['SUN',17,0.8,24,4],['BUR',16,0.8,23,3],['LEE',15,0.7,21,4],['BHA',26,1.1,27,5]];
+let sortK='xg',sortDir=-1;
+function renderClubs(){const idx={club:0,win:1,xg:2,cs:3,left:4};const rows=[...clubs].sort((a,b)=>{const i=idx[sortK];return (a[i]>b[i]?1:a[i]<b[i]?-1:0)*sortDir;});
+  document.querySelector('#ctab tbody').innerHTML=rows.map(c=>`<tr class="${c[4]<=0?'full':''}"><td>${c[0]}</td><td class="right">${c[1]}%</td><td class="right">${c[2]}</td><td class="right">${c[3]}%</td><td class="right">${c[4]}</td></tr>`).join('');}
+document.querySelectorAll('#ctab th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;sortDir=(sortK===k)?-sortDir:-1;sortK=k;document.querySelectorAll('#ctab th').forEach(h=>h.textContent=h.textContent.replace(/[ ▲▼]+$/,''));th.textContent+=sortDir<0?' ▼':' ▲';renderClubs();});
+renderClubs();
+</script>
+</body></html>
