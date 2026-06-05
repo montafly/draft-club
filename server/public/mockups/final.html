@@ -19,7 +19,7 @@
   .phead{display:flex;align-items:baseline;justify-content:space-between}.phead .nm{font-weight:800}.phead .tot{font-size:19px;font-weight:800;color:var(--gold)}
   .subhead{color:var(--mut);font-size:11px;margin:2px 0 6px}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
-  .pcol table{table-layout:fixed}.pcol td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pcol table{table-layout:fixed}.pcol td:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   thead th{color:var(--mut);font-weight:600;font-size:10px;letter-spacing:.03em;border-bottom:1px solid var(--line)}
   .right{text-align:right}
   .gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coa{color:#bb8fce}
@@ -88,9 +88,9 @@ document.getElementById('cols').innerHTML=players.map(pl=>`
     <div class="phead"><span class="nm">${medal(pl.place)} ${pl.name}</span><span class="tot">${pl.total}</span></div>
     <div class="subhead">осталось сыграть: ${pl.remaining}</div>
     <table>
-      <thead><tr><th style="width:30px">POS</th><th>PLAYER</th><th style="width:22px"></th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th><th class="right" style="width:36px">PTS</th></tr></thead>
-      <tbody>${pl.squad.map(p=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td style="text-align:center">${stIcon(p.st)}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
-      <tr class="totrow"><td colspan="5">Итого</td><td class="right">${pl.base}</td></tr></tbody>
+      <thead><tr><th style="width:18px">#</th><th style="width:28px">POS</th><th>PLAYER</th><th style="width:22px"></th><th style="width:36px">TEAM</th><th class="right" style="width:42px">COST</th><th class="right" style="width:34px">PTS</th></tr></thead>
+      <tbody>${pl.squad.map((p,i)=>`<tr class="${p.st==='dnp'?'dnp':p.st==='up'?'up':''}"><td class="mut">${i+1}</td><td class="${p.pos.toLowerCase()}">${p.pos}</td><td>${p.name}</td><td style="text-align:center">${stIcon(p.st)}</td><td>${p.club}</td><td class="right">$${p.price}</td><td class="right">${ptsCell(p)}</td></tr>`).join('')}
+      <tr class="totrow"><td colspan="6">Итого</td><td class="right">${pl.base}</td></tr></tbody>
     </table>
     <hr class="subsep">
     <div class="subrow ${pl.subOn?'on':'off'}">
