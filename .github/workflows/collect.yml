@@ -18,5 +18,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          SEASON_IDS: "1995,1900"   # World Cup + PL; меняй по сезону
+          SEASON_IDS: "1995,1900,1990"   # World Cup + PL + Friendly International (live-тест)
         run: python collect.py auto
