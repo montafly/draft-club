@@ -169,7 +169,7 @@ function renderBottom(){
         else if((d.lot.passed||[]).includes(m.id)){s='выбыл';c='st-out';row='out';}
         else if(m.id===d.actor){s='ходит';c='st-act';}
         else if(m.finished){s='—';c='st-pass';}
-        else {s='в торгах';c='st-in';}
+        else {const lb=(d.lot.bidsBy||{})[m.id];if(lb!=null){s='ставка $'+lb;c='st-in';}else{s='в торгах';c='st-pass';}}
         return `<div class="b ${row}"><span>${m.name}</span><span class="${c}">${s}</span></div>`;}).join('')}</div>`;
   } else if(d.phase==='substitutes') lotH+='<span class="mut">Каждый участник по очереди (по порядку завершения) выбирает замену.</span>';
   else lotH+='<div class="mut">ожидается номинация</div>'+actionBox(d);

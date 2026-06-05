@@ -96,7 +96,7 @@ export class Room {
         phase: d.phase,
         actor: d.actor,
         order: d.order,
-        lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed] },
+        lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed], bidsBy: d.lot.bidsBy },
         clubCounts: d.clubCounts,
         taken: [...d.taken],
         picks: d.picks,

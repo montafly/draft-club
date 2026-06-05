@@ -87,7 +87,7 @@ export class Draft {
 
     this.lot = { unit, highBid: openingBid, highBidder: managerId, passed: new Set(),
                  lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo,
-                 startAt: this.now(), bids: 1 };
+                 startAt: this.now(), bids: 1, bidsBy: { [managerId]: openingBid } };
     this.phase = 'bidding';
     this.log.push(`NOMINATE ${m.name} -> ${unit.name} @${openingBid}`);
     this._advance();
@@ -107,6 +107,7 @@ export class Draft {
     lot.highBidder = managerId;
     lot.lastIdx = this.orderIdx.get(managerId);
     lot.bids++;
+    lot.bidsBy[managerId] = amount;
     this.log.push(`BID ${m.name} @${amount}`);
     this._advance();
     return this.state();
