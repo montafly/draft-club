@@ -1,0 +1,22 @@
+# Прогон движка драфта: симулятор + тесты подсчёта.
+name: Engine tests
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "engine/**"
+      - ".github/workflows/engine.yml"
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Симулятор драфта (500 прогонов, проверка правил)
+        run: node engine/sim.js 500
+      - name: Тесты подсчёта очков
+        run: node engine/scoring.test.js
