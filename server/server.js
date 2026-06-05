@@ -39,7 +39,7 @@ function sendErr(ws, message) {
 wss.on('connection', (ws) => {
   ws.seatId = null;
   clients.add(ws);
-  ws.send(JSON.stringify({ type: 'pool', units: room.pool }));
+  ws.send(JSON.stringify({ type: 'pool', units: room.pool, clubOdds: room.clubOdds }));
   broadcast();
 
   ws.on('message', (raw) => {

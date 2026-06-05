@@ -1,13 +1,22 @@
 // Комната драфта (transport-agnostic): места + одна партия Draft + сериализация состояния.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Draft } from '../engine/draft.js';
 import { DEFAULT_CONFIG } from '../engine/config.js';
 import { makePool } from '../engine/data.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+let POOLFILE = null;
+try { POOLFILE = JSON.parse(fs.readFileSync(path.join(__dirname, 'pool.json'), 'utf8')); } catch {}
 
 export class Room {
   constructor(config = DEFAULT_CONFIG, maxSeats = 5) {
     this.config = config;
     this.maxSeats = maxSeats;
-    this.pool = makePool();              // 2b.3: заменить на реальный пул FanTeam + тренеры
+    // реальный пул FanTeam из pool.json (collect.py pool); фолбэк — синтетический
+    this.pool = (POOLFILE && POOLFILE.units && POOLFILE.units.length) ? POOLFILE.units : makePool();
+    this.clubOdds = (POOLFILE && POOLFILE.clubOdds) || [];
     this.seats = [];                     // {id,name,ready,connected}
     this.draft = null;
   }

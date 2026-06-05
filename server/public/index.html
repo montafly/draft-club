@@ -13,7 +13,7 @@
   main{flex:1;overflow:auto;padding:12px}.wrap{max-width:1720px;margin:0 auto}
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
-  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:230px;flex:none}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:300px;flex:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
@@ -24,12 +24,12 @@
   .form{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.seg{font-size:11px;border-radius:5px;padding:1px 6px;font-weight:600}
   .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#3a3320;color:var(--gold)}.seg.ok{background:#22303d}.needline{font-size:10px;color:var(--miss)}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
-  .pcol table{table-layout:fixed}.pcol td:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pcol table{table-layout:fixed}.pcol td:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
   .pcol tr.subrow td{border-top:2px dashed #34495e;padding-top:3px}
   thead th{color:var(--mut);font-weight:600;font-size:10px;border-bottom:1px solid var(--line)}
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
-  .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}
+  .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{display:flex;gap:12px;align-items:center}
@@ -58,7 +58,7 @@
       <div class="cols" id="cols"></div>
       <div id="bottom"></div>
     </div>
-    <div class="right"><div class="clubs"><h3>Клубы · слоты (из 5)</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Коэф/xG/CS подключим из FanTeam отдельным шагом.</p></div></div>
+    <div class="right"><div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div></div>
   </div>
 </div></main>
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
@@ -71,10 +71,10 @@ const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60))
 const name=(sessionStorage.getItem('dc_name')||prompt('Твоё имя:')||'Player').slice(0,24);
 sessionStorage.setItem('dc_name',name);
 const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null,S=null,POOL=[];
+let me=null,S=null,POOL=[],CLUBODDS=[];
 ws.onopen=()=>ws.send(JSON.stringify({type:'join',name}));
 ws.onmessage=e=>{const m=JSON.parse(e.data);
-  if(m.type==='pool')POOL=m.units;
+  if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];}
   else if(m.type==='joined'){me=m.you;document.getElementById('who').textContent=m.you?`${name} · место ${m.you}`:`${name} · зритель`;}
   else if(m.type==='error')showErr(m.message);
   else if(m.type==='state'){S=m.state;render();}};
@@ -116,14 +116,20 @@ function renderCols(){
       ${formBlock(m.counts, m.finished)}
       <table><thead><tr><th style="width:18px">#</th><th style="width:28px">POS</th><th>PLAYER</th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th></tr></thead>
       <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.name}</td><td>${u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
-      ${m.substitute?`<tr class="subrow"><td class="mut" style="font-size:10px">зам</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
+      ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
     </div>`).join('');
 }
+let clubSortK='xg',clubSortDir=-1;
 function renderClubs(){
   const el=document.getElementById('clubs');
   if(!S.started){el.innerHTML='<span class="mut">—</span>';return;}
-  const cc=S.draft.clubCounts||{};const clubs=[...new Set(POOL.map(u=>u.club))].sort();
-  el.innerHTML='<table>'+clubs.map(c=>{const left=5-(cc[c]||0);return `<tr class="${left<=0?'full':''}"><td>${c}</td><td class="right">${left}</td></tr>`;}).join('')+'</table>';
+  const cc=S.draft.clubCounts||{};const odds={};(CLUBODDS||[]).forEach(o=>{odds[o.club]=o;});
+  const clubs=[...new Set(POOL.map(u=>u.club))];
+  const rows=clubs.map(c=>({club:c,left:5-(cc[c]||0),win:odds[c]?.win,xg:odds[c]?.xg,cs:odds[c]?.cs}));
+  rows.sort((a,b)=>{const an=a[clubSortK]==null?-Infinity:a[clubSortK],bn=b[clubSortK]==null?-Infinity:b[clubSortK];return (an>bn?1:an<bn?-1:0)*clubSortDir || a.club.localeCompare(b.club);});
+  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">П%</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" class="right">СЛОТ</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr class="${r.left<=0?'full':''}"><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win??'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs??'—'}</td><td class="right">${r.left}</td></tr>`).join('')+'</tbody></table>';
+  el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
 
 function renderBottom(){

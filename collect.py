@@ -295,6 +295,55 @@ def collect_auto(season_ids: list[int], window_hours: int = 6):
         print(f"season {sid}: активных матчей {len(active)}, строк игроков {total}")
 
 
+def build_pool(season_id: int, rnd: int, out: str = "server/pool.json"):
+    """Собрать pool.json для движка: реальные игроки тура (позиции) + тренеры по клубам
+    + коэф/xG/CS по клубам (из коэффициентов матчей тура)."""
+    POSMAP = {"goalkeeper": "GK", "defender": "DEF", "midfielder": "MID", "forward": "FWD"}
+    d = fetch(f"real_matches?season_id={season_id}&round={rnd}")
+    teams = {t["id"]: t.get("name", str(t["id"])) for t in d.get("realTeams", [])}
+    units, seen = [], set()
+    # игроки — из составов всех матчей тура
+    for m in d.get("realMatches", []):
+        det = fetch(f"real_matches/{m['id']}")
+        for mem in det.get("realTeamMemberships", []):
+            pid = mem.get("realPlayerId")
+            if pid in seen:
+                continue
+            pos = POSMAP.get(mem.get("position"))
+            if not pos:
+                continue
+            seen.add(pid)
+            p = mem.get("realPlayer", {}) or {}
+            nm = p.get("lastName") or p.get("firstName") or str(pid)
+            units.append({"id": pid, "name": nm, "club": teams.get(mem["realTeamId"], str(mem["realTeamId"])), "position": pos})
+    # тренеры — по одному на клуб (ручной справочник; имя клуба пока заглушка)
+    for tid, tname in teams.items():
+        units.append({"id": -int(tid), "name": f"Coach {tname}", "club": tname, "position": "COACH"})
+    # коэффициенты по клубам
+    clubodds = []
+    for m in d.get("realMatches", []):
+        det = m.get("details", {}) or {}
+        od = det.get("odds", {}) or {}
+        xg = (det.get("expectedGoals") or [None, None])[:2]
+        ids = (m.get("realTeamIds") or [None, None])[:2]
+        try:
+            inv = [1 / float(od["home"]), 1 / float(od["draw"]), 1 / float(od["away"])]
+            s = sum(inv)
+            wh, wa = round(inv[0] / s * 100), round(inv[2] / s * 100)
+        except Exception:
+            wh = wa = None
+        xh, xa = xg[0], xg[1]
+        csh = round(math.exp(-xa) * 100) if xa is not None else None
+        csa = round(math.exp(-xh) * 100) if xh is not None else None
+        clubodds.append({"club": teams.get(ids[0]), "win": wh, "xg": xh, "cs": csh})
+        clubodds.append({"club": teams.get(ids[1]), "win": wa, "xg": xa, "cs": csa})
+
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump({"season": season_id, "round": rnd, "units": units, "clubOdds": clubodds}, f, ensure_ascii=False)
+    print(f"pool.json: {len(units)} юнитов ({len(teams)} клубов), коэф по {len(clubodds)} строкам -> {out}")
+
+
 def collect_season(season_id: int, r1: int = 1, r2: int = 38):
     """Бэкфилл всего сезона: туры r1..r2 последовательно с троттлингом."""
     for rnd in range(r1, r2 + 1):
@@ -308,6 +357,8 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if not args:
         validate()
+    elif args[0] == "pool":
+        build_pool(int(args[1]), int(args[2]))
     elif args[0] == "season":
         sid = int(args[1])
         r1 = int(args[2]) if len(args) > 2 else 1
