@@ -1,0 +1,10 @@
+# Деплой Draft Club на Render (free). New + → Blueprint → этот репозиторий.
+services:
+  - type: web
+    name: draft-club
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
