@@ -48,7 +48,9 @@ export class Room {
   }
 
   startable() {
-    return !this.draft && this.seats.length >= 1 && this.seats.every((s) => s.ready);
+    if (this.draft || !this.seats.length || !this.seats.every((s) => s.ready)) return false;
+    const need = this.allowedUserIds ? Math.max(2, this.allowedUserIds.size) : 1; // реальный драфт: все принятые на месте (мин. 2); тест-комната (allowedUserIds=null): 1
+    return this.seats.length >= need;
   }
 
   start() {
@@ -131,6 +133,7 @@ export class Room {
     const lobby = {
       seats: this.seats.map((s) => ({ id: s.id, name: s.name, ready: s.ready, connected: s.connected })),
       startable: this.startable(),
+      need: this.allowedUserIds ? this.allowedUserIds.size : null,
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;

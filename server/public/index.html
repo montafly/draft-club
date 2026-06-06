@@ -339,6 +339,7 @@ function tick(){
   document.querySelectorAll('.countdown').forEach(el=>{el.textContent=cdText(el.dataset.start);});
 }
 setInterval(tick,1000);
+setInterval(()=>{if(authedOnce&&document.getElementById('viewer').style.display!=='block'&&document.getElementById('draft').style.display!=='block')loadDrafts();},12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
 function showSection(sec){
   document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
@@ -475,7 +476,7 @@ function renderViewerTeams(){
   const el=document.getElementById('vTeams');const sc=VIEW.score;
   document.getElementById('vLive').innerHTML=sc&&sc.status==='live'?'<span class="badge admin">LIVE</span>':(sc&&sc.status==='settled'?'<span class="badge">финал</span>':'');
   if(!sc||sc.error){el.innerHTML='<div class="empty">не удалось загрузить</div>';document.getElementById('vRibbon').innerHTML='';return;}
-  if(!sc.teams||!sc.teams.length){el.innerHTML='<div class="empty">составы не сохранены (драфт сыгран до подключения скоринга)</div>';document.getElementById('vRibbon').innerHTML='';return;}
+  if(!sc.teams||!sc.teams.length){const msg=sc.status==='live'?'Аукцион ещё идёт — составы появятся после его завершения. Если ты участник, зайди в драфт из «Мои драфты» → «Войти».':'Составы не сохранены (старый драфт, сыгран до подключения скоринга).';el.innerHTML='<div class="empty">'+msg+'</div>';document.getElementById('vRibbon').innerHTML='';return;}
   document.getElementById('vRibbon').innerHTML=(sc.standings||[]).map((s,i)=>`<div class="chip ${i===0?'me':''}"><b>${i===0?'🥇 ':''}${s.name}</b> · <span class="b">${f1(s.total)}</span></div>`).join('');
   const cols=sc.teams.map((t,i)=>{
     const starters=t.players.filter(p=>!p.isSub).slice().sort((a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position));
@@ -757,7 +758,9 @@ function renderBottom(){
   const el=document.getElementById('bottom');const d=S.draft;
   if(!S.started){
     const ms=S.lobby.seats.find(s=>s.id===me);
-    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Старт».</p>`+
+    const seats=S.lobby.seats||[];const rdy=seats.filter(s=>s.ready).length;const need=S.lobby.need;
+    const wait=need?`<p class="mut">В комнате ${seats.length}/${need}, готовы ${rdy}/${seats.length}.${seats.length<need?' Ждём остальных участников.':(rdy<seats.length?' Ждём готовности всех.':'')}</p>`:'';
+    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Старт».</p>${wait}`+
       (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
       <button class="btn p" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт</button>`:'<span class="mut">Ты зритель</span>')+`</div>`;
     return;
