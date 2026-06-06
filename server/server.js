@@ -19,7 +19,214 @@ try {
   }
 } catch {}
 
+// --- FanTeam (ScoutGG) прокси: список матчей тура для создания драфта ---
+const FT_API = 'https://fanteam-game.api.scoutgg.net';
+const FT_HEADERS = {
+  accept: 'application/json',
+  authorization: 'Bearer fanteam undefined', // dummy-токен, реальный логин не нужен
+  origin: 'https://fanteam.com', referer: 'https://fanteam.com/',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+};
+async function ftMatches(season, round) {
+  const r = await fetch(`${FT_API}/real_matches?season_id=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}`, { headers: FT_HEADERS });
+  if (!r.ok) throw new Error('FanTeam ' + r.status);
+  const d = await r.json();
+  const teams = {};
+  for (const t of d.realTeams || []) teams[t.id] = { name: t.name || String(t.id), abbr: t.abbr || '' };
+  return (d.realMatches || []).map(m => {
+    const [a, b] = (m.realTeamIds || []).slice(0, 2);
+    return {
+      matchId: m.id,
+      home: teams[a]?.name || a, away: teams[b]?.name || b,
+      homeCode: teams[a]?.abbr || '', awayCode: teams[b]?.abbr || '',
+      startTime: m.startTime || null, status: m.status || null,
+    };
+  });
+}
+
+async function ftGet(path) {
+  const r = await fetch(`${FT_API}/${path}`, { headers: FT_HEADERS });
+  if (!r.ok) throw new Error('FanTeam ' + r.status + ' ' + path);
+  return r.json();
+}
+// деталь матча с кэшем 60с (для скоринга/просмотра — не дёргать FanTeam на каждый клик)
+const ftCache = new Map();
+async function ftDetail(matchId) {
+  const c = ftCache.get(matchId), now = Date.now();
+  if (c && now - c.t < 60000) return c.data;
+  const d = await ftGet(`real_matches/${matchId}`);
+  ftCache.set(matchId, { t: now, data: d });
+  return d;
+}
+// очки игрока по позиционным весам FanTeam (порт collect.py compute_points — валидирован)
+function cp(s, pos) {
+  const g = (k) => (+s[k] || 0);
+  let p = g('playtime1') + g('playtime60') + g('assist') * 3 + g('penaltyCaused') * -2 + g('penaltyMiss') * -2 + g('ownGoal') * -2 + g('yellowCard') * -1 + g('redCard') * -3 + g('impact') * 0.3;
+  if (pos === 'goalkeeper') p += g('goal') * 8 + g('cleanSheet') * 4 + g('shotOnTarget') * 1 + g('keeperSave') * 0.5 + g('penaltySave') * 5 + Math.floor(g('concededGoal') / 2) * -1;
+  else if (pos === 'defender') p += g('goal') * 6 + g('cleanSheet') * 4 + g('shotOnTarget') * 0.6 + Math.floor(g('concededGoal') / 2) * -1;
+  else if (pos === 'midfielder') p += g('goal') * 5 + g('cleanSheet') * 1 + g('fullGame') * 1 + g('shotOnTarget') * 0.4;
+  else if (pos === 'forward') p += g('goal') * 4 + g('fullGame') * 1 + g('shotOnTarget') * 0.4;
+  return Math.round(p * 100) / 100;
+}
+const POSMAP = { goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD' };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Собрать пул движка по выбранным матчам драфта: игроки + тренеры + коэф/xG/CS по клубам
+async function buildDraftPool(seasonId, round, matchIds) {
+  const idset = new Set((matchIds || []).map(Number));
+  const listing = await ftGet(`real_matches?season_id=${seasonId}&round=${round}`);
+  const teams = {}, abbr = {};
+  for (const t of listing.realTeams || []) { teams[t.id] = t.name || String(t.id); abbr[t.id] = t.abbr || String(t.name || '').slice(0, 3).toUpperCase(); }
+  const sel = (listing.realMatches || []).filter((m) => idset.has(Number(m.id)));
+  const clubOdds = [];
+  for (const m of sel) {
+    const det = m.details || {}, od = det.odds || {}, xg = (det.expectedGoals || [null, null]).slice(0, 2);
+    const ids = (m.realTeamIds || [null, null]).slice(0, 2);
+    let wh = null, wa = null;
+    try { const inv = [1 / +od.home, 1 / +od.draw, 1 / +od.away]; const s = inv[0] + inv[1] + inv[2]; wh = Math.round(inv[0] / s * 100); wa = Math.round(inv[2] / s * 100); } catch {}
+    const xh = xg[0], xa = xg[1];
+    clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
+    clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
+  }
+  const units = [], seen = new Set(), involved = new Set();
+  for (const m of sel) {
+    const det = await ftGet(`real_matches/${m.id}`);
+    for (const mem of det.realTeamMemberships || []) {
+      const pid = mem.realPlayerId; if (seen.has(pid)) continue;
+      const pos = POSMAP[mem.position]; if (!pos) continue;
+      seen.add(pid);
+      const p = mem.realPlayer || {}; const tid = mem.realTeamId; involved.add(tid);
+      units.push({ id: pid, name: p.lastName || p.firstName || String(pid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
+    }
+    await sleep(250); // вежливый троттлинг FanTeam
+  }
+  for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
+  const matches = sel.map((m) => { const ids = (m.realTeamIds || [null, null]).slice(0, 2); return { home: teams[ids[0]] || '', away: teams[ids[1]] || '', startTime: m.startTime || null }; });
+  return { units, clubOdds, matches };
+}
+
+// REST-хелперы (service key) для launchDraft
+async function svcGet(path) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY } });
+  if (!r.ok) throw new Error('db ' + r.status); return r.json();
+}
+async function svcPatch(path, body) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'PATCH', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'content-type': 'application/json', prefer: 'return=minimal' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('db patch ' + r.status);
+}
+async function svcPost(path, body) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'POST', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'content-type': 'application/json', prefer: 'return=minimal' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('db post ' + r.status + ' ' + (await r.text()));
+}
+async function svcDelete(path) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'DELETE', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' } });
+  if (!r.ok) throw new Error('db del ' + r.status);
+}
+async function launchDraft(draftId) {
+  const rows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = rows[0];
+  if (!d) throw new Error('драфт не найден');
+  if (d.room_code && rooms.has(d.room_code)) return d.room_code; // уже запущен
+  const acc = await svcGet(`dc_applications?draft_id=eq.${draftId}&status=eq.accepted&select=user_id`);
+  if (!acc.length) throw new Error('нет принятых участников');
+  const pool = await buildDraftPool(d.season_id, d.round, d.match_ids);
+  if (!pool.units.length) throw new Error('не собрался пул игроков по матчам');
+  const code = (d.room_code && !rooms.has(d.room_code)) ? d.room_code : makeCode();
+  const room = new Room(undefined, d.slots, pool.units, pool.clubOdds, pool.matches);
+  room.allowedUserIds = new Set(acc.map((a) => a.user_id));
+  room.draftId = draftId;
+  room.persistedStatus = 'live';
+  rooms.set(code, { room, clients: new Set() });
+  await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'live', room_code: code });
+  return code;
+}
+// держим dc_drafts.status в синхроне с фазой движка + сохраняем составы на финише
+function syncStatus(e) {
+  if (!e || !e.room || !e.room.draftId || !e.room.draft) return;
+  const desired = e.room.draft.phase === 'done' ? 'done' : 'live';
+  if (e.room.persistedStatus !== desired) {
+    e.room.persistedStatus = desired;
+    svcPatch(`dc_drafts?id=eq.${e.room.draftId}`, { status: desired }).catch(() => {});
+  }
+  if (e.room.draft.phase === 'done' && !e.room.rostersSaved) {
+    e.room.rostersSaved = true;
+    persistRosters(e).catch((err) => { e.room.rostersSaved = false; console.error('persistRosters', err); });
+  }
+}
+// сохранить составы участников (для скоринга) при завершении аукциона
+async function persistRosters(e) {
+  const r = e.room, d = r.draft; if (!d || !r.draftId) return;
+  const seatUser = {}; for (const s of r.seats) seatUser[s.id] = s.userId;
+  const rows = [];
+  for (const m of d.managers.values()) {
+    const uid = seatUser[m.id]; if (!uid) continue;
+    for (const u of m.roster) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: u.id, name: u.name, club: u.club, position: u.position, price: u.price, is_sub: false });
+    if (m.substitute) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: m.substitute.id, name: m.substitute.name, club: m.substitute.club, position: m.substitute.position, price: 0, is_sub: true });
+  }
+  if (!rows.length) return;
+  await svcDelete(`dc_draft_rosters?draft_id=eq.${r.draftId}`);
+  await svcPost('dc_draft_rosters', rows);
+}
+// очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
+async function draftPoints(ids) {
+  const playerPts = {}, playerMin = {}, coachPts = {}; let confirmed = 0;
+  for (const mid of ids) {
+    let det; try { det = await ftDetail(mid); } catch { continue; }
+    if ((det.realMatch || {}).status === 'confirmed') confirmed++;
+    for (const r of det.realPlayerMatchStats || []) {
+      const pid = r.realPlayerId, pos = r.position || '', pts = cp(r.stats || {}, pos), min = r.minutesPlayed || 0;
+      playerPts[pid] = (playerPts[pid] || 0) + pts; playerMin[pid] = (playerMin[pid] || 0) + min;
+      if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; } // тренер = очки вышедших на замену
+    }
+  }
+  return { playerPts, playerMin, coachPts, allConfirmed: ids.length > 0 && confirmed === ids.length };
+}
+// standings драфта; статус settled когда все матчи confirmed
+async function scoreDraft(draftId) {
+  const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = drows[0];
+  if (!d) throw new Error('нет драфта');
+  const ids = d.match_ids || [];
+  const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=user_id,player_id,name,club,position,is_sub`);
+  const { playerPts, playerMin, coachPts, allConfirmed } = await draftPoints(ids);
+  const uids = [...new Set(rosters.map((r) => r.user_id))]; const names = {};
+  if (uids.length) { const pf = await svcGet(`dc_profiles?id=in.(${uids.map((u) => '"' + u + '"').join(',')})&select=id,display_name`); for (const p of pf) names[p.id] = p.display_name; }
+  const rnd1 = (x) => Math.round(x * 10) / 10;
+  const PMIN = { GK: 1, DEF: 3, MID: 2, FWD: 1, COACH: 1 }, PMAX = { GK: 1, DEF: 5, MID: 5, FWD: 3, COACH: 1 };
+  const byUser = {}; for (const r of rosters) (byUser[r.user_id] || (byUser[r.user_id] = [])).push(r);
+  const standings = [], teams = [];
+  for (const uid of Object.keys(byUser)) {
+    const rs = byUser[uid], starters = rs.filter((r) => !r.is_sub), sub = rs.find((r) => r.is_sub);
+    let total = 0; const players = [];
+    const counts = { GK: 0, DEF: 0, MID: 0, FWD: 0, COACH: 0 };
+    for (const r of starters) counts[r.position] = (counts[r.position] || 0) + 1;
+    for (const r of starters) {
+      const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
+      total += pp;
+      players.push({ name: r.name, club: r.club, position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, isCoach: r.position === 'COACH', isSub: false, counted: true });
+    }
+    // замена выходит только если ею можно заменить невышедшего стартового без нарушения минимумов формации
+    let subUsed = false;
+    if (sub) {
+      const P = sub.position;
+      const dnp = starters.filter((r) => r.position !== 'COACH' && (playerMin[r.player_id] || 0) === 0);
+      for (const r of dnp) {
+        if (r.position === P) { subUsed = true; break; }                                   // та же позиция — всегда валидно
+        if ((counts[r.position] - 1) >= PMIN[r.position] && (counts[P] + 1) <= PMAX[P]) { subUsed = true; break; }
+      }
+      const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
+      players.push({ name: sub.name, club: sub.club, position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, isCoach: false, isSub: true, counted: subUsed });
+    }
+    total = rnd1(total);
+    standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });
+    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, players });
+  }
+  standings.sort((a, b) => b.total - a.total); teams.sort((a, b) => b.total - a.total);
+  let status = d.status;
+  if (allConfirmed && d.status === 'done') { await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled'; }
+  return { status, allConfirmed, standings, teams, hasRosters: rosters.length > 0 };
+}
+
 const rooms = new Map(); // code -> { room, clients:Set<ws> }
+let autoplayEnabled = false; // тумблер авто-доигрывания (для теста), по умолчанию выкл — в проде остаётся off
 function makeCode() {
   const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let c;
@@ -33,6 +240,71 @@ const server = http.createServer((req, res) => {
   if (url === '/config.json') {
     res.writeHead(200, { 'content-type': 'application/json' });
     return res.end(JSON.stringify(clientConfig()));
+  }
+  if (url === '/api/ft/matches') {
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    const season = q.get('season'), round = q.get('round');
+    if (!season || !round) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужны season и round' })); }
+    ftMatches(season, round)
+      .then(matches => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ matches })); })
+      .catch(e => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/flags') {
+    res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ autoplay: autoplayEnabled }));
+  }
+  if (url === '/api/admin/autoplay' && req.method === 'POST') {
+    let body = ''; req.on('data', (c) => { body += c; });
+    req.on('end', async () => {
+      try {
+        const { on } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        autoplayEnabled = !!on;
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ autoplay: autoplayEnabled }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
+  if (url === '/api/ft/matchstats') {
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    const matchId = q.get('matchId');
+    if (!matchId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен matchId' })); }
+    ftDetail(matchId).then((det) => {
+      const names = {}; for (const m of det.realTeamMemberships || []) names[m.realPlayerId] = (m.realPlayer || {}).lastName || (m.realPlayer || {}).firstName || m.realPlayerId;
+      const teams = {}; for (const t of det.realTeams || []) teams[t.id] = t.name || String(t.id);
+      const rm = det.realMatch || {}; const tids = (rm.realTeamIds || []).slice(0, 2);
+      const players = (det.realPlayerMatchStats || []).map((r) => ({ name: names[r.realPlayerId] || r.realPlayerId, club: teams[r.realTeamId] || r.realTeamId, position: r.position, lineup: r.lineup, minutes: r.minutesPlayed || 0, total: cp(r.stats || {}, r.position), stats: r.stats || {} }));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ home: teams[tids[0]] || '', away: teams[tids[1]] || '', status: rm.status || null, players }));
+    }).catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/draft/score') {
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    const draftId = q.get('draftId');
+    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    scoreDraft(draftId)
+      .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
+      .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/draft/launch' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { draftId } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);
+        const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ может запускать драфт');
+        const code = await launchDraft(draftId);
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ code }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
   }
   let file = url === '/' ? '/index.html' : url;
   if (file.endsWith('/')) file += 'index.html';
@@ -64,7 +336,7 @@ function attach(ws, code) {
   const e = rooms.get(code);
   e.clients.add(ws);
   ws.send(JSON.stringify({ type: 'room', code }));
-  ws.send(JSON.stringify({ type: 'pool', units: e.room.pool, clubOdds: e.room.clubOdds }));
+  ws.send(JSON.stringify({ type: 'pool', units: e.room.pool, clubOdds: e.room.clubOdds, matches: e.room.matches }));
 }
 async function joinAuthed(ws, msg) {
   const user = await authUser(msg.token);              // валидация токена → {id,email}
@@ -98,8 +370,16 @@ wss.on('connection', (ws) => {
         if (!e) return sendErr(ws, 'Сначала создай или войди в комнату');
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
         else if (msg.type === 'start') { e.room.start(); }
+        else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
+        else if (msg.type === 'autoplay') {
+          let ok = !e.room.allowedUserIds;                       // тестовая комната — всегда можно
+          if (!ok && ws.user) { const prof = await getProfile(ws.user.id); ok = autoplayEnabled && prof && prof.role === 'admin'; }
+          if (!ok) throw new Error('авто-доигрывание выключено (включается в Админке)');
+          e.room.autoplay();
+        }
         else { if (!ws.seatId) throw new Error('вы зритель'); e.room.action(ws.seatId, msg); }
         broadcast(ws.roomCode);
+        syncStatus(e);
       }
     } catch (err) { sendErr(ws, err.message); }
   });

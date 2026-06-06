@@ -24,6 +24,11 @@
   .statline{display:flex;gap:22px;flex-wrap:wrap}.stat{display:flex;flex-direction:column}.stat .v{font-size:22px;font-weight:800}.stat .v.gold{color:var(--gold)}.stat .k{font-size:11px;color:var(--mut);text-transform:uppercase}
   .empty{color:var(--mut);padding:24px;text-align:center;border:1px dashed var(--line);border-radius:10px}
   .badge{font-size:10px;padding:2px 8px;border-radius:8px;background:#22303d;color:var(--mut)}.badge.admin{background:#3a3320;color:var(--gold)}
+  .applist div{padding:2px 0;border-bottom:1px solid #1d2935;font-size:12px}.applist div:last-child{border-bottom:none}
+  .dcard{border-left:4px solid var(--line)}
+  .dcard.st-recruiting{border-left-color:#5d7488}.dcard.st-finalized{border-left-color:#a569bd}.dcard.st-live{border-left-color:var(--acc)}.dcard.st-done{border-left-color:#3498db}.dcard.st-settled{border-left-color:var(--gold)}.dcard.st-cancelled{border-left-color:var(--miss)}
+  .qbid{padding:2px 7px!important;font-size:11px!important;border-radius:6px!important}
+  .plist .pblockh{position:sticky;top:0;background:#1a2733;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-bottom:1px solid var(--line)}
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
@@ -31,6 +36,7 @@
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
+  .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:48px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
   .phead .nm{font-weight:800}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
@@ -87,6 +93,7 @@
       <button class="tab admin" data-sec="admin" onclick="showSection('admin')" style="display:none">Админка</button>
     </nav>
     <span class="sp"></span>
+    <span class="pill" id="navClock" title="местное время · UTC+3"></span>
     <span class="pill coin" id="navCoin">0 DCC</span>
     <span class="pill" id="navName"></span>
     <a href="#" onclick="doLogout();return false" class="mut">выйти</a>
@@ -94,31 +101,41 @@
   <main>
     <!-- ЛОББИ -->
     <div id="secLobby" class="view active">
-      <div class="card2">
-        <h2>Лобби</h2>
-        <div class="row">
-          <button class="btn p" onclick="doCreate()">Создать драфт</button>
-          <span class="mut">или войти по коду комнаты:</span>
-          <input id="lcode" placeholder="КОД" style="width:90px;text-transform:uppercase">
-          <button class="btn" onclick="doJoinRoom()">Войти</button>
+      <div class="nav" style="margin-bottom:12px">
+        <button class="tab subtab active" data-sub="reg" onclick="showLobbyTab('reg')">Запись</button>
+        <button class="tab subtab" data-sub="all" onclick="showLobbyTab('all')">Все драфты</button>
+      </div>
+      <!-- подвкладка: запись -->
+      <div id="lobReg">
+        <div class="card2">
+          <h3>Войти в драфт</h3>
+          <div class="row">
+            <span class="mut">по коду комнаты:</span>
+            <input id="lcode" placeholder="КОД" style="width:90px;text-transform:uppercase">
+            <button class="btn" onclick="doJoinRoom()">Войти</button>
+            <button class="btn" onclick="doCreate()">Создать тестовый драфт</button>
+          </div>
+          <div id="lerr" class="err" style="margin-top:8px"></div>
         </div>
-        <div id="lerr" class="err" style="margin-top:8px"></div>
-        <p class="mut" style="font-size:11px;margin:10px 0 0">Создание драфта временно доступно всем — в Фазе B станет функцией админа (выбор турнира/тура/матчей, лига, настройки).</p>
+        <div class="card2">
+          <h3>Собираются сейчас — открыта запись</h3>
+          <div id="lobRegList"><div class="empty">загрузка…</div></div>
+        </div>
       </div>
-      <div class="card2">
-        <h3>Собираются сейчас</h3>
-        <div class="empty">Список собирающихся драфтов появится в Фазе B (заявки + лайв-статус).</div>
-      </div>
-      <div class="card2">
-        <h3>Идут / состоявшиеся</h3>
-        <div class="empty">Просмотр текущих и сыгранных драфтов — Фаза E.</div>
+      <!-- подвкладка: все драфты -->
+      <div id="lobAll" style="display:none">
+        <div class="card2">
+          <h3>Все драфты — идут и состоявшиеся</h3>
+          <div id="lobAllList"><div class="empty">загрузка…</div></div>
+        </div>
       </div>
     </div>
     <!-- МОИ ДРАФТЫ -->
     <div id="secMine" class="view">
       <div class="card2">
         <h2>Мои драфты</h2>
-        <div class="empty">Здесь появятся драфты, в которых ты участвуешь: очки и шансы по текущему туру + история. Подключим в Фазе E.</div>
+        <div id="mineList"><div class="empty">загрузка…</div></div>
+        <p class="mut" style="font-size:11px;margin:10px 0 0">Очки и шансы по текущему туру подключим вместе с live-движком.</p>
       </div>
     </div>
     <!-- ПРОФИЛЬ -->
@@ -129,6 +146,11 @@
           <label>Никнейм</label>
           <div class="row"><input id="profNick" style="flex:1" placeholder="никнейм"><button class="btn p" onclick="saveNick()">Сохранить</button></div>
           <div id="nickMsg" class="mut" style="font-size:12px"></div>
+        </div>
+        <div class="field" style="max-width:420px">
+          <label>Часовой пояс (для отображения времени)</label>
+          <div class="row"><select id="profTz" style="flex:1"></select><button class="btn p" onclick="saveTz()">Сохранить</button></div>
+          <div id="tzMsg" class="mut" style="font-size:12px">«Авто» определяет зону по браузеру. Время старта драфтов всегда дублируется в UTC+3.</div>
         </div>
       </div>
       <div class="card2">
@@ -148,9 +170,50 @@
     </div>
     <!-- АДМИНКА (только для админа) -->
     <div id="secAdmin" class="view">
+      <div class="card2" style="border-left:4px solid #a569bd">
+        <label><input type="checkbox" id="autoToggle" onchange="toggleAutoplay()"> Разрешить авто-доигрывание драфта (для теста)</label>
+        <span id="autoToggleMsg" class="mut" style="margin-left:8px"></span>
+        <p class="mut" style="font-size:11px;margin:6px 0 0">В проде держать выключенным: при включении в кокпите появляется кнопка «⚡ Авто-доиграть», мгновенно завершающая аукцион. Нужно, чтобы соло прогнать драфт до итоговой картинки с очками.</p>
+      </div>
       <div class="card2">
-        <h2>Админка</h2>
-        <div class="empty">Создание и настройка драфтов (турнир, тур, матчи, лига, слоты), заявки и финализация, начисление DCC — Фазы B-D.</div>
+        <h2>Создать драфт</h2>
+        <div class="row" style="align-items:flex-end">
+          <div class="field" style="margin:0"><label>Турнир</label><select id="dTour"></select></div>
+          <div class="field" style="margin:0"><label>Тур</label><input id="dRound" type="number" min="1" value="1" style="width:80px"></div>
+          <button class="btn" onclick="loadMatches()">Загрузить матчи</button>
+          <span id="dMatchMsg" class="mut"></span>
+        </div>
+        <div id="dMatches" style="margin-top:12px"></div>
+      </div>
+      <div class="card2">
+        <h3>Лига и экономика</h3>
+        <div class="row" style="align-items:flex-end">
+          <div class="field" style="margin:0"><label>Лига</label>
+            <select id="dLeague" onchange="leagueDefaults()">
+              <option value="BRONZE">🟤 BRONZE</option><option value="SILVER">⚪ SILVER</option><option value="GOLDEN">🟡 GOLDEN</option>
+            </select></div>
+          <div class="field" style="margin:0"><label>Бай-ин (DCC)</label><input id="dBuyin" type="number" min="0" style="width:90px"></div>
+          <div class="field" style="margin:0"><label>1 место</label><input id="dP1" type="number" min="0" style="width:90px"></div>
+          <div class="field" style="margin:0"><label>2 место</label><input id="dP2" type="number" min="0" style="width:90px"></div>
+        </div>
+      </div>
+      <div class="card2">
+        <h3>Настройки</h3>
+        <div class="row" style="align-items:flex-end">
+          <div class="field" style="margin:0"><label>Слотов (участников)</label><input id="dSlots" type="number" min="2" max="12" value="5" style="width:90px"></div>
+          <div class="field" style="margin:0"><label>Лимит игроков из клуба</label><input id="dClubLim" type="number" min="1" max="11" value="5" style="width:90px"></div>
+          <div class="field" style="margin:0"><label>Дата и время <span id="dTzLbl" class="mut"></span></label><input id="dWhen" type="datetime-local"><span id="dNowHint" class="mut" style="font-size:11px"></span></div>
+        </div>
+      </div>
+      <div class="card2">
+        <button class="btn p" onclick="createDraft()">Создать драфт</button>
+        <div id="dCreateMsg" class="mut" style="margin-top:8px"></div>
+        <div id="dPreview" style="margin-top:10px"></div>
+      </div>
+      <div class="card2">
+        <h3>Созданные драфты</h3>
+        <div id="adminMsg" class="mut" style="margin-bottom:8px"></div>
+        <div id="adminDraftsList"><div class="empty">загрузка…</div></div>
       </div>
     </div>
   </main>
@@ -163,7 +226,7 @@
     <button class="btn" onclick="leaveDraft()">← Разделы</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-    <span class="sp"></span><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </header>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -172,23 +235,37 @@
         <div class="cols" id="cols"></div>
         <div id="bottom"></div>
       </div>
-      <div class="right"><div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div></div>
+      <div class="right">
+        <div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
+        <div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div>
+      </div>
     </div>
   </div></main>
 </div>
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
+<div id="viewer" style="display:none;position:fixed;inset:0;background:#000b;z-index:20;overflow:auto;padding:24px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div class="card2">
+      <div class="row"><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><button class="btn" onclick="closeViewer()">Закрыть</button></div>
+      <div class="nav" style="margin:10px 0"><button class="tab vtab active" data-vt="teams" onclick="viewerTab('teams')">Команды</button><button class="tab vtab" data-vt="matches" onclick="viewerTab('matches')">Матчи</button></div>
+      <div id="vTeams"></div>
+      <div id="vMatches" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
 <script>
-const LIM={GK:[1,1],DEF:[3,5],MID:[3,5],FWD:[1,3],COACH:[1,1]};
+const LIM={GK:[1,1],DEF:[3,5],MID:[2,5],FWD:[1,3],COACH:[1,1]};
 const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null,S=null,POOL=[],CLUBODDS=[],myName='',myRoom='',sb=null,session=null,PROFILE={};
+let me=null,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
-  else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];}
+  else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();}
   else if(m.type==='joined'){me=m.you;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='state'){S=m.state;render();}};
@@ -198,18 +275,24 @@ async function initAuth(){
   try{const cfg=await (await fetch('/config.json')).json(); sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);}
   catch(e){const a=document.getElementById('amsg'); if(a)a.textContent='не удалось получить конфиг сервера'; return;}
   const {data}=await sb.auth.getSession(); session=data.session;
-  sb.auth.onAuthStateChange((_e,s)=>{session=s; if(s) onAuthed();});
+  // важно: onAuthed() сбрасывает вид на Лобби. Зовём его ТОЛЬКО при первом входе,
+  // иначе обновление токена/возврат фокуса (Supabase шлёт событие) выкидывает из live-комнаты.
+  sb.auth.onAuthStateChange((ev,s)=>{session=s; if(ev==='SIGNED_OUT'){authedOnce=false; showAuth();} else if(s && !authedOnce){onAuthed();}});
   if(session) onAuthed(); else showAuth();
 }
 function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
 function showApp(){document.getElementById('landing').style.display='none';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';}
 async function onAuthed(){
+  authedOnce=true;
   myName=(session.user.email||'Player').split('@')[0];
   PROFILE={};
   try{const {data}=await sb.from('dc_profiles').select('*').eq('id',session.user.id).single(); if(data)PROFILE=data;}catch{}
   if(PROFILE.display_name)myName=PROFILE.display_name;
+  initTzSelect();
   renderProfileUI();
+  initAdminForm();
   showApp(); showSection('lobby');
+  tick(); loadDrafts(); loadFlags();
   const room=new URLSearchParams(location.search).get('room'); if(room) document.getElementById('lcode').value=room;
 }
 function renderProfileUI(){
@@ -223,12 +306,294 @@ function renderProfileUI(){
   document.getElementById('stWins').textContent=PROFILE.wins||0;
   document.getElementById('stPod').textContent=PROFILE.podiums||0;
   const rb=document.getElementById('profRole');rb.textContent=isAdmin?'админ':'юзер';rb.className='badge'+(isAdmin?' admin':'');
+  const tzSel=document.getElementById('profTz');if(tzSel)tzSel.value=PROFILE.timezone||'';
 }
+function initTzSelect(){
+  const sel=document.getElementById('profTz');if(!sel||sel.options.length)return;
+  let zones;try{zones=Intl.supportedValuesOf('timeZone');}catch{zones=['Europe/Nicosia','Europe/Kyiv','Europe/Moscow','Asia/Yekaterinburg','Asia/Almaty','Europe/London','UTC'];}
+  sel.innerHTML='<option value="">Авто (по браузеру)</option>'+zones.map(z=>`<option value="${z}">${z}</option>`).join('');
+}
+async function saveTz(){
+  const tz=document.getElementById('profTz').value||null;
+  const {error}=await sb.from('dc_profiles').update({timezone:tz}).eq('id',session.user.id);
+  if(error){document.getElementById('tzMsg').textContent=error.message;return;}
+  PROFILE.timezone=tz;document.getElementById('tzMsg').textContent='сохранено';tick();
+  setTimeout(()=>{const m=document.getElementById('tzMsg');if(m.textContent==='сохранено')m.textContent='';},2500);
+}
+// живые часы (местное игрока + UTC+3) и обратные отсчёты
+function cdText(iso){if(!iso)return '';const ms=new Date(iso)-new Date();if(ms<=0)return 'начался';const s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),ss=s%60;return (d?d+'д ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
+function tick(){
+  const now=new Date(),c=document.getElementById('navClock');
+  if(c){const tz=effTZ();c.textContent='🕒 '+clockIn(tz,now)+' '+offLabel(tz,now)+' · '+clockIn(TZ,now)+' '+offLabel(TZ,now);}
+  document.querySelectorAll('.countdown').forEach(el=>{el.textContent=cdText(el.dataset.start);});
+}
+setInterval(tick,1000);
 function showSection(sec){
   document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
   const map={lobby:'secLobby',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
   document.getElementById(map[sec]).classList.add('active');
+  if(sec==='admin')refreshAdminTime();
+  if(sec==='lobby'||sec==='admin'||sec==='mine')loadDrafts();
+}
+// --- Лобби: подвкладки Запись / Все драфты ---
+function showLobbyTab(t){
+  document.querySelectorAll('#secLobby .subtab').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
+  document.getElementById('lobReg').style.display=t==='reg'?'block':'none';
+  document.getElementById('lobAll').style.display=t==='all'?'block':'none';
+}
+// --- Админка: создание драфта ---
+const TOURNAMENTS=[{label:'EPL 2025/26',season:1900},{label:'World Cup 2026',season:1995}];
+const LEAGUES={BRONZE:{buyin:8,p1:28,p2:10},SILVER:{buyin:28,p1:90,p2:38},GOLDEN:{buyin:115,p1:350,p2:165}};
+const TZ='Europe/Nicosia'; // Кипр/Киев — одна зона EET/EEST (сейчас UTC+3, зимой UTC+2)
+let loadedMatches=[];
+// время поля трактуем как киевское (datetime-local без таймзоны = настенное время зоны TZ)
+function tzWallString(date){const p=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});const h=p.hour==='24'?'00':p.hour;return `${p.year}-${p.month}-${p.day}T${h}:${p.minute}`;}
+// смещение/метка/часы для произвольной IANA-зоны
+function offMin(tz,d){const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).reduce((a,x)=>(a[x.type]=x.value,a),{});const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+(p.hour==='24'?0:p.hour),+p.minute,+p.second);return Math.round((asUTC-d.getTime())/60000);}
+function offLabel(tz,d){const m=offMin(tz,d);const s=m>=0?'+':'-';const ah=Math.floor(Math.abs(m)/60);const am=Math.abs(m)%60;return 'UTC'+s+ah+(am?':'+String(am).padStart(2,'0'):'');}
+function clockIn(tz,d){return new Intl.DateTimeFormat('ru-RU',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d);}
+function effTZ(){return (PROFILE&&PROFILE.timezone)||Intl.DateTimeFormat().resolvedOptions().timeZone;}
+function tzOffsetMin(date){return offMin(TZ,date);}
+function tzLabel(){return offLabel(TZ,new Date());}
+function tzNowHint(){return 'сейчас: '+new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date())+' ('+tzLabel()+')';}
+function tzWallToUTC(wall){if(!wall)return null;const [d,t]=wall.split('T');const [Y,M,D]=d.split('-').map(Number);const [h,mi]=t.split(':').map(Number);const g=Date.UTC(Y,M-1,D,h,mi);const off=tzOffsetMin(new Date(g));return new Date(g-off*60000);}
+function refreshAdminTime(){const w=document.getElementById('dWhen');if(w&&!w.value)w.value=tzWallString(new Date());const h=document.getElementById('dNowHint');if(h)h.textContent=tzNowHint();const l=document.getElementById('dTzLbl');if(l)l.textContent='('+tzLabel()+')';}
+function initAdminForm(){
+  const sel=document.getElementById('dTour');
+  if(sel&&!sel.options.length)sel.innerHTML=TOURNAMENTS.map((t,i)=>`<option value="${i}">${t.label}</option>`).join('');
+  leagueDefaults();refreshAdminTime();
+}
+function leagueDefaults(){
+  const L=LEAGUES[document.getElementById('dLeague').value];if(!L)return;
+  document.getElementById('dBuyin').value=L.buyin;document.getElementById('dP1').value=L.p1;document.getElementById('dP2').value=L.p2;
+}
+async function loadMatches(){
+  const t=TOURNAMENTS[+document.getElementById('dTour').value];const round=+document.getElementById('dRound').value;
+  const msg=document.getElementById('dMatchMsg');msg.textContent='загружаю…';
+  try{
+    const r=await fetch(`/api/ft/matches?season=${t.season}&round=${round}`);const j=await r.json();
+    if(!r.ok)throw new Error(j.error||r.status);
+    loadedMatches=j.matches||[];renderMatches();
+    msg.textContent=loadedMatches.length?`матчей: ${loadedMatches.length}`:'матчей не найдено для этого тура';
+  }catch(e){msg.textContent='ошибка: '+e.message;document.getElementById('dMatches').innerHTML='';}
+}
+function renderMatches(){
+  const el=document.getElementById('dMatches');
+  if(!loadedMatches.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="row" style="margin-bottom:6px"><button class="btn" onclick="allMatches(true)">Все</button><button class="btn" onclick="allMatches(false)">Снять</button><span class="mut">отметь матчи драфта</span></div>`+
+    '<table><thead><tr><th style="width:24px"></th><th>матч</th><th>старт</th><th>статус</th></tr></thead><tbody>'+
+    loadedMatches.map((m,i)=>`<tr><td><input type="checkbox" class="mch" data-i="${i}" checked></td><td>${m.home} — ${m.away}</td><td class="mut">${fmtKick(m.startTime)}</td><td class="mut">${m.status||''}</td></tr>`).join('')+'</tbody></table>';
+}
+function allMatches(on){document.querySelectorAll('.mch').forEach(c=>c.checked=on);}
+function fmtKick(s){if(!s)return '—';try{return new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return s;}}
+async function createDraft(){
+  const msg=document.getElementById('dCreateMsg');
+  const t=TOURNAMENTS[+document.getElementById('dTour').value];
+  const chosen=[...document.querySelectorAll('.mch')].filter(c=>c.checked).map(c=>loadedMatches[+c.dataset.i]);
+  if(!chosen.length){msg.textContent='загрузи матчи тура и отметь хотя бы один';return;}
+  const utc=tzWallToUTC(document.getElementById('dWhen').value||null);
+  const row={created_by:session.user.id,tournament:t.label,season_id:t.season,round:+document.getElementById('dRound').value,
+    match_ids:chosen.map(m=>m.matchId),league:document.getElementById('dLeague').value,
+    buyin:+document.getElementById('dBuyin').value,prize1:+document.getElementById('dP1').value,prize2:+document.getElementById('dP2').value,
+    slots:+document.getElementById('dSlots').value,club_limit:+document.getElementById('dClubLim').value,
+    starts_at:utc?utc.toISOString():null};
+  msg.textContent='сохраняю…';
+  const {error}=await sb.from('dc_drafts').insert(row);
+  if(error){msg.textContent='ошибка: '+error.message;return;}
+  msg.textContent='драфт создан ✓ — см. Лобби и список ниже';
+  document.getElementById('dPreview').innerHTML='';
+  document.getElementById('dMatches').innerHTML='';loadedMatches=[];document.getElementById('dMatchMsg').textContent='';
+  await loadDrafts();
+}
+// --- драфты: загрузка и рендер ---
+const LEAGUE_ICON={BRONZE:'🟤',SILVER:'⚪',GOLDEN:'🟡'};
+const STATUS_RU={recruiting:'идёт запись',finalized:'запланирован',live:'идёт',done:'сыгран · подсчёт очков',settled:'сыгран · очки подсчитаны',cancelled:'отменён'};
+let DRAFTS=[],APPS=[],MYAPPS=new Set(),PROFNAMES={},SCORES={},AUTOPLAY_ON=false;
+function fmtStart(iso){if(!iso)return 'время не задано';try{return new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(iso))+' ('+tzLabel()+')';}catch{return iso;}}
+async function loadDrafts(){
+  try{
+    const {data:dr}=await sb.from('dc_drafts').select('*').order('created_at',{ascending:false});DRAFTS=dr||[];
+    const {data:ap}=await sb.from('dc_applications').select('*');APPS=ap||[];
+    MYAPPS=new Set(APPS.filter(a=>a.user_id===session.user.id).map(a=>a.draft_id));
+    const ids=[...new Set(APPS.map(a=>a.user_id))];
+    if(ids.length){const {data:pf}=await sb.from('dc_profiles').select('id,display_name').in('id',ids);(pf||[]).forEach(p=>PROFNAMES[p.id]=p.display_name);}
+  }catch(e){DRAFTS=[];APPS=[];}
+  renderLobbyReg();renderLobbyAll();renderAdminDrafts();renderMine();tick();
+}
+function nameOf(uid){return PROFNAMES[uid]||uid.slice(0,8);}
+function applicantNames(id){return APPS.filter(a=>a.draft_id===id).map(a=>nameOf(a.user_id)+(a.status==='accepted'?' ✓':a.status==='rejected'?' ✗':''));}
+function acceptedNames(id){return APPS.filter(a=>a.draft_id===id&&a.status==='accepted').map(a=>nameOf(a.user_id));}
+function namesCol(arr){return arr.length?arr.map(n=>`<div>${n}</div>`).join(''):'<div class="mut">—</div>';}
+async function ensureScore(id){
+  if(SCORES[id])return; SCORES[id]={loading:true};
+  try{const r=await fetch('/api/draft/score?draftId='+id);const j=await r.json();SCORES[id]=r.ok?j:{error:true};
+    if(SCORES[id].status==='settled'){const d=DRAFTS.find(x=>x.id===id);if(d)d.status='settled';}
+  }catch{SCORES[id]={error:true};}
+  renderMine();renderLobbyAll();
+}
+// --- просмотрщик драфта (Команды + Матчи) ---
+let VIEW={};
+const FTPOS={goalkeeper:['GK','gk'],defender:['DEF','def'],midfielder:['MID','mid'],forward:['FWD','fwd']};
+function posClass(p){return FTPOS[p]?FTPOS[p][1]:(p||'').toLowerCase();}
+function closeViewer(){document.getElementById('viewer').style.display='none';}
+function viewerTab(t){document.querySelectorAll('#viewer .vtab').forEach(b=>b.classList.toggle('active',b.dataset.vt===t));document.getElementById('vTeams').style.display=t==='teams'?'block':'none';document.getElementById('vMatches').style.display=t==='matches'?'block':'none';}
+async function openViewer(id){
+  const d=DRAFTS.find(x=>x.id===id);if(!d)return;
+  VIEW={draft:d,score:null,fixtures:[]};
+  document.getElementById('vTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament}, тур ${d.round}`;
+  document.getElementById('viewer').style.display='block';viewerTab('teams');
+  document.getElementById('vTeams').innerHTML='<div class="mut">загрузка…</div>';document.getElementById('vMatches').innerHTML='<div class="mut">загрузка…</div>';
+  try{const r=await fetch('/api/draft/score?draftId='+id);VIEW.score=await r.json();}catch{VIEW.score={error:true};}
+  renderViewerTeams();
+  try{const r=await fetch(`/api/ft/matches?season=${d.season_id}&round=${d.round}`);const j=await r.json();const set=new Set((d.match_ids||[]).map(Number));VIEW.fixtures=(j.matches||[]).filter(m=>set.has(Number(m.matchId)));}catch{VIEW.fixtures=[];}
+  renderViewerMatchesList();
+}
+function renderViewerTeams(){
+  const el=document.getElementById('vTeams');const sc=VIEW.score;
+  if(!sc||sc.error){el.innerHTML='<div class="empty">не удалось загрузить</div>';return;}
+  if(!sc.teams||!sc.teams.length){el.innerHTML='<div class="empty">составы не сохранены (драфт сыгран до подключения скоринга)</div>';return;}
+  el.innerHTML='<div class="cols">'+sc.teams.map((t,i)=>`<div class="pcol"><div class="phead"><span class="nm">${i===0?'🥇 ':''}${t.name}</span> · <span style="color:var(--gold);font-weight:800">${t.total}</span></div>
+    <table><thead><tr><th>POS</th><th>Игрок</th><th>Клуб</th><th class="right">Мин</th><th class="right">Очки</th></tr></thead><tbody>${t.players.map(p=>`<tr style="${p.isSub&&!p.counted?'opacity:.4':''}"><td class="${posClass(p.position)}">${p.isSub?'S':posShort(p.position)}</td><td>${p.name}</td><td>${p.club}</td><td class="right">${p.minutes}</td><td class="right">${p.counted?'<b>'+p.points+'</b>':p.points}</td></tr>`).join('')}</tbody></table></div>`).join('')+'</div>';
+}
+function renderViewerMatchesList(){
+  const el=document.getElementById('vMatches');const fx=VIEW.fixtures;const ids=VIEW.draft.match_ids||[];
+  const list=fx.length?fx:ids.map(id=>({matchId:id,home:'матч',away:id}));
+  el.innerHTML=`<div style="margin-bottom:10px">${list.map(m=>`<button class="btn" style="margin:0 6px 6px 0" onclick="openMatch(${m.matchId})">${m.home} — ${m.away}</button>`).join('')}</div><div id="vMatchBody"><span class="mut">Выбери матч, чтобы увидеть статистику игроков.</span></div>`;
+}
+async function openMatch(mid){
+  const b=document.getElementById('vMatchBody');b.innerHTML='<span class="mut">загрузка…</span>';
+  try{const r=await fetch('/api/ft/matchstats?matchId='+mid);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);b.innerHTML=renderMatchStats(j);}catch(e){b.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
+}
+function renderMatchStats(j){
+  const COLS=[['G','goal'],['AST','assist'],['CS','cleanSheet'],['CG','concededGoal'],['SoT','shotOnTarget'],['S','keeperSave'],['PS','penaltySave'],['BLD','penaltyCaused'],['PM','penaltyMiss'],['OG','ownGoal'],['YC','yellowCard'],['RC','redCard'],['IMP','impact']];
+  const byClub={};j.players.forEach(p=>{(byClub[p.club]||(byClub[p.club]=[])).push(p);});
+  let html=`<div style="margin-bottom:8px"><b>${j.home} — ${j.away}</b> <span class="badge">${j.status||''}</span></div>`;
+  for(const club of Object.keys(byClub)){
+    const rows=byClub[club].sort((a,b)=>b.total-a.total);
+    html+=`<h4 style="margin:12px 0 4px">${club}</h4><div style="overflow-x:auto"><table style="font-size:11px"><thead><tr><th>Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`+
+      rows.map(p=>{const fp=FTPOS[p.position]||[p.position,''];return `<tr><td>${p.name}${p.lineup==='bench'?' <span class="mut">(зам)</span>':''}</td><td class="${fp[1]}">${fp[0]}</td><td class="right">${p.minutes}</td>`+COLS.map(c=>`<td class="right ${p.stats[c[1]]?'':'mut'}">${p.stats[c[1]]||0}</td>`).join('')+`<td class="right"><b>${Math.round(p.total*10)/10}</b></td></tr>`;}).join('')+`</tbody></table></div>`;
+  }
+  return html;
+}
+function renderLobbyReg(){
+  const el=document.getElementById('lobRegList');if(!el)return;
+  const rec=DRAFTS.filter(d=>d.status==='recruiting');
+  el.innerHTML=rec.length?rec.map(d=>{
+    const applied=MYAPPS.has(d.id);const an=applicantNames(d.id);
+    return `<div class="card2" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · матчей ${(d.match_ids||[]).length}<br>
+      старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · бай-ин ${d.buyin} DCC · призы ${d.prize1}/${d.prize2}
+      <div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>
+      <button class="btn p" style="margin-top:8px" ${applied?'disabled':''} onclick="applyToDraft(${d.id})">${applied?'Заявка отправлена ✓':'Оставить заявку ('+d.buyin+' DCC)'}</button></div>`;
+  }).join(''):'<div class="empty">Сейчас нет открытых на запись драфтов.</div>';
+}
+function renderLobbyAll(){
+  const el=document.getElementById('lobAllList');if(!el)return;
+  el.innerHTML=DRAFTS.length?DRAFTS.map(d=>{
+    const fin=d.status!=='recruiting';const acc=acceptedNames(d.id);const an=applicantNames(d.id);
+    const block=fin
+      ?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
+      :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
+    const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?`<br><button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${watch}</div>`;
+  }).join(''):'<div class="empty">Драфтов пока нет.</div>';
+}
+function renderAdminDrafts(){
+  const el=document.getElementById('adminDraftsList');if(!el)return;
+  if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов ещё нет.</div>';return;}
+  el.innerHTML=DRAFTS.map(d=>{
+    const apps=APPS.filter(a=>a.draft_id===d.id);
+    const acc=apps.filter(a=>a.status==='accepted').length;const over=acc>d.slots;
+    const rows=apps.length?apps.map(a=>{
+      const nm=PROFNAMES[a.user_id]||a.user_id.slice(0,8);
+      const tag=a.status==='accepted'?'<span class="badge admin">принят</span>':a.status==='rejected'?'<span class="badge">отклонён</span>':'<span class="badge">ожидает</span>';
+      return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0">
+        <span>${nm} ${tag}</span>
+        <span><button class="btn p" onclick="setApp(${a.id},'accepted')" ${a.status==='accepted'?'disabled':''}>Принять</button>
+        <button class="btn r" onclick="setApp(${a.id},'rejected')" ${a.status==='rejected'?'disabled':''}>Отклонить</button></span></div>`;
+    }).join(''):'<span class="mut">заявок пока нет</span>';
+    const ctrl=d.status==='recruiting'
+      ? `<button class="btn p" onclick="setDraftStatus(${d.id},'finalized')" ${acc<1||over?'disabled':''}>Финализировать состав (${acc})</button>${over?'<span class="err"> убери лишних — превышен лимит</span>':''}`
+      : d.status==='finalized'
+        ? `<span class="badge admin">состав зафиксирован</span> <button class="btn p" onclick="launchDraftBtn(${d.id})">Запустить live</button> <button class="btn" onclick="setDraftStatus(${d.id},'recruiting')">Вернуть в набор</button>`
+        : d.status==='live'
+          ? `<span class="badge admin">LIVE · код ${d.room_code||'—'}</span> <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button>`
+          : `<span class="badge">${d.status}</span>`;
+    return `<div class="card2" style="margin:0 0 10px">
+      <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
+      принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}
+      <div style="margin:8px 0">${rows}</div>
+      ${ctrl} <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button></div>`;
+  }).join('');
+}
+async function deleteDraft(id){
+  if(!confirm('Удалить драфт безвозвратно (вместе с заявками и составами)?'))return;
+  const m=document.getElementById('adminMsg');
+  const {error}=await sb.from('dc_drafts').delete().eq('id',id);
+  if(error){if(m)m.textContent='не удалось удалить: '+error.message;return;}
+  if(m)m.textContent='драфт удалён';delete SCORES[id];await loadDrafts();
+}
+function mineCard(a,d){
+  const cd=(d.starts_at&&d.status!=='live'&&d.status!=='done'&&d.status!=='settled')?` · до старта <span class="countdown" data-start="${d.starts_at}"></span>`:'';
+  const fin=(d.status!=='recruiting');const acc=acceptedNames(d.id),an=applicantNames(d.id);
+  const block=fin?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
+    :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
+  let st,enter='';
+  if(a.status==='pending')st='<span class="badge">заявка на рассмотрении</span>';
+  else if(a.status==='rejected')st='<span class="badge">не прошёл в этот раз</span>';
+  else if(d.status==='live'){st='<span class="badge admin">LIVE — идёт</span>';enter=` <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button>`;}
+  else if(d.status==='finalized')st='<span class="badge admin">вы в составе ✓ — ждите старта</span>';
+  else if(d.status==='recruiting')st='<span class="badge admin">приняты, ждём финализации состава</span>';
+  else st='';
+  let scoreBlock='';
+  if(d.status==='done'||d.status==='settled'){const sc=SCORES[d.id];
+    if(!sc){ensureScore(d.id);scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';}
+    else if(sc.loading)scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';
+    else if(sc.error)scoreBlock='<div class="mut" style="margin-top:6px">не удалось посчитать очки</div>';
+    else if(!sc.hasRosters)scoreBlock='<div class="mut" style="margin-top:6px">состав не сохранён (сыгран до подключения скоринга)</div>';
+    else scoreBlock=`<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">`+sc.standings.map((s,i)=>`<div>${['🥇','🥈'][i]||'• '}${s.name} — <b>${s.total}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`).join('')+'</div>';
+  }
+  const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?` <button class="btn" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+  return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)}${cd} · бай-ин ${d.buyin} DCC${block}${scoreBlock}<br>${st}${enter}${watch}</div>`;
+}
+function renderMine(){
+  const el=document.getElementById('mineList');if(!el)return;
+  const dById={};DRAFTS.forEach(d=>dById[d.id]=d);
+  const mine=APPS.filter(a=>a.user_id===session.user.id);
+  if(!mine.length){el.innerHTML='<div class="empty">Ты пока не подавал заявок. Загляни в Лобби → Запись.</div>';return;}
+  const g={live:[],planned:[],past:[]};
+  for(const a of mine){const d=dById[a.draft_id];if(!d)continue;
+    if(d.status==='settled'||d.status==='cancelled')g.past.push([a,d]);
+    else if(d.status==='live'||d.status==='done')g.live.push([a,d]);
+    else g.planned.push([a,d]);}
+  const sec=(t,arr)=>arr.length?`<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase">${t}</h3>`+arr.map(([a,d])=>mineCard(a,d)).join(''):'';
+  el.innerHTML=(sec('LIVE',g.live)+sec('Запланированные',g.planned)+sec('Прошедшие',g.past))||'<div class="empty">—</div>';
+}
+async function loadFlags(){try{const r=await fetch('/api/flags');const j=await r.json();AUTOPLAY_ON=!!j.autoplay;const c=document.getElementById('autoToggle');if(c)c.checked=AUTOPLAY_ON;}catch{}}
+async function toggleAutoplay(){
+  const on=document.getElementById('autoToggle').checked;const m=document.getElementById('autoToggleMsg');
+  try{const t=await authToken();const r=await fetch('/api/admin/autoplay',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({on})});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);AUTOPLAY_ON=!!j.autoplay;if(m)m.textContent=AUTOPLAY_ON?'включено':'выключено';}
+  catch(e){if(m)m.textContent='ошибка: '+e.message;document.getElementById('autoToggle').checked=AUTOPLAY_ON;}
+}
+async function setApp(appId,status){await sb.from('dc_applications').update({status}).eq('id',appId);await loadDrafts();}
+async function setDraftStatus(id,status){await sb.from('dc_drafts').update({status}).eq('id',id);await loadDrafts();}
+async function launchDraftBtn(id){
+  const m=document.getElementById('adminMsg');if(m)m.textContent='собираю пул игроков по матчам и поднимаю комнату… (может занять до минуты)';
+  try{
+    const t=await authToken();
+    const r=await fetch('/api/draft/launch',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    if(m)m.textContent='драфт запущен ✓ код '+j.code+' — участники входят из «Мои драфты», ты — кнопкой «Войти»';
+    await loadDrafts();
+  }catch(e){if(m)m.textContent='ошибка запуска: '+e.message;}
+}
+async function enterRoom(code){if(!code)return;const t=await authToken();if(!t){showAuth();return;}send({type:'joinRoom',code,token:t});}
+async function applyToDraft(id){
+  const le=document.getElementById('lerr');
+  const {error}=await sb.from('dc_applications').insert({draft_id:id,user_id:session.user.id});
+  if(error){if(le)le.textContent='не удалось подать заявку: '+error.message;return;}
+  if(le)le.textContent='';
+  await loadDrafts();
 }
 async function saveNick(){
   const nn=document.getElementById('profNick').value.trim();
@@ -267,8 +632,15 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderCols();renderBottom();renderClubs();
+  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();
+  const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
+  const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
+}
+function renderFixtures(){
+  const el=document.getElementById('matches');if(!el)return;
+  if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
+  el.innerHTML='<table style="font-size:11px"><tbody>'+MATCHES.map(m=>`<tr><td style="text-align:right">${m.home}</td><td class="mut" style="padding:0 4px">—</td><td>${m.away}</td></tr>`).join('')+'</tbody></table>';
 }
 function renderRibbon(){
   const el=document.getElementById('ribbon');
@@ -281,9 +653,9 @@ function renderCols(){
   if(!S.started){el.innerHTML='<div class="pcol mut">Составы появятся после старта.</div>';return;}
   const d=S.draft;
   el.innerHTML=ordered().map(m=>`
-    <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''}">
+    <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
       <div class="cam">камера</div>
-      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}${m.finished?' ✓':''}</span></div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}</div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
         <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
@@ -292,6 +664,7 @@ function renderCols(){
       ${formBlock(m.counts, m.finished)}
       <table><thead><tr><th style="width:18px">#</th><th style="width:28px">POS</th><th>PLAYER</th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th></tr></thead>
       <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.name}</td><td>${u.code||u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
+      ${Array.from({length:Math.max(0,12-m.roster.length)},(_,i)=>`<tr><td class="mut">${m.roster.length+i+1}</td><td></td><td class="mut">—</td><td></td><td></td></tr>`).join('')}
       ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.code||m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
     </div>`).join('');
 }
@@ -340,9 +713,12 @@ function renderBottom(){
 function actionBox(d){
   if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
+  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
+  const allin=`<button class="btn qbid" style="background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>all-in ${o.maxAmount}</button>`;
   return `<div style="margin-top:8px"><button class="btn r" onclick='send({type:"pass"})'>FOLD</button>
     <input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:58px">
-    <button class="btn p" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button></div>`;
+    <button class="btn p" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button>
+    <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${quick}${allin}</div></div>`;
 }
 function nomPanel(d){
   const mine=d.actor===me;
@@ -360,7 +736,7 @@ function nomPanel(d){
 function filterUI(mode){
   const units=S.draft.actorOptions.units||[];
   const teams=[...new Set(units.map(u=>u.club))].sort();
-  const poss=[...new Set(units.map(u=>u.position))];
+  const poss=POSORD.filter(p=>units.some(u=>u.position===p));
   return `<div class="filters">
     <input id="fq" placeholder="поиск по фамилии…" oninput="renderNom('${mode}')">
     <select id="ft" onchange="renderNom('${mode}')"><option value="">все клубы</option>${teams.map(t=>`<option>${t}</option>`).join('')}</select>
@@ -373,19 +749,52 @@ function renderNom(mode){
   const t=document.getElementById('ft')?.value||'';const p=document.getElementById('fp')?.value||'';
   const list=units.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
   const el=document.getElementById('plist');if(!el)return;
-  el.innerHTML=list.slice(0,80).map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.name} · ${u.club}</div>`).join('')||'<div class="pitem mut">ничего не найдено</div>';
+  let html='';
+  for(const pos of POSORD){
+    const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
+    if(!grp.length)continue;
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.name} · ${u.club}</div>`).join('');
+  }
+  el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
 let selId=null;
 function selectPlayer(id,mode){
   selId=id;const u=(S.draft.actorOptions.units||[]).find(x=>x.id===id);const sel=document.getElementById('sel');
   if(mode==='nominate'){
     const mx=S.draft.actorOptions.maxOpen;
+    const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid" onclick="document.getElementById('open').value=${v}" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
     sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
-      <button class="btn p" onclick='send({type:"nominate",unitId:${id},openingBid:+document.getElementById("open").value})'>Подтвердить выставление</button>`;
+      <div style="margin:6px 0;display:flex;gap:4px;flex-wrap:wrap">${q}<button class="btn qbid" style="background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx}">макс ${mx}</button></div>
+      <button class="btn p" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
   }else{
     sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club}
       <button class="btn p" onclick='send({type:"pickSubstitute",unitId:${id}})'>Подтвердить замену</button>`;
   }
+}
+// реплика движковых canAdd/maxBid для предсказания авто-забора (лимит позиции/клуба/физибилити + макс.бид)
+function clientCanAdd(m,unit,clubCounts){
+  if(m.finished||m.size>=12)return false;
+  const c={...m.counts};
+  if((c[unit.position]||0)+1>LIM[unit.position][1])return false;
+  if((clubCounts[unit.club]||0)>=5)return false;
+  c[unit.position]=(c[unit.position]||0)+1;
+  const remaining=12-(m.size+1);let needMin=0,cap=0;
+  for(const p of POSORD){needMin+=Math.max(0,LIM[p][0]-(c[p]||0));cap+=LIM[p][1]-(c[p]||0);}
+  return remaining>=needMin&&remaining<=cap;
+}
+function wouldAutoGrab(unit,openingBid){
+  const d=S.draft,cc=d.clubCounts||{};
+  for(const m of d.managers){
+    if(m.id===me||m.finished)continue;
+    if(clientCanAdd(m,unit,cc)&&m.maxBid>=openingBid+1)return false; // есть кто может перебить
+  }
+  return true; // никто не может — будет авто-забор
+}
+function confirmNominate(id){
+  const open=+document.getElementById('open').value;
+  const u=(S.draft.actorOptions.units||[]).find(x=>x.id===id);if(!u)return;
+  if(wouldAutoGrab(u,open)&&!confirm(`Внимание: соперники не могут перебить ${u.name} (${u.club}) — при подтверждении игрок сразу ваш за $${open}. Точно выставляем?`))return;
+  send({type:'nominate',unitId:id,openingBid:open});
 }
 function toggleHist(){const el=document.getElementById('hist');const open=el.style.display==='none'||!el.style.display;el.style.display=open?'block':'none';if(open)renderHist();}
 function renderHist(){const b=document.getElementById('histBody');if(!S||!S.started){b.innerHTML='<p>Драфт не начат</p>';return;}

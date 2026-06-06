@@ -44,3 +44,5 @@ create trigger dc_on_auth_user_created
   for each row execute function dc_handle_new_user();
 
 grant select, insert, update on public.dc_profiles to service_role;
+-- authenticated нужен табличный грант, иначе RLS-политики не срабатывают (Postgres режет до RLS)
+grant select, insert, update on public.dc_profiles to authenticated;

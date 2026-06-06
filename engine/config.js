@@ -9,7 +9,7 @@ export const DEFAULT_CONFIG = {
   positions: {
     GK:    { min: 1, max: 1 },
     DEF:   { min: 3, max: 5 },
-    MID:   { min: 3, max: 5 },
+    MID:   { min: 2, max: 5 },
     FWD:   { min: 1, max: 3 },
     COACH: { min: 1, max: 1 },
   },

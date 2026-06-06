@@ -12,3 +12,6 @@ end $$;
 
 -- 3) Матвей (montafly4@gmail.com) -> админ
 update dc_profiles set role = 'admin' where id = '56a7da2d-8f97-4c52-86a9-b10cc66564f4';
+
+-- 4) грант для роли authenticated (без него RLS-политики не работают — Postgres режет до RLS)
+grant select, insert, update on dc_profiles to authenticated;

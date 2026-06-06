@@ -26,7 +26,7 @@ export async function authUser(token) {
 /** Профиль игрока (display_name создаётся триггером при регистрации). */
 export async function getProfile(userId) {
   const r = await fetch(
-    `${U()}/rest/v1/dc_profiles?id=eq.${userId}&select=display_name,games_played,wins,podiums`,
+    `${U()}/rest/v1/dc_profiles?id=eq.${userId}&select=display_name,role,dcc_balance,games_played,wins,podiums`,
     { headers: { apikey: SERVICE(), authorization: `Bearer ${SERVICE()}` } });
   if (!r.ok) return null;
   const rows = await r.json();

@@ -11,12 +11,17 @@ let POOLFILE = null;
 try { POOLFILE = JSON.parse(fs.readFileSync(path.join(__dirname, 'pool.json'), 'utf8')); } catch {}
 
 export class Room {
-  constructor(config = DEFAULT_CONFIG, maxSeats = 5) {
+  constructor(config = DEFAULT_CONFIG, maxSeats = 5, pool = null, clubOdds = null, matches = null) {
     this.config = config;
     this.maxSeats = maxSeats;
-    // реальный пул FanTeam из pool.json (collect.py pool); фолбэк — синтетический
-    this.pool = (POOLFILE && POOLFILE.units && POOLFILE.units.length) ? POOLFILE.units : makePool();
-    this.clubOdds = (POOLFILE && POOLFILE.clubOdds) || [];
+    // пул конкретного драфта (по match_ids) если передан; иначе pool.json; иначе синтетика
+    this.pool = (pool && pool.length) ? pool
+      : ((POOLFILE && POOLFILE.units && POOLFILE.units.length) ? POOLFILE.units : makePool());
+    this.clubOdds = clubOdds || (POOLFILE && POOLFILE.clubOdds) || [];
+    this.matches = matches || (POOLFILE && POOLFILE.matches) || []; // [{home,away,startTime}]
+    this.allowedUserIds = null;          // null = открыто (тест); Set = место только принятым, остальные зрители
+    this.draftId = null;                 // связь с dc_drafts
+    this.history = [];                   // стек снапшотов для отмены: {seatId, snap}
     this.seats = [];                     // {id,name,ready,connected}
     this.draft = null;
   }
@@ -25,7 +30,8 @@ export class Room {
     // переподключение по аккаунту (userId)
     const existing = this.seats.find((s) => s.userId === userId);
     if (existing) { existing.connected = true; existing.name = name; return existing.id; }
-    if (this.seats.length >= this.maxSeats) return null; // спектатор
+    if (this.allowedUserIds && !this.allowedUserIds.has(userId)) return null; // не принят → зритель
+    if (this.seats.length >= this.maxSeats) return null; // мест нет → зритель
     const id = this.seats.length + 1;
     this.seats.push({ id, userId, name, ready: false, connected: true });
     return id;
@@ -42,7 +48,7 @@ export class Room {
   }
 
   startable() {
-    return !this.draft && this.seats.length >= 2 && this.seats.every((s) => s.ready);
+    return !this.draft && this.seats.length >= 1 && this.seats.every((s) => s.ready);
   }
 
   start() {
@@ -55,13 +61,52 @@ export class Room {
 
   action(seatId, msg) {
     if (!this.draft) throw new Error('драфт не начат');
+    const snap = snapDraft(this.draft);          // снимок ДО действия
+    let res;
     switch (msg.type) {
-      case 'nominate': return this.draft.nominate(seatId, msg.unitId, msg.openingBid ?? 1);
-      case 'bid':      return this.draft.bid(seatId, msg.amount);
-      case 'pass':     return this.draft.pass(seatId);
-      case 'pickSubstitute': return this.draft.pickSubstitute(seatId, msg.unitId);
+      case 'nominate': res = this.draft.nominate(seatId, msg.unitId, msg.openingBid ?? 1); break;
+      case 'bid':      res = this.draft.bid(seatId, msg.amount); break;
+      case 'pass':     res = this.draft.pass(seatId); break;
+      case 'pickSubstitute': res = this.draft.pickSubstitute(seatId, msg.unitId); break;
       default: throw new Error('неизвестное действие: ' + msg.type);
     }
+    this.history.push({ seatId, snap });          // действие прошло → фиксируем для отмены
+    if (this.history.length > 50) this.history.shift();
+    return res;
+  }
+
+  // отмена: вернуть состояние до последнего действия, но только если оно принадлежит этому игроку
+  // (нельзя отменить через чужой ход → накопительно откатываешь только свои последние действия)
+  undo(seatId) {
+    if (!this.draft) throw new Error('драфт не начат');
+    const top = this.history[this.history.length - 1];
+    if (!top || top.seatId !== seatId) throw new Error('нечего отменять (сверху не ваше действие)');
+    restoreDraft(this.draft, top.snap);
+    this.history.pop();
+  }
+
+  // ТОЛЬКО ДЛЯ ТЕСТА: авто-доиграть драфт (каждый номинирует дешёвого, остальные пасуют → забор за старт)
+  autoplay() {
+    if (!this.draft) {
+      if (!this.seats.length) throw new Error('нет игроков');
+      for (const s of this.seats) s.ready = true;
+      this.start();
+    }
+    const d = this.draft; let guard = 0;
+    while (d.phase !== 'done' && guard++ < 5000) {
+      if (d.phase === 'nominating') {
+        const elig = d.eligibleNominations(d.actor);
+        if (!elig.length) break;
+        d.nominate(d.actor, elig[0].id, 1);
+      } else if (d.phase === 'bidding') {
+        d.pass(d.actor);
+      } else if (d.phase === 'substitutes') {
+        const elig = d.eligibleSubstitutes(d.actor);
+        if (!elig.length) break;
+        d.pickSubstitute(d.actor, elig[0].id);
+      } else break;
+    }
+    this.history = []; // снапшоты отмены после автодоигрывания не нужны
   }
 
   _actorOptions() {
@@ -87,14 +132,16 @@ export class Room {
       seats: this.seats.map((s) => ({ id: s.id, name: s.name, ready: s.ready, connected: s.connected })),
       startable: this.startable(),
     };
-    if (!this.draft) return { started: false, lobby, draft: null };
+    if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;
     return {
       started: true,
+      isTest: !this.allowedUserIds,
       lobby,
       draft: {
         phase: d.phase,
         actor: d.actor,
+        canUndoSeat: this.history.length ? this.history[this.history.length - 1].seatId : null,
         order: d.order,
         lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed], bidsBy: d.lot.bidsBy },
         clubCounts: d.clubCounts,
@@ -118,3 +165,8 @@ function countPos(roster) {
   for (const u of roster) c[u.position]++;
   return c;
 }
+
+// снапшот/восстановление состояния движка для отмены (units/config/now не меняются — не клонируем)
+const SNAP_FIELDS = ['taken', 'clubCounts', 'managers', 'order', 'orderIdx', 'phase', 'nominatorPtr', 'lot', 'actor', '_finishCounter', 'subOrder', 'subPtr', 'log', 'picks', 'lotNo'];
+function snapDraft(d) { const o = {}; for (const k of SNAP_FIELDS) o[k] = structuredClone(d[k]); return o; }
+function restoreDraft(d, s) { for (const k of SNAP_FIELDS) d[k] = structuredClone(s[k]); }
