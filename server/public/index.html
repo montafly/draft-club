@@ -50,6 +50,17 @@
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* --- просмотрщик итогов: вкладка Команды --- */
+  .vteams{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;align-items:flex-start}
+  .vteam{flex:1;min-width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+  .vthead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+  .vthead .vtn{font-weight:800}.vthead .vtp{color:var(--gold);font-weight:800;font-size:16px}
+  .vteam td.nm{white-space:nowrap}.vteam td.cl{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mut)}
+  .vteam tfoot td{border-top:1px solid var(--line);font-weight:800;padding-top:5px}
+  .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:6px;font-size:11px}
+  .vteam tr.dnp{opacity:.45}.vteam .subcounted{color:var(--acc);font-weight:700}
+  .vsub{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--mut);font-weight:700;margin-right:6px}
   .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{display:flex;gap:12px;align-items:center}
@@ -245,7 +256,7 @@
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
-<div id="viewer" style="display:none;position:fixed;inset:0;background:#000b;z-index:20;overflow:auto;padding:24px">
+<div id="viewer" style="display:none;position:fixed;inset:0;background:#000b;z-index:20;overflow:auto;padding:24px" onclick="if(!event.target.closest('.card2'))closeViewer()">
   <div style="max-width:1200px;margin:0 auto">
     <div class="card2">
       <div class="row"><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><button class="btn" onclick="closeViewer()">Закрыть</button></div>
@@ -453,26 +464,39 @@ function renderViewerTeams(){
   const el=document.getElementById('vTeams');const sc=VIEW.score;
   if(!sc||sc.error){el.innerHTML='<div class="empty">не удалось загрузить</div>';return;}
   if(!sc.teams||!sc.teams.length){el.innerHTML='<div class="empty">составы не сохранены (драфт сыгран до подключения скоринга)</div>';return;}
-  el.innerHTML='<div class="cols">'+sc.teams.map((t,i)=>`<div class="pcol"><div class="phead"><span class="nm">${i===0?'🥇 ':''}${t.name}</span> · <span style="color:var(--gold);font-weight:800">${t.total}</span></div>
-    <table><thead><tr><th>POS</th><th>Игрок</th><th>Клуб</th><th class="right">Мин</th><th class="right">Очки</th></tr></thead><tbody>${t.players.map(p=>`<tr style="${p.isSub&&!p.counted?'opacity:.4':''}"><td class="${posClass(p.position)}">${p.isSub?'S':posShort(p.position)}</td><td>${p.name}</td><td>${p.club}</td><td class="right">${p.minutes}</td><td class="right">${p.counted?'<b>'+p.points+'</b>':p.points}</td></tr>`).join('')}</tbody></table></div>`).join('')+'</div>';
+  el.innerHTML='<div class="vteams">'+sc.teams.map((t,i)=>{
+    const starters=t.players.filter(p=>!p.isSub).slice().sort((a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position));
+    const sub=t.players.find(p=>p.isSub);
+    let n=0;
+    let body=starters.map(p=>{n++;return `<tr><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td class="nm">${p.name}</td><td class="cl">${p.club}</td><td class="right">${p.minutes}</td><td class="right">${p.counted?'<b>'+p.points+'</b>':p.points}</td></tr>`;}).join('');
+    if(sub){const tag=sub.counted?`<span class="subcounted">+${sub.points} в зачёте</span>`:`<span class="mut">не сыграла</span>`;body+=`<tr class="subr${sub.counted?'':' dnp'}"><td colspan="6"><span class="vsub">SUB</span><span class="${posClass(sub.position)}">${posShort(sub.position)}</span> ${sub.name} · <span class="mut">${sub.club}</span> ${tag}</td></tr>`;}
+    return `<div class="vteam${i===0?' lead':''}"><div class="vthead"><span class="vtn">${i===0?'🥇 ':''}${t.name}</span><span class="vtp">${t.total}</span></div><table><thead><tr><th>#</th><th>POS</th><th>Игрок</th><th>Клуб</th><th class="right">Мин</th><th class="right">Очки</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="5">Итого</td><td class="right">${t.total}</td></tr></tfoot></table></div>`;
+  }).join('')+'</div>';
 }
 function renderViewerMatchesList(){
   const el=document.getElementById('vMatches');const fx=VIEW.fixtures;const ids=VIEW.draft.match_ids||[];
   const list=fx.length?fx:ids.map(id=>({matchId:id,home:'матч',away:id}));
-  el.innerHTML=`<div style="margin-bottom:10px">${list.map(m=>`<button class="btn" style="margin:0 6px 6px 0" onclick="openMatch(${m.matchId})">${m.home} — ${m.away}</button>`).join('')}</div><div id="vMatchBody"><span class="mut">Выбери матч, чтобы увидеть статистику игроков.</span></div>`;
+  el.innerHTML=`<div style="display:flex;gap:14px;align-items:flex-start"><div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">${list.map(m=>`<button class="btn" style="text-align:left;white-space:nowrap" onclick="openMatch(${m.matchId},this)">${m.home} — ${m.away}</button>`).join('')}</div><div id="vMatchBody" style="flex:1;min-width:0"><span class="mut">Выбери матч, чтобы увидеть статистику игроков.</span></div></div>`;
 }
-async function openMatch(mid){
+async function openMatch(mid,btn){
+  if(btn){document.querySelectorAll('#vMatches .btn').forEach(b=>b.classList.remove('p'));btn.classList.add('p');}
   const b=document.getElementById('vMatchBody');b.innerHTML='<span class="mut">загрузка…</span>';
   try{const r=await fetch('/api/ft/matchstats?matchId='+mid);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);b.innerHTML=renderMatchStats(j);}catch(e){b.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
 }
 function renderMatchStats(j){
   const COLS=[['G','goal'],['AST','assist'],['CS','cleanSheet'],['CG','concededGoal'],['SoT','shotOnTarget'],['S','keeperSave'],['PS','penaltySave'],['BLD','penaltyCaused'],['PM','penaltyMiss'],['OG','ownGoal'],['YC','yellowCard'],['RC','redCard'],['IMP','impact']];
-  const byClub={};j.players.forEach(p=>{(byClub[p.club]||(byClub[p.club]=[])).push(p);});
+  const FTORD={goalkeeper:0,defender:1,midfielder:2,forward:3};
+  const prank=p=>(p.position in FTORD?FTORD[p.position]:9);
+  const byClub={};j.players.forEach(p=>{if((p.minutes||0)>0)(byClub[p.club]||(byClub[p.club]=[])).push(p);});
   let html=`<div style="margin-bottom:8px"><b>${j.home} — ${j.away}</b> <span class="badge">${j.status||''}</span></div>`;
+  const rowHtml=p=>{const fp=FTPOS[p.position]||[p.position,''];return `<tr><td style="white-space:nowrap">${p.name}</td><td class="${fp[1]}">${fp[0]}</td><td class="right">${p.minutes}</td>`+COLS.map(c=>`<td class="right ${p.stats[c[1]]?'':'mut'}">${p.stats[c[1]]||0}</td>`).join('')+`<td class="right"><b>${Math.round(p.total*10)/10}</b></td></tr>`;};
   for(const club of Object.keys(byClub)){
-    const rows=byClub[club].sort((a,b)=>b.total-a.total);
-    html+=`<h4 style="margin:12px 0 4px">${club}</h4><div style="overflow-x:auto"><table style="font-size:11px"><thead><tr><th>Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`+
-      rows.map(p=>{const fp=FTPOS[p.position]||[p.position,''];return `<tr><td>${p.name}${p.lineup==='bench'?' <span class="mut">(зам)</span>':''}</td><td class="${fp[1]}">${fp[0]}</td><td class="right">${p.minutes}</td>`+COLS.map(c=>`<td class="right ${p.stats[c[1]]?'':'mut'}">${p.stats[c[1]]||0}</td>`).join('')+`<td class="right"><b>${Math.round(p.total*10)/10}</b></td></tr>`;}).join('')+`</tbody></table></div>`;
+    const start=byClub[club].filter(p=>p.lineup!=='bench').sort((a,b)=>prank(a)-prank(b));
+    const subs=byClub[club].filter(p=>p.lineup==='bench').sort((a,b)=>prank(a)-prank(b));
+    html+=`<h4 style="margin:12px 0 4px">${club}</h4><div style="overflow-x:auto"><table style="font-size:11px"><thead><tr><th>Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`
+      +start.map(rowHtml).join('')
+      +(subs.length?`<tr><td colspan="${COLS.length+4}" style="border-top:2px dashed #34495e;padding-top:6px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Вышли на замену</td></tr>`+subs.map(rowHtml).join(''):'')
+      +`</tbody></table></div>`;
   }
   return html;
 }
