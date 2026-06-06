@@ -1,6 +1,7 @@
 # Деплой на VPS: git pull, заливка server/.env через SFTP, перезапуск сервиса.
 # Секреты не печатаются: .env переносится файлом, не через stdout.
 import sys, paramiko
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows-консоль (cp1251) иначе падает на '●'/кириллице
 
 HOST = "147.45.158.66"
 USER = "root"
