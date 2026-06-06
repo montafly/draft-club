@@ -567,8 +567,10 @@ function renderLobbyAll(){
     const block=fin
       ?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
       :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
-    const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?`<br><button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
-    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${watch}</div>`;
+    const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id);
+    const enter=(d.status==='live'&&myA&&myA.status==='accepted')?`<button class="btn p" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
+    const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?`<button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}<br>${enter}${watch}</div>`;
   }).join(''):'<div class="empty">Драфтов пока нет.</div>';
 }
 function renderAdminDrafts(){
@@ -590,7 +592,7 @@ function renderAdminDrafts(){
       : d.status==='finalized'
         ? `<span class="badge admin">состав зафиксирован</span> <button class="btn p" onclick="launchDraftBtn(${d.id})">Запустить live</button> <button class="btn" onclick="setDraftStatus(${d.id},'recruiting')">Вернуть в набор</button>`
         : d.status==='live'
-          ? `<span class="badge admin">LIVE · код ${d.room_code||'—'}</span> <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button>`
+          ? `<span class="badge admin">LIVE · код ${d.room_code||'—'}</span> <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button> <button class="btn" onclick="launchDraftBtn(${d.id})" title="Воскресить комнату после перезапуска сервера">Перезапустить комнату</button>`
           : `<span class="badge">${d.status}</span>`;
     return `<div class="card2" style="margin:0 0 10px">
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
