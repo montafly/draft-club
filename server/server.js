@@ -105,6 +105,27 @@ async function buildDraftPool(seasonId, round, matchIds) {
   return { units, clubOdds, matches };
 }
 
+// лёгкая сводка тура для страницы результатов: котировки клубов + расписание (один запрос листинга, без сбора пула игроков)
+async function tourInfo(seasonId, round, matchIds) {
+  const idset = new Set((matchIds || []).map(Number));
+  const listing = await ftGet(`real_matches?season_id=${seasonId}&round=${round}`);
+  const teams = {}, abbr = {};
+  for (const t of listing.realTeams || []) { teams[t.id] = t.name || String(t.id); abbr[t.id] = t.abbr || String(t.name || '').slice(0, 3).toUpperCase(); }
+  const sel = (listing.realMatches || []).filter((m) => idset.has(Number(m.id)));
+  const clubOdds = [], fixtures = [];
+  for (const m of sel) {
+    const det = m.details || {}, od = det.odds || {}, xg = (det.expectedGoals || [null, null]).slice(0, 2);
+    const ids = (m.realTeamIds || [null, null]).slice(0, 2);
+    let wh = null, wa = null;
+    try { const inv = [1 / +od.home, 1 / +od.draw, 1 / +od.away]; const s = inv[0] + inv[1] + inv[2]; wh = Math.round(inv[0] / s * 100); wa = Math.round(inv[2] / s * 100); } catch {}
+    const xh = xg[0], xa = xg[1];
+    clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
+    clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
+    fixtures.push({ matchId: m.id, home: teams[ids[0]] || '', away: teams[ids[1]] || '', homeCode: abbr[ids[0]] || '', awayCode: abbr[ids[1]] || '', startTime: m.startTime || null, status: m.status || null });
+  }
+  return { clubOdds, fixtures };
+}
+
 // REST-хелперы (service key) для launchDraft
 async function svcGet(path) {
   const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY } });
@@ -168,25 +189,33 @@ async function persistRosters(e) {
 }
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
-  const playerPts = {}, playerMin = {}, coachPts = {}; let confirmed = 0;
+  const playerPts = {}, playerMin = {}, coachPts = {}, matchInfo = {}; let confirmed = 0;
   for (const mid of ids) {
     let det; try { det = await ftDetail(mid); } catch { continue; }
-    if ((det.realMatch || {}).status === 'confirmed') confirmed++;
+    const rm = det.realMatch || {};
+    matchInfo[mid] = { status: rm.status || null, score: Array.isArray(rm.score) ? rm.score.slice(0, 2) : null };
+    if (rm.status === 'confirmed') confirmed++;
     for (const r of det.realPlayerMatchStats || []) {
       const pid = r.realPlayerId, pos = r.position || '', pts = cp(r.stats || {}, pos), min = r.minutesPlayed || 0;
       playerPts[pid] = (playerPts[pid] || 0) + pts; playerMin[pid] = (playerMin[pid] || 0) + min;
       if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; } // тренер = очки вышедших на замену
     }
   }
-  return { playerPts, playerMin, coachPts, allConfirmed: ids.length > 0 && confirmed === ids.length };
+  return { playerPts, playerMin, coachPts, matchInfo, allConfirmed: ids.length > 0 && confirmed === ids.length };
 }
 // standings драфта; статус settled когда все матчи confirmed
 async function scoreDraft(draftId) {
   const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = drows[0];
   if (!d) throw new Error('нет драфта');
   const ids = d.match_ids || [];
-  const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=user_id,player_id,name,club,position,is_sub`);
-  const { playerPts, playerMin, coachPts, allConfirmed } = await draftPoints(ids);
+  const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=user_id,player_id,name,club,position,is_sub,price`);
+  const { playerPts, playerMin, coachPts, matchInfo, allConfirmed } = await draftPoints(ids);
+  let clubOdds = [], matches = [];
+  try { const ti = await tourInfo(d.season_id, d.round, ids); clubOdds = ti.clubOdds; matches = ti.fixtures.map((f) => ({ ...f, score: (matchInfo[f.matchId] || {}).score || null, status: (matchInfo[f.matchId] || {}).status || f.status })); } catch (e) { console.error('tourInfo', e.message); }
+  const clubStatus = {}, clubCode = {};
+  for (const f of matches) { clubStatus[f.home] = f.status; clubStatus[f.away] = f.status; clubCode[f.home] = f.homeCode; clubCode[f.away] = f.awayCode; }
+  // статус игрока: сыграл / не вышел (0 минут при завершённом матче) / идёт / ждёт матч; тренер — по статусу матча
+  const pstat = (club, min, isCoach) => { const st = clubStatus[club] || 'pending'; if (isCoach) return st === 'confirmed' ? 'final' : st; if (st === 'confirmed') return min > 0 ? 'played' : 'dnp'; return st; };
   const uids = [...new Set(rosters.map((r) => r.user_id))]; const names = {};
   if (uids.length) { const pf = await svcGet(`dc_profiles?id=in.(${uids.map((u) => '"' + u + '"').join(',')})&select=id,display_name`); for (const p of pf) names[p.id] = p.display_name; }
   const rnd1 = (x) => Math.round(x * 10) / 10;
@@ -201,7 +230,7 @@ async function scoreDraft(draftId) {
     for (const r of starters) {
       const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
       total += pp;
-      players.push({ name: r.name, club: r.club, position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, isCoach: r.position === 'COACH', isSub: false, counted: true });
+      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true });
     }
     // замена выходит только если ею можно заменить невышедшего стартового без нарушения минимумов формации
     let subUsed = false;
@@ -213,16 +242,17 @@ async function scoreDraft(draftId) {
         if ((counts[r.position] - 1) >= PMIN[r.position] && (counts[P] + 1) <= PMAX[P]) { subUsed = true; break; }
       }
       const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
-      players.push({ name: sub.name, club: sub.club, position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, isCoach: false, isSub: true, counted: subUsed });
+      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed });
     }
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });
-    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, players });
+    const toPlay = players.filter((p) => p.mstatus === 'pending' || p.mstatus === 'live').length;
+    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, players });
   }
   standings.sort((a, b) => b.total - a.total); teams.sort((a, b) => b.total - a.total);
   let status = d.status;
   if (allConfirmed && d.status === 'done') { await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled'; }
-  return { status, allConfirmed, standings, teams, hasRosters: rosters.length > 0 };
+  return { status, allConfirmed, standings, teams, matches, clubOdds, hasRosters: rosters.length > 0 };
 }
 
 const rooms = new Map(); // code -> { room, clients:Set<ws> }

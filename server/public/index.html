@@ -50,17 +50,16 @@
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  /* --- просмотрщик итогов: вкладка Команды --- */
-  .vteams{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;align-items:flex-start}
-  .vteam{flex:1;min-width:300px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
-  .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
-  .vthead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
-  .vthead .vtn{font-weight:800}.vthead .vtp{color:var(--gold);font-weight:800;font-size:16px}
-  .vteam td.nm{white-space:nowrap}.vteam td.cl{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mut)}
-  .vteam tfoot td{border-top:1px solid var(--line);font-weight:800;padding-top:5px}
-  .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:6px;font-size:11px}
-  .vteam tr.dnp{opacity:.45}.vteam .subcounted{color:var(--acc);font-weight:700}
-  .vsub{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--mut);font-weight:700;margin-right:6px}
+  /* --- просмотрщик итогов: полноэкранная страница (раскладка как кокпит) --- */
+  .vteam{flex:1;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
+  .vthead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.vthead .vtn{font-weight:800}.vthead .vtp{color:var(--gold);font-weight:800;font-size:15px}
+  .vteam table{table-layout:fixed;width:100%}
+  .vteam td.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vteam td.vst{text-align:center}.vok{color:var(--acc)}.vno{color:var(--miss)}.vlive{color:var(--gold);font-weight:700}
+  .vteam tfoot td{border-top:1px solid var(--line);font-weight:800;padding-top:4px}
+  .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:5px;font-size:11px}
+  .vteam tr.dnp{opacity:.5}.vteam .subcounted{color:var(--acc);font-weight:700}
   .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{display:flex;gap:12px;align-items:center}
@@ -256,14 +255,13 @@
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
-<div id="viewer" style="display:none;position:fixed;inset:0;background:#000b;z-index:20;overflow:auto;padding:24px" onclick="if(!event.target.closest('.card2'))closeViewer()">
-  <div style="max-width:1200px;margin:0 auto">
-    <div class="card2">
-      <div class="row"><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><button class="btn" onclick="closeViewer()">Закрыть</button></div>
-      <div class="nav" style="margin:10px 0"><button class="tab vtab active" data-vt="teams" onclick="viewerTab('teams')">Команды</button><button class="tab vtab" data-vt="matches" onclick="viewerTab('matches')">Матчи</button></div>
-      <div id="vTeams"></div>
-      <div id="vMatches" style="display:none"></div>
-    </div>
+<div id="viewer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto">
+  <div style="max-width:1720px;margin:0 auto;padding:14px">
+    <div class="row" style="margin-bottom:6px"><button class="btn" onclick="closeViewer()">← Назад</button><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><span id="vLive"></span></div>
+    <div id="vRibbon" class="ribbon"></div>
+    <div class="nav" style="margin:6px 0 10px"><button class="tab vtab active" data-vt="teams" onclick="viewerTab('teams')">Команды</button><button class="tab vtab" data-vt="matches" onclick="viewerTab('matches')">Матчи</button></div>
+    <div id="vTeams"></div>
+    <div id="vMatches" style="display:none"></div>
   </div>
 </div>
 
@@ -447,31 +445,63 @@ async function ensureScore(id){
 let VIEW={};
 const FTPOS={goalkeeper:['GK','gk'],defender:['DEF','def'],midfielder:['MID','mid'],forward:['FWD','fwd']};
 function posClass(p){return FTPOS[p]?FTPOS[p][1]:(p||'').toLowerCase();}
-function closeViewer(){document.getElementById('viewer').style.display='none';}
+let viewerPoll=null;
+function stopViewerPoll(){if(viewerPoll){clearInterval(viewerPoll);viewerPoll=null;}}
+function closeViewer(){document.getElementById('viewer').style.display='none';stopViewerPoll();}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('viewer').style.display==='block')closeViewer();});
 function viewerTab(t){document.querySelectorAll('#viewer .vtab').forEach(b=>b.classList.toggle('active',b.dataset.vt===t));document.getElementById('vTeams').style.display=t==='teams'?'block':'none';document.getElementById('vMatches').style.display=t==='matches'?'block':'none';}
 async function openViewer(id){
   const d=DRAFTS.find(x=>x.id===id);if(!d)return;
   VIEW={draft:d,score:null,fixtures:[]};
   document.getElementById('vTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament}, тур ${d.round}`;
   document.getElementById('viewer').style.display='block';viewerTab('teams');
-  document.getElementById('vTeams').innerHTML='<div class="mut">загрузка…</div>';document.getElementById('vMatches').innerHTML='<div class="mut">загрузка…</div>';
-  try{const r=await fetch('/api/draft/score?draftId='+id);VIEW.score=await r.json();}catch{VIEW.score={error:true};}
-  renderViewerTeams();
-  try{const r=await fetch(`/api/ft/matches?season=${d.season_id}&round=${d.round}`);const j=await r.json();const set=new Set((d.match_ids||[]).map(Number));VIEW.fixtures=(j.matches||[]).filter(m=>set.has(Number(m.matchId)));}catch{VIEW.fixtures=[];}
-  renderViewerMatchesList();
+  document.getElementById('vRibbon').innerHTML='';document.getElementById('vLive').innerHTML='';
+  document.getElementById('vTeams').innerHTML='<div class="mut">загрузка…</div>';document.getElementById('vMatches').innerHTML='';
+  await loadViewer(id,true);
+  stopViewerPoll();
+  if(VIEW.score&&(VIEW.score.status==='live'||VIEW.score.status==='done'))viewerPoll=setInterval(()=>loadViewer(id,false),45000);
 }
+async function loadViewer(id,initial){
+  try{const r=await fetch('/api/draft/score?draftId='+id);VIEW.score=await r.json();}catch{VIEW.score={error:true};}
+  VIEW.fixtures=(VIEW.score&&VIEW.score.matches)||[];
+  renderViewerTeams();
+  if(initial)renderViewerMatchesList();
+}
+const VSTAT={played:'<span class="vok">✓</span>',final:'<span class="vok">✓</span>',dnp:'<span class="vno">✗</span>',live:'<span class="vlive">●</span>',pending:'<span class="mut">·</span>'};
 function renderViewerTeams(){
   const el=document.getElementById('vTeams');const sc=VIEW.score;
-  if(!sc||sc.error){el.innerHTML='<div class="empty">не удалось загрузить</div>';return;}
-  if(!sc.teams||!sc.teams.length){el.innerHTML='<div class="empty">составы не сохранены (драфт сыгран до подключения скоринга)</div>';return;}
-  el.innerHTML='<div class="vteams">'+sc.teams.map((t,i)=>{
+  document.getElementById('vLive').innerHTML=sc&&sc.status==='live'?'<span class="badge admin">LIVE</span>':(sc&&sc.status==='settled'?'<span class="badge">финал</span>':'');
+  if(!sc||sc.error){el.innerHTML='<div class="empty">не удалось загрузить</div>';document.getElementById('vRibbon').innerHTML='';return;}
+  if(!sc.teams||!sc.teams.length){el.innerHTML='<div class="empty">составы не сохранены (драфт сыгран до подключения скоринга)</div>';document.getElementById('vRibbon').innerHTML='';return;}
+  document.getElementById('vRibbon').innerHTML=(sc.standings||[]).map((s,i)=>`<div class="chip ${i===0?'me':''}"><b>${i===0?'🥇 ':''}${s.name}</b> · <span class="b">${s.total}</span></div>`).join('');
+  const cols=sc.teams.map((t,i)=>{
     const starters=t.players.filter(p=>!p.isSub).slice().sort((a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position));
     const sub=t.players.find(p=>p.isSub);
     let n=0;
-    let body=starters.map(p=>{n++;return `<tr><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td class="nm">${p.name}</td><td class="cl">${p.club}</td><td class="right">${p.minutes}</td><td class="right">${p.counted?'<b>'+p.points+'</b>':p.points}</td></tr>`;}).join('');
-    if(sub){const tag=sub.counted?`<span class="subcounted">+${sub.points} в зачёте</span>`:`<span class="mut">не сыграла</span>`;body+=`<tr class="subr${sub.counted?'':' dnp'}"><td colspan="6"><span class="vsub">SUB</span><span class="${posClass(sub.position)}">${posShort(sub.position)}</span> ${sub.name} · <span class="mut">${sub.club}</span> ${tag}</td></tr>`;}
-    return `<div class="vteam${i===0?' lead':''}"><div class="vthead"><span class="vtn">${i===0?'🥇 ':''}${t.name}</span><span class="vtp">${t.total}</span></div><table><thead><tr><th>#</th><th>POS</th><th>Игрок</th><th>Клуб</th><th class="right">Мин</th><th class="right">Очки</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="5">Итого</td><td class="right">${t.total}</td></tr></tfoot></table></div>`;
-  }).join('')+'</div>';
+    let body=starters.map(p=>{n++;return `<tr><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td class="vst">${VSTAT[p.mstatus]||''}</td><td class="nm">${p.name}</td><td>${p.code||p.club}</td><td class="right">${p.cost!=null?'$'+p.cost:''}</td><td class="right">${p.counted?'<b>'+p.points+'</b>':p.points}</td></tr>`;}).join('');
+    if(sub){const tag=sub.counted?`<span class="subcounted">+${sub.points}</span>`:`<span class="mut">${(sub.mstatus==='pending'||sub.mstatus==='live')?'ждёт':'не сыграла'}</span>`;body+=`<tr class="subr${sub.counted?'':' dnp'}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td class="vst">${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td class="right">${sub.cost!=null?'$'+sub.cost:''}</td><td class="right">${tag}</td></tr>`;}
+    return `<div class="vteam${i===0?' lead':''}"><div class="vthead"><span class="vtn">${i===0?'🥇 ':''}${t.name}</span><span class="vtp">${t.total}</span></div>
+      <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
+      <table><colgroup><col style="width:16px"><col style="width:26px"><col style="width:18px"><col><col style="width:34px"><col style="width:40px"><col style="width:34px"></colgroup><thead><tr><th>#</th><th>POS</th><th></th><th>PLAYER</th><th>TEAM</th><th class="right">COST</th><th class="right">PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td class="right">${t.total}</td></tr></tfoot></table></div>`;
+  }).join('');
+  const right=`<div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3>${renderViewerSchedule()}</div><div class="clubs"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div>`;
+  el.innerHTML=`<div class="layout"><div class="left"><div class="cols">${cols}</div></div><div class="right">${right}</div></div>`;
+}
+function renderViewerSchedule(){
+  const ms=(VIEW.score&&VIEW.score.matches)||[];
+  if(!ms.length)return '<span class="mut">—</span>';
+  return '<table style="font-size:11px"><tbody>'+ms.map(m=>{
+    const scr=m.score?`${m.score[0]}:${m.score[1]}`:'—';
+    const stt=m.status==='confirmed'?'<span class="mut">FT</span>':(m.status==='live'?'<span class="vlive">LIVE</span>':'');
+    return `<tr><td style="text-align:right">${m.homeCode||m.home}</td><td style="padding:0 6px;font-weight:700;text-align:center">${scr}</td><td>${m.awayCode||m.away}</td><td class="right">${stt}</td></tr>`;
+  }).join('')+'</tbody></table>';
+}
+function renderViewerClubs(){
+  const od=(VIEW.score&&VIEW.score.clubOdds)||[];
+  if(!od.length)return '<span class="mut">—</span>';
+  const rows=od.slice().sort((a,b)=>{const x=(b.xg==null?-1:b.xg)-(a.xg==null?-1:a.xg);return x||String(a.club).localeCompare(String(b.club));});
+  return '<table style="font-size:11px"><thead><tr><th>КЛУБ</th><th class="right">П%</th><th class="right">xG</th><th class="right">CS</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg!=null?r.xg:'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>';
 }
 function renderViewerMatchesList(){
   const el=document.getElementById('vMatches');const fx=VIEW.fixtures;const ids=VIEW.draft.match_ids||[];
@@ -714,7 +744,7 @@ function renderBottom(){
       <button class="btn p" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт</button>`:'<span class="mut">Ты зритель</span>')+`</div>`;
     return;
   }
-  if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки посчитаются по итогам матчей.</div>';return;}
+  if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div>';return;}
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
   if(d.lot){const u=d.lot.unit;const hb=d.managers.find(m=>m.id===d.lot.highBidder)?.name;
