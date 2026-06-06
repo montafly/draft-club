@@ -3,11 +3,15 @@
 create table if not exists dc_profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   display_name text not null,
+  role         text not null default 'user' check (role in ('user','admin')),
+  dcc_balance  int  not null default 0,
   games_played int  not null default 0,
   wins         int  not null default 0,
   podiums      int  not null default 0,
   created_at   timestamptz default now()
 );
+
+-- для уже существующей таблицы (Фаза A): отдельная миграция в profiles_phaseA.sql
 
 alter table dc_profiles enable row level security;
 

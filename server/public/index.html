@@ -7,10 +7,24 @@
   *{box-sizing:border-box} html,body{height:100%} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt);display:flex;flex-direction:column}
   header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0}.sp{flex:1}.mut{color:var(--mut)}
-  .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}
+  .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}.pill.coin{background:#2a2410;color:var(--gold);font-weight:700}
   .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
   input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px}
   main{flex:1;overflow:auto;padding:12px}.wrap{max-width:1720px;margin:0 auto}
+  /* --- оболочка приложения: навигация по разделам --- */
+  .nav{display:flex;gap:4px}
+  .tab{background:transparent;color:var(--mut);border:1px solid transparent;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px}
+  .tab:hover{color:var(--txt)}.tab.active{background:#22303d;color:var(--txt);border-color:var(--line)}
+  .tab.admin{color:var(--gold)}
+  .view{display:none;max-width:1100px;margin:0 auto}.view.active{display:block}
+  .card2{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+  .card2 h2{margin:0 0 12px;font-size:17px}.card2 h3{margin:0 0 10px;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}.field label{font-size:12px;color:var(--mut)}
+  .statline{display:flex;gap:22px;flex-wrap:wrap}.stat{display:flex;flex-direction:column}.stat .v{font-size:22px;font-weight:800}.stat .v.gold{color:var(--gold)}.stat .k{font-size:11px;color:var(--mut);text-transform:uppercase}
+  .empty{color:var(--mut);padding:24px;text-align:center;border:1px dashed var(--line);border-radius:10px}
+  .badge{font-size:10px;padding:2px 8px;border-radius:8px;background:#22303d;color:var(--mut)}.badge.admin{background:#3a3320;color:var(--gold)}
+  /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
   .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:300px;flex:none}
@@ -49,41 +63,120 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+
+<!-- ЛЕНДИНГ: только вход/регистрация -->
 <div id="landing" style="position:fixed;inset:0;background:#0d1419;display:flex;align-items:center;justify-content:center;z-index:30">
-  <div class="panel" style="width:360px">
+  <div class="card2" style="width:360px">
     <h2 style="margin:0 0 12px">Draft Club</h2>
-    <div id="authBox">
-      <input id="aemail" type="email" placeholder="email" style="width:100%;margin:4px 0">
-      <input id="apass" type="password" placeholder="пароль" style="width:100%;margin:4px 0 8px">
-      <button class="btn p" onclick="doLogin()">Войти</button>
-      <button class="btn" onclick="doRegister()">Регистрация</button>
-      <div id="amsg" class="mut" style="margin-top:8px;font-size:12px"></div>
-    </div>
-    <div id="roomBox" style="display:none">
-      <div class="mut" style="margin-bottom:8px">Вы вошли как <b id="profName"></b> · <a href="#" onclick="doLogout();return false" style="color:var(--acc)">выйти</a></div>
-      <button class="btn p" onclick="doCreate()">Создать драфт</button>
-      <div style="margin:12px 0 6px;color:var(--mut)">или войти по коду комнаты:</div>
-      <input id="lcode" placeholder="КОД" style="width:90px;text-transform:uppercase"> <button class="btn" onclick="doJoinRoom()">Войти</button>
-      <div id="lerr" class="err" style="margin-top:10px"></div>
-    </div>
+    <input id="aemail" type="email" placeholder="email" style="width:100%;margin:4px 0">
+    <input id="apass" type="password" placeholder="пароль" style="width:100%;margin:4px 0 8px">
+    <button class="btn p" onclick="doLogin()">Войти</button>
+    <button class="btn" onclick="doRegister()">Регистрация</button>
+    <div id="amsg" class="mut" style="margin-top:8px;font-size:12px"></div>
   </div>
 </div>
-<header>
-  <h1>Draft Club</h1>
-  <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
-  <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-  <span class="sp"></span><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
-</header>
-<main><div class="wrap">
-  <div class="ribbon" id="ribbon"></div>
-  <div class="layout">
-    <div class="left">
-      <div class="cols" id="cols"></div>
-      <div id="bottom"></div>
+
+<!-- ОБОЛОЧКА ПРИЛОЖЕНИЯ: разделы -->
+<div id="app" style="display:none;flex:1;min-height:0;flex-direction:column">
+  <header>
+    <h1>Draft Club</h1>
+    <nav class="nav">
+      <button class="tab" data-sec="lobby" onclick="showSection('lobby')">Лобби</button>
+      <button class="tab" data-sec="mine" onclick="showSection('mine')">Мои драфты</button>
+      <button class="tab" data-sec="profile" onclick="showSection('profile')">Профиль</button>
+      <button class="tab admin" data-sec="admin" onclick="showSection('admin')" style="display:none">Админка</button>
+    </nav>
+    <span class="sp"></span>
+    <span class="pill coin" id="navCoin">0 DCC</span>
+    <span class="pill" id="navName"></span>
+    <a href="#" onclick="doLogout();return false" class="mut">выйти</a>
+  </header>
+  <main>
+    <!-- ЛОББИ -->
+    <div id="secLobby" class="view active">
+      <div class="card2">
+        <h2>Лобби</h2>
+        <div class="row">
+          <button class="btn p" onclick="doCreate()">Создать драфт</button>
+          <span class="mut">или войти по коду комнаты:</span>
+          <input id="lcode" placeholder="КОД" style="width:90px;text-transform:uppercase">
+          <button class="btn" onclick="doJoinRoom()">Войти</button>
+        </div>
+        <div id="lerr" class="err" style="margin-top:8px"></div>
+        <p class="mut" style="font-size:11px;margin:10px 0 0">Создание драфта временно доступно всем — в Фазе B станет функцией админа (выбор турнира/тура/матчей, лига, настройки).</p>
+      </div>
+      <div class="card2">
+        <h3>Собираются сейчас</h3>
+        <div class="empty">Список собирающихся драфтов появится в Фазе B (заявки + лайв-статус).</div>
+      </div>
+      <div class="card2">
+        <h3>Идут / состоявшиеся</h3>
+        <div class="empty">Просмотр текущих и сыгранных драфтов — Фаза E.</div>
+      </div>
     </div>
-    <div class="right"><div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div></div>
-  </div>
-</div></main>
+    <!-- МОИ ДРАФТЫ -->
+    <div id="secMine" class="view">
+      <div class="card2">
+        <h2>Мои драфты</h2>
+        <div class="empty">Здесь появятся драфты, в которых ты участвуешь: очки и шансы по текущему туру + история. Подключим в Фазе E.</div>
+      </div>
+    </div>
+    <!-- ПРОФИЛЬ -->
+    <div id="secProfile" class="view">
+      <div class="card2">
+        <h2>Профиль <span id="profRole" class="badge"></span></h2>
+        <div class="field" style="max-width:320px">
+          <label>Никнейм</label>
+          <div class="row"><input id="profNick" style="flex:1" placeholder="никнейм"><button class="btn p" onclick="saveNick()">Сохранить</button></div>
+          <div id="nickMsg" class="mut" style="font-size:12px"></div>
+        </div>
+      </div>
+      <div class="card2">
+        <h3>Баланс</h3>
+        <div class="statline"><div class="stat"><span class="v gold" id="profCoin">0</span><span class="k">Draft Coins</span></div></div>
+        <p class="mut" style="font-size:11px;margin:10px 0 0">1 USDT = 1 DCC. Пополнение через Telegram-бота — позже; пока начисляет админ. Списание бай-ина — при завершении драфта.</p>
+      </div>
+      <div class="card2">
+        <h3>Статистика</h3>
+        <div class="statline">
+          <div class="stat"><span class="v" id="stGames">0</span><span class="k">Сыграно</span></div>
+          <div class="stat"><span class="v" id="stWins">0</span><span class="k">Побед</span></div>
+          <div class="stat"><span class="v" id="stPod">0</span><span class="k">Призовых</span></div>
+        </div>
+        <p class="mut" style="font-size:11px;margin:10px 0 0">Ачивки добавим позже.</p>
+      </div>
+    </div>
+    <!-- АДМИНКА (только для админа) -->
+    <div id="secAdmin" class="view">
+      <div class="card2">
+        <h2>Админка</h2>
+        <div class="empty">Создание и настройка драфтов (турнир, тур, матчи, лига, слоты), заявки и финализация, начисление DCC — Фазы B-D.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- КОКПИТ ДРАФТА -->
+<div id="draft" style="display:none;flex:1;min-height:0;flex-direction:column">
+  <header>
+    <h1>Draft Club</h1>
+    <button class="btn" onclick="leaveDraft()">← Разделы</button>
+    <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
+    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
+    <span class="sp"></span><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+  </header>
+  <main><div class="wrap">
+    <div class="ribbon" id="ribbon"></div>
+    <div class="layout">
+      <div class="left">
+        <div class="cols" id="cols"></div>
+        <div id="bottom"></div>
+      </div>
+      <div class="right"><div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div></div>
+    </div>
+  </div></main>
+</div>
+
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
 <script>
@@ -92,13 +185,14 @@ const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null,S=null,POOL=[],CLUBODDS=[],myName='',myRoom='',sb=null,session=null;
+let me=null,S=null,POOL=[],CLUBODDS=[],myName='',myRoom='',sb=null,session=null,PROFILE={};
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];}
   else if(m.type==='joined'){me=m.you;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
-  else if(m.type==='error'){const l=document.getElementById('landing');if(l.style.display!=='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
+  else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='state'){S=m.state;render();}};
+
 // --- Supabase авторизация ---
 async function initAuth(){
   try{const cfg=await (await fetch('/config.json')).json(); sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);}
@@ -107,13 +201,43 @@ async function initAuth(){
   sb.auth.onAuthStateChange((_e,s)=>{session=s; if(s) onAuthed();});
   if(session) onAuthed(); else showAuth();
 }
-function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('authBox').style.display='block';document.getElementById('roomBox').style.display='none';}
+function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
+function showApp(){document.getElementById('landing').style.display='none';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';}
 async function onAuthed(){
-  let nm=(session.user.email||'Player').split('@')[0];
-  try{const {data}=await sb.from('dc_profiles').select('display_name').eq('id',session.user.id).single(); if(data&&data.display_name) nm=data.display_name;}catch{}
-  myName=nm; document.getElementById('profName').textContent=nm;
-  document.getElementById('authBox').style.display='none'; document.getElementById('roomBox').style.display='block'; document.getElementById('landing').style.display='flex';
+  myName=(session.user.email||'Player').split('@')[0];
+  PROFILE={};
+  try{const {data}=await sb.from('dc_profiles').select('*').eq('id',session.user.id).single(); if(data)PROFILE=data;}catch{}
+  if(PROFILE.display_name)myName=PROFILE.display_name;
+  renderProfileUI();
+  showApp(); showSection('lobby');
   const room=new URLSearchParams(location.search).get('room'); if(room) document.getElementById('lcode').value=room;
+}
+function renderProfileUI(){
+  const isAdmin=PROFILE.role==='admin';
+  document.getElementById('navName').textContent=myName;
+  document.getElementById('navCoin').textContent=(PROFILE.dcc_balance||0)+' DCC';
+  document.querySelector('.tab.admin').style.display=isAdmin?'inline-block':'none';
+  document.getElementById('profNick').value=myName;
+  document.getElementById('profCoin').textContent=PROFILE.dcc_balance||0;
+  document.getElementById('stGames').textContent=PROFILE.games_played||0;
+  document.getElementById('stWins').textContent=PROFILE.wins||0;
+  document.getElementById('stPod').textContent=PROFILE.podiums||0;
+  const rb=document.getElementById('profRole');rb.textContent=isAdmin?'админ':'юзер';rb.className='badge'+(isAdmin?' admin':'');
+}
+function showSection(sec){
+  document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
+  const map={lobby:'secLobby',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
+  document.getElementById(map[sec]).classList.add('active');
+}
+async function saveNick(){
+  const nn=document.getElementById('profNick').value.trim();
+  if(!nn){document.getElementById('nickMsg').textContent='введи никнейм';return;}
+  const {error}=await sb.from('dc_profiles').update({display_name:nn}).eq('id',session.user.id);
+  if(error){document.getElementById('nickMsg').textContent=error.message;return;}
+  myName=nn;PROFILE.display_name=nn;renderProfileUI();
+  document.getElementById('nickMsg').textContent='сохранено';
+  setTimeout(()=>{const m=document.getElementById('nickMsg');if(m.textContent==='сохранено')m.textContent='';},2500);
 }
 async function doRegister(){const email=document.getElementById('aemail').value.trim(),pass=document.getElementById('apass').value;
   if(!email||!pass){document.getElementById('amsg').textContent='введи email и пароль';return;}
@@ -124,7 +248,10 @@ async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
-function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);document.getElementById('landing').style.display='none';const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
+function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);
+  document.getElementById('landing').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
+  const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
+function leaveDraft(){location.href='/';}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
