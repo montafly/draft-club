@@ -180,12 +180,16 @@ async function persistRosters(e) {
   const rows = [];
   for (const m of d.managers.values()) {
     const uid = seatUser[m.id]; if (!uid) continue;
-    for (const u of m.roster) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: u.id, name: u.name, club: u.club, position: u.position, price: u.price, is_sub: false });
-    if (m.substitute) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: m.substitute.id, name: m.substitute.name, club: m.substitute.club, position: m.substitute.position, price: 0, is_sub: true });
+    const fo = m.finishOrder != null ? m.finishOrder : null;
+    for (const u of m.roster) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: u.id, name: u.name, club: u.club, position: u.position, price: u.price, is_sub: false, finish_order: fo });
+    if (m.substitute) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: m.substitute.id, name: m.substitute.name, club: m.substitute.club, position: m.substitute.position, price: 0, is_sub: true, finish_order: fo });
   }
   if (!rows.length) return;
   await svcDelete(`dc_draft_rosters?draft_id=eq.${r.draftId}`);
-  await svcPost('dc_draft_rosters', rows);
+  try { await svcPost('dc_draft_rosters', rows); }
+  catch (err) { await svcPost('dc_draft_rosters', rows.map(({ finish_order, ...x }) => x)); } // колонки finish_order ещё нет — сохраняем без неё
+  // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
+  try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
 }
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
@@ -208,7 +212,7 @@ async function scoreDraft(draftId) {
   const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = drows[0];
   if (!d) throw new Error('нет драфта');
   const ids = d.match_ids || [];
-  const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=user_id,player_id,name,club,position,is_sub,price`);
+  const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=*`);
   const { playerPts, playerMin, coachPts, matchInfo, allConfirmed } = await draftPoints(ids);
   let clubOdds = [], matches = [];
   try { const ti = await tourInfo(d.season_id, d.round, ids); clubOdds = ti.clubOdds; matches = ti.fixtures.map((f) => ({ ...f, score: (matchInfo[f.matchId] || {}).score || null, status: (matchInfo[f.matchId] || {}).status || f.status })); } catch (e) { console.error('tourInfo', e.message); }
@@ -247,12 +251,13 @@ async function scoreDraft(draftId) {
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });
     const toPlay = players.filter((p) => p.mstatus === 'pending' || p.mstatus === 'live').length;
-    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, players });
+    const finishOrder = rs.length && rs[0].finish_order != null ? rs[0].finish_order : null;
+    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, finishOrder, players });
   }
   standings.sort((a, b) => b.total - a.total); teams.sort((a, b) => b.total - a.total);
   let status = d.status;
   if (allConfirmed && d.status === 'done') { await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled'; }
-  return { status, allConfirmed, standings, teams, matches, clubOdds, hasRosters: rosters.length > 0 };
+  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, hasRosters: rosters.length > 0 };
 }
 
 const rooms = new Map(); // code -> { room, clients:Set<ws> }

@@ -510,13 +510,15 @@ function renderViewerClubs(){
 }
 function viewerHist(){
   const sc=VIEW.score;const b=document.getElementById('histBody');const el=document.getElementById('hist');
-  if(!sc||!sc.teams||!sc.teams.length){b.innerHTML='<p class="mut">Нет данных.</p>';}
-  else{
+  if(sc&&Array.isArray(sc.picks)&&sc.picks.length){
+    b.innerHTML='<table style="font-size:12px;width:100%"><thead><tr><th>#</th><th style="text-align:left">Игрок</th><th>Клуб</th><th>Поз</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th><th class="right">Ставок</th><th class="right">Время</th></tr></thead><tbody>'+
+      sc.picks.map(p=>`<tr${p.sub?' style="opacity:.75"':''}><td style="text-align:center">${p.sub?'S':(p.no!=null?p.no:'')}</td><td>${p.unitName||''}</td><td style="text-align:center">${p.club||''}</td><td style="text-align:center">${posShort(p.position||'')}</td><td>${p.winnerName||''}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td><td class="right">${p.bids!=null?p.bids:'—'}</td><td class="right">${p.durationMs!=null?Math.round(p.durationMs/1000)+'с':'—'}</td></tr>`).join('')+'</tbody></table>';
+  } else if(sc&&sc.teams&&sc.teams.length){
     const picks=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(!p.isSub)picks.push({name:p.name,club:p.code||p.club,owner:t.name,price:p.cost});}));
     picks.sort((a,b)=>(b.price||0)-(a.price||0));
-    b.innerHTML='<p class="mut" style="font-size:11px;margin:0 0 8px">Пики по цене (хронология лога пока не сохраняется — список восстановлен из финальных составов).</p><table style="font-size:12px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th>Клуб</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th></tr></thead><tbody>'+
+    b.innerHTML='<p class="mut" style="font-size:11px;margin:0 0 8px">Старый драфт без сохранённого лога — список восстановлен из составов (по цене).</p><table style="font-size:12px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th>Клуб</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th></tr></thead><tbody>'+
       picks.map(p=>`<tr><td>${p.name}</td><td style="text-align:center">${p.club}</td><td>${p.owner}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td></tr>`).join('')+'</tbody></table>';
-  }
+  } else { b.innerHTML='<p class="mut">Нет данных.</p>'; }
   el.style.zIndex='30';el.style.display='block';
 }
 function renderViewerMatchesList(){
