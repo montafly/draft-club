@@ -154,7 +154,7 @@ export class Draft {
     const w = this.m(lot.highBidder);
     w.budget -= lot.highBid;
     w.roster.push({ ...lot.unit, price: lot.highBid });
-    this.picks.push({ no: lot.no, unitName: lot.unit.name, club: lot.unit.club,
+    this.picks.push({ no: lot.no, unitName: lot.unit.name, club: lot.unit.club, code: lot.unit.code,
                       position: lot.unit.position, price: lot.highBid,
                       winnerId: w.id, winnerName: w.name,
                       bids: lot.bids, durationMs: this.now() - lot.startAt });
@@ -197,7 +197,7 @@ export class Draft {
     m.substitute = { ...unit, price: 0 };
     this.taken.add(unit.id);
     this.clubCounts[unit.club] = (this.clubCounts[unit.club] || 0) + 1;
-    this.picks.push({ no: null, sub: true, unitName: unit.name, club: unit.club,
+    this.picks.push({ no: null, sub: true, unitName: unit.name, club: unit.club, code: unit.code,
                       position: unit.position, price: 0, winnerId: m.id, winnerName: m.name });
     this.log.push(`SUB ${m.name} <- ${unit.name}`);
     this.subPtr++;

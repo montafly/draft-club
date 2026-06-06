@@ -512,8 +512,10 @@ function renderViewerClubs(){
 function viewerHist(){
   const sc=VIEW.score;const b=document.getElementById('histBody');const el=document.getElementById('hist');
   if(sc&&Array.isArray(sc.picks)&&sc.picks.length){
+    const codeOf={};(sc.matches||[]).forEach(m=>{if(m.home)codeOf[m.home]=m.homeCode||m.home;if(m.away)codeOf[m.away]=m.awayCode||m.away;});
+    const cl=p=>p.code||codeOf[p.club]||p.club;
     b.innerHTML='<table style="font-size:12px;width:100%"><thead><tr><th>#</th><th style="text-align:left">Игрок</th><th>Клуб</th><th>Поз</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th><th class="right">Ставок</th><th class="right">Время</th></tr></thead><tbody>'+
-      sc.picks.map(p=>`<tr${p.sub?' style="opacity:.75"':''}><td style="text-align:center">${p.sub?'S':(p.no!=null?p.no:'')}</td><td>${p.unitName||''}</td><td style="text-align:center">${p.club||''}</td><td style="text-align:center">${posShort(p.position||'')}</td><td>${p.winnerName||''}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td><td class="right">${p.bids!=null?p.bids:'—'}</td><td class="right">${p.durationMs!=null?Math.round(p.durationMs/1000)+'с':'—'}</td></tr>`).join('')+'</tbody></table>';
+      sc.picks.map(p=>`<tr${p.sub?' style="opacity:.75"':''}><td style="text-align:center">${p.sub?'S':(p.no!=null?p.no:'')}</td><td style="white-space:nowrap">${p.unitName||''}</td><td style="text-align:center">${cl(p)}</td><td style="text-align:center">${posShort(p.position||'')}</td><td style="white-space:nowrap">${p.winnerName||''}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td><td class="right">${p.bids!=null?p.bids:'—'}</td><td class="right">${p.durationMs!=null?Math.round(p.durationMs/1000)+'с':'—'}</td></tr>`).join('')+'</tbody></table>';
   } else if(sc&&sc.teams&&sc.teams.length){
     const picks=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(!p.isSub)picks.push({name:p.name,club:p.code||p.club,owner:t.name,price:p.cost});}));
     picks.sort((a,b)=>(b.price||0)-(a.price||0));
@@ -570,7 +572,15 @@ function renderLobbyAll(){
     const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id);
     const enter=(d.status==='live'&&myA&&myA.status==='accepted')?`<button class="btn p" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
     const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?`<button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
-    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}<br>${enter}${watch}</div>`;
+    let scoreBlock='';
+    if(d.status==='done'||d.status==='settled'){const sc=SCORES[d.id];
+      if(!sc){ensureScore(d.id);scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';}
+      else if(sc.loading)scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';
+      else if(sc.error)scoreBlock='<div class="mut" style="margin-top:6px">не удалось посчитать очки</div>';
+      else if(!sc.hasRosters)scoreBlock='';
+      else scoreBlock=`<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">`+sc.standings.map((s,i)=>`<div>${['🥇','🥈'][i]||'• '}${s.name} — <b>${f1(s.total)}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`).join('')+'</div>';
+    }
+    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${scoreBlock}<br>${enter}${watch}</div>`;
   }).join(''):'<div class="empty">Драфтов пока нет.</div>';
 }
 function renderAdminDrafts(){
