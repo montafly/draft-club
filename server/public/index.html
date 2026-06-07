@@ -274,7 +274,7 @@
         <div class="clubs" style="margin-top:10px"><h3>Лог драфта</h3><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div>
       </div>
       <div class="right">
-        <div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
+        <div class="clubs" style="margin-bottom:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
         <div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div>
       </div>
     </div>
@@ -285,7 +285,7 @@
 
 <div id="viewer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto">
   <div style="max-width:1720px;margin:0 auto;padding:14px">
-    <div class="row" style="margin-bottom:6px"><button class="btn" onclick="closeViewer()">← Назад</button><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><span id="vLive"></span><button class="btn" onclick="viewerHist()">История пиков</button></div>
+    <div class="row" style="margin-bottom:6px"><button class="btn" onclick="closeViewer()">← Назад</button><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><span id="vLive"></span><button class="btn" onclick="viewerHist()">История драфта</button></div>
     <div id="vRibbon" class="ribbon"></div>
     <div class="nav" style="margin:6px 0 10px"><button class="tab vtab active" data-vt="teams" onclick="viewerTab('teams')">Команды</button><button class="tab vtab" data-vt="matches" onclick="viewerTab('matches')">Матчи</button></div>
     <div id="vTeams"></div>
@@ -639,7 +639,9 @@ function renderViewerClubs(){
 }
 function viewerHist(){
   const sc=VIEW.score;const b=document.getElementById('histBody');const el=document.getElementById('hist');
-  if(sc&&Array.isArray(sc.picks)&&sc.picks.length){
+  if(sc&&Array.isArray(sc.events)&&sc.events.length){
+    b.innerHTML='<div style="font-size:12px;line-height:1.6">'+sc.events.map(e=>{const o=(typeof e==='string')?{text:e}:e;const tm=o.t?new Date(o.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';return `<div style="text-align:left;color:${LOGCOL[o.kind]||'var(--txt)'}"><span class="mut" style="font-size:10px;margin-right:6px">${tm}</span>${o.text}</div>`;}).join('')+'</div>';
+  } else if(sc&&Array.isArray(sc.picks)&&sc.picks.length){
     const codeOf={};(sc.matches||[]).forEach(m=>{if(m.home)codeOf[m.home]=m.homeCode||m.home;if(m.away)codeOf[m.away]=m.awayCode||m.away;});
     const cl=p=>p.code||codeOf[p.club]||p.club;
     b.innerHTML='<table style="font-size:12px;width:100%"><thead><tr><th>#</th><th style="text-align:left">Игрок</th><th>Клуб</th><th>Поз</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th><th class="right">Ставок</th><th class="right">Время</th></tr></thead><tbody>'+

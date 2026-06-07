@@ -39,7 +39,7 @@ export class Room {
     this.logEvent('join', `${name} — вошёл (участник)`);
     return id;
   }
-  logEvent(kind, text) { this.events.push({ t: Date.now(), kind, text }); if (this.events.length > 300) this.events.shift(); }
+  logEvent(kind, text) { this.events.push({ t: Date.now(), kind, text }); if (this.events.length > 1000) this.events.shift(); }
 
   setReady(seatId, ready = true) {
     const s = this.seats.find((x) => x.id === seatId);
@@ -145,7 +145,7 @@ export class Room {
       startable: this.startable(),
       need: this.allowedUserIds ? this.allowedUserIds.size : null,
       spectators: [...this.spectators.values()],
-      events: this.events.slice(-150),
+      events: this.events.slice(-800),
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;

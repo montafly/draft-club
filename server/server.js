@@ -190,6 +190,7 @@ async function persistRosters(e) {
   catch (err) { await svcPost('dc_draft_rosters', rows.map(({ finish_order, ...x }) => x)); } // колонки finish_order ещё нет — сохраняем без неё
   // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
+  try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-800) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
   // DCC: списываем бай-ины с сыгравших участников (идемпотентно через dc_drafts.charged_at)
   try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
 }
@@ -288,7 +289,7 @@ async function scoreDraft(draftId) {
     await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled';
     try { await payPrizes(draftId, standings, d); } catch (err) { console.error('payPrizes', err.message); }
   }
-  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, hasRosters: rosters.length > 0 };
+  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, hasRosters: rosters.length > 0 };
 }
 
 const rooms = new Map(); // code -> { room, clients:Set<ws> }
