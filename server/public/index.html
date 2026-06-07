@@ -361,18 +361,31 @@ async function renderLedger(){
     const {data}=await sb.from('dc_ledger').select('*').order('created_at',{ascending:false}).limit(50);
     if(!data||!data.length){el.innerHTML='<p class="mut" style="font-size:11px">Операций пока нет.</p>';return;}
     const TYP={buyin:'Бай-ин',prize:'Приз',admin_credit:'Начисление',refund:'Возврат'};
+    const dById={};(DRAFTS||[]).forEach(d=>dById[d.id]=d);
     el.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:2px">История операций:</div><table style="font-size:12px;width:auto"><tbody>'+
-      data.map(r=>`<tr><td style="padding-right:14px">${TYP[r.type]||r.type}${r.note?' <span class="mut">('+r.note+')</span>':''}</td><td class="right" style="font-weight:700;color:${r.amount<0?'var(--miss)':'var(--acc)'};padding-right:14px">${r.amount>0?'+':''}${r.amount}</td><td class="mut" style="font-size:10px">${fmtStart(r.created_at)}</td></tr>`).join('')+'</tbody></table>';
+      data.map(r=>{
+        const d=r.draft_id?dById[r.draft_id]:null;
+        const dc=d?`<a href="#" onclick="openViewer(${d.id});return false" style="color:var(--acc);text-decoration:none">${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament} тур ${d.round}</a>`:'<span class="mut">—</span>';
+        return `<tr><td style="padding-right:14px">${TYP[r.type]||r.type}${r.note?' <span class="mut">('+r.note+')</span>':''}</td><td style="padding-right:14px">${dc}</td><td class="right" style="font-weight:700;color:${r.amount<0?'var(--miss)':'var(--acc)'};padding-right:14px">${r.amount>0?'+':''}${r.amount}</td><td class="mut" style="font-size:10px">${fmtStart(r.created_at)}</td></tr>`;
+      }).join('')+'</tbody></table>';
   }catch(e){el.innerHTML='<p class="mut" style="font-size:11px">не удалось загрузить историю</p>';}
 }
+let ADMIN_USERS=[];
 async function renderAdminUsers(){
   const el=document.getElementById('adminUsers');if(!el)return;
   try{
     const t=await authToken();const r=await fetch('/api/admin/users',{headers:{authorization:'Bearer '+t}});const j=await r.json();
     if(!r.ok)throw new Error(j.error||r.status);
-    el.innerHTML='<table style="font-size:13px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th class="right">Баланс</th><th style="width:230px"></th></tr></thead><tbody>'+
-      j.users.map(u=>`<tr><td>${u.display_name||u.id.slice(0,8)}${u.role==='admin'?' <span class="badge admin">admin</span>':''}</td><td class="right" style="font-weight:700;color:var(--gold)" id="bal-${u.id}">${u.dcc_balance||0}</td><td><div class="row" style="gap:4px;justify-content:flex-end"><input id="cr-${u.id}" type="number" placeholder="±DCC" style="width:90px"><button class="btn p qbid" onclick="creditUser('${u.id}')">Начислить</button></div></td></tr>`).join('')+'</tbody></table><div id="creditMsg" class="mut" style="font-size:12px;margin-top:6px"></div>';
+    ADMIN_USERS=j.users||[];
+    el.innerHTML='<input id="userFilter" placeholder="поиск по нику…" oninput="drawAdminUsers()" style="margin-bottom:8px;width:240px"><div style="max-height:360px;overflow-y:auto"><table style="font-size:13px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th class="right">Баланс</th><th style="width:230px"></th></tr></thead><tbody id="userRows"></tbody></table></div><div id="creditMsg" class="mut" style="font-size:12px;margin-top:6px"></div>';
+    drawAdminUsers();
   }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
+}
+function drawAdminUsers(){
+  const tb=document.getElementById('userRows');if(!tb)return;
+  const q=((document.getElementById('userFilter')||{}).value||'').toLowerCase();
+  const rows=ADMIN_USERS.filter(u=>!q||(u.display_name||'').toLowerCase().includes(q));
+  tb.innerHTML=rows.length?rows.map(u=>`<tr><td>${u.display_name||u.id.slice(0,8)}${u.role==='admin'?' <span class="badge admin">admin</span>':''}</td><td class="right" style="font-weight:700;color:var(--gold)" id="bal-${u.id}">${u.dcc_balance||0}</td><td><div class="row" style="gap:4px;justify-content:flex-end"><input id="cr-${u.id}" type="number" placeholder="±DCC" style="width:90px"><button class="btn p qbid" onclick="creditUser('${u.id}')">Начислить</button></div></td></tr>`).join(''):'<tr><td colspan="3" class="mut">никого не найдено</td></tr>';
 }
 async function creditUser(id){
   const inp=document.getElementById('cr-'+id);const amt=Math.round(Number(inp.value));if(!amt)return;
@@ -380,7 +393,8 @@ async function creditUser(id){
   try{
     const t=await authToken();const r=await fetch('/api/admin/credit',{method:'POST',headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:JSON.stringify({userId:id,amount:amt})});
     const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
-    document.getElementById('bal-'+id).textContent=j.balance;inp.value='';msg.textContent='начислено ✓';
+    const bEl=document.getElementById('bal-'+id);if(bEl)bEl.textContent=j.balance;if(inp)inp.value='';msg.textContent='начислено ✓';
+    const u=ADMIN_USERS.find(x=>x.id===id);if(u)u.dcc_balance=j.balance;
     if(session&&id===session.user.id){PROFILE.dcc_balance=j.balance;renderProfileUI();}
   }catch(e){msg.textContent='ошибка: '+e.message;}
 }

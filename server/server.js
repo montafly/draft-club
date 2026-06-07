@@ -194,6 +194,12 @@ async function persistRosters(e) {
   try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
 }
 // --- DCC: операции (леджер) + движение баланса (read-modify-write; один сервер) ---
+// PATCH с возвратом изменённых строк — для атомарного «застолбления» (только один запрос флипнет null→now)
+async function svcPatchReturn(path, body) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'PATCH', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'content-type': 'application/json', prefer: 'return=representation' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('db patch ' + r.status);
+  return r.json();
+}
 async function ledger(userId, draftId, type, amount, note) {
   await svcPost('dc_ledger', [{ user_id: userId, draft_id: draftId, type, amount, note: note || null }]);
   const pf = await svcGet(`dc_profiles?id=eq.${userId}&select=dcc_balance`);
@@ -201,17 +207,17 @@ async function ledger(userId, draftId, type, amount, note) {
   await svcPatch(`dc_profiles?id=eq.${userId}`, { dcc_balance: bal + amount });
 }
 async function chargeBuyins(draftId, userIds) {
-  const dr = await svcGet(`dc_drafts?id=eq.${draftId}&select=buyin,charged_at`); const d = dr[0];
-  if (!d || d.charged_at) return;                       // нет драфта или уже списано
+  const dr = await svcGet(`dc_drafts?id=eq.${draftId}&select=buyin`); const d = dr[0]; if (!d) return;
+  const claimed = await svcPatchReturn(`dc_drafts?id=eq.${draftId}&charged_at=is.null`, { charged_at: new Date().toISOString() });
+  if (!claimed.length) return;                          // уже списано (атомарно через charged_at)
   const buyin = d.buyin || 0;
   if (buyin > 0) for (const uid of [...new Set(userIds)]) await ledger(uid, draftId, 'buyin', -buyin, 'бай-ин');
-  await svcPatch(`dc_drafts?id=eq.${draftId}`, { charged_at: new Date().toISOString() });
 }
 async function payPrizes(draftId, standings, d) {
-  if (d.paid_at) return;                                // уже выплачено
+  const claimed = await svcPatchReturn(`dc_drafts?id=eq.${draftId}&paid_at=is.null`, { paid_at: new Date().toISOString() });
+  if (!claimed.length) return;                          // уже выплачено (атомарно через paid_at)
   const prizes = [d.prize1 || 0, d.prize2 || 0];
   for (let i = 0; i < 2; i++) { const s = standings[i]; if (s && prizes[i] > 0) await ledger(s.user_id, draftId, 'prize', prizes[i], `приз за ${i + 1} место`); }
-  await svcPatch(`dc_drafts?id=eq.${draftId}`, { paid_at: new Date().toISOString() });
 }
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
