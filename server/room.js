@@ -23,6 +23,7 @@ export class Room {
     this.draftId = null;                 // связь с dc_drafts
     this.history = [];                   // стек снапшотов для отмены: {seatId, snap}
     this.seats = [];                     // {id,name,ready,connected}
+    this.spectators = new Map();         // userId -> name (зрители без места)
     this.draft = null;
   }
 
@@ -46,6 +47,9 @@ export class Room {
     const s = this.seats.find((x) => x.id === seatId);
     if (s) s.connected = false;
   }
+
+  addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId)) this.spectators.set(userId, name); }
+  removeSpectator(userId) { this.spectators.delete(userId); }
 
   startable() {
     if (this.draft || !this.seats.length || !this.seats.every((s) => s.ready)) return false;
@@ -134,6 +138,7 @@ export class Room {
       seats: this.seats.map((s) => ({ id: s.id, name: s.name, ready: s.ready, connected: s.connected })),
       startable: this.startable(),
       need: this.allowedUserIds ? this.allowedUserIds.size : null,
+      spectators: [...this.spectators.values()],
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;

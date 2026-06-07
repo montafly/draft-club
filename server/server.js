@@ -438,8 +438,10 @@ async function joinAuthed(ws, msg) {
   const prof = await getProfile(user.id);
   const name = (prof && prof.display_name) || (user.email || 'Player').split('@')[0];
   ws.user = user;
-  const id = ws.roomCode ? rooms.get(ws.roomCode).room.join(user.id, name) : null;
-  ws.seatId = id;                                      // null = спектатор (комната полна)
+  const e = ws.roomCode ? rooms.get(ws.roomCode) : null;
+  const id = e ? e.room.join(user.id, name) : null;
+  ws.seatId = id;                                      // null = зритель (не принят / мест нет)
+  if (id === null && e) e.room.addSpectator(user.id, name);
   ws.send(JSON.stringify({ type: 'joined', you: id, name }));
   broadcast(ws.roomCode);
 }
@@ -483,6 +485,7 @@ wss.on('connection', (ws) => {
     if (!e) return;
     e.clients.delete(ws);
     if (ws.seatId) e.room.disconnect(ws.seatId);
+    else if (ws.user) e.room.removeSpectator(ws.user.id);
     broadcast(ws.roomCode);
   });
 });

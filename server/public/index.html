@@ -189,6 +189,10 @@
           <button class="btn" id="mtMic" onclick="toggleMic()" disabled>Микрофон: —</button>
           <button class="btn r" id="mtStop" onclick="stopMediaTest()" disabled>Выключить</button>
         </div>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <select id="mtCamSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option>Камера</option></select>
+          <select id="mtMicSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option>Микрофон</option></select>
+        </div>
         <div style="margin-top:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
           <video id="mtVideo" autoplay muted playsinline style="width:260px;height:160px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;object-fit:cover"></video>
           <div style="flex:1;min-width:180px;max-width:260px"><div class="mut" style="font-size:11px;margin-bottom:4px">Уровень микрофона:</div><div style="height:12px;background:#0a0f14;border:1px solid var(--line);border-radius:6px;overflow:hidden"><div id="mtMicBar" style="height:100%;width:0;background:var(--acc)"></div></div></div>
@@ -420,20 +424,42 @@ function syncMediaBtns(){
   document.getElementById('mtCam').textContent='Камера: '+(v&&v.enabled?'вкл':'выкл');
   document.getElementById('mtMic').textContent='Микрофон: '+(a&&a.enabled?'вкл':'выкл');
 }
+function mtSetupMic(){
+  if(mtRAF){cancelAnimationFrame(mtRAF);mtRAF=null;}
+  if(mtAudioCtx){mtAudioCtx.close().catch(()=>{});mtAudioCtx=null;}
+  mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const srcNode=mtAudioCtx.createMediaStreamSource(mtStream),an=mtAudioCtx.createAnalyser();an.fftSize=256;srcNode.connect(an);
+  const buf=new Uint8Array(an.frequencyBinCount);
+  const loop=()=>{an.getByteTimeDomainData(buf);let peak=0;for(const v of buf)peak=Math.max(peak,Math.abs(v-128));document.getElementById('mtMicBar').style.width=Math.min(100,Math.round(peak/128*200))+'%';mtRAF=requestAnimationFrame(loop);};loop();
+}
+async function mtPopulateDevices(){
+  try{
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    const fill=(sel,kind,lbl)=>{const cur=sel.value;sel.innerHTML=devs.filter(d=>d.kind===kind).map((d,i)=>`<option value="${d.deviceId}">${d.label||(lbl+' '+(i+1))}</option>`).join('');if(cur)sel.value=cur;sel.disabled=false;};
+    fill(document.getElementById('mtCamSel'),'videoinput','Камера');
+    fill(document.getElementById('mtMicSel'),'audioinput','Микрофон');
+  }catch{}
+}
+async function mtAcquire(){
+  const camSel=document.getElementById('mtCamSel'),micSel=document.getElementById('mtMicSel');
+  const video=(camSel&&camSel.value)?{deviceId:{exact:camSel.value}}:true;
+  const audio=(micSel&&micSel.value)?{deviceId:{exact:micSel.value}}:true;
+  if(mtStream)mtStream.getTracks().forEach(t=>t.stop());
+  mtStream=await navigator.mediaDevices.getUserMedia({video,audio});
+  document.getElementById('mtVideo').srcObject=mtStream;
+  mtSetupMic();syncMediaBtns();
+}
 async function startMediaTest(){
   const msg=document.getElementById('mtMsg');msg.textContent='запрашиваю доступ к камере и микрофону…';
   try{
-    mtStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-    document.getElementById('mtVideo').srcObject=mtStream;
+    await mtAcquire();
+    await mtPopulateDevices();   // метки и список устройств доступны только после разрешения
     document.getElementById('mtStart').disabled=true;document.getElementById('mtStop').disabled=false;
-    document.getElementById('mtCam').disabled=false;document.getElementById('mtMic').disabled=false;syncMediaBtns();
-    mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    const srcNode=mtAudioCtx.createMediaStreamSource(mtStream),an=mtAudioCtx.createAnalyser();an.fftSize=256;srcNode.connect(an);
-    const buf=new Uint8Array(an.frequencyBinCount);
-    const loop=()=>{an.getByteTimeDomainData(buf);let peak=0;for(const v of buf)peak=Math.max(peak,Math.abs(v-128));document.getElementById('mtMicBar').style.width=Math.min(100,Math.round(peak/128*200))+'%';mtRAF=requestAnimationFrame(loop);};loop();
-    msg.textContent='работает: ты должен видеть себя, полоска двигается при звуке. Кнопками выше можно вкл/выкл камеру и микрофон.';
+    document.getElementById('mtCam').disabled=false;document.getElementById('mtMic').disabled=false;
+    msg.textContent='работает: видишь себя, полоска двигается при звуке. Можно выбрать другую камеру/микрофон и вкл/выкл их.';
   }catch(e){msg.textContent='не удалось: '+(e.message||e)+' — проверь разрешения браузера на камеру/микрофон.';}
 }
+async function changeMediaDevice(){ if(!mtStream)return; try{await mtAcquire();}catch(e){document.getElementById('mtMsg').textContent='не удалось переключить устройство: '+(e.message||e);} }
 function toggleCam(){const v=mtStream&&mtStream.getVideoTracks()[0];if(v){v.enabled=!v.enabled;syncMediaBtns();}}
 function toggleMic(){const a=mtStream&&mtStream.getAudioTracks()[0];if(a){a.enabled=!a.enabled;syncMediaBtns();}}
 function stopMediaTest(){
@@ -442,7 +468,7 @@ function stopMediaTest(){
   if(mtStream){mtStream.getTracks().forEach(t=>t.stop());mtStream=null;}
   const vid=document.getElementById('mtVideo');if(vid)vid.srcObject=null;
   document.getElementById('mtMicBar').style.width='0';
-  document.getElementById('mtStart').disabled=false;['mtStop','mtCam','mtMic'].forEach(i=>document.getElementById(i).disabled=true);
+  document.getElementById('mtStart').disabled=false;['mtStop','mtCam','mtMic','mtCamSel','mtMicSel'].forEach(i=>document.getElementById(i).disabled=true);
   document.getElementById('mtMsg').textContent='выключено';
 }
 // --- Лобби: подвкладки Запись / Все драфты ---
@@ -670,8 +696,10 @@ function renderLobbyAll(){
       ?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
       :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
     const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id);
-    const enter=(d.status==='live'&&myA&&myA.status==='accepted')?`<button class="btn p" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
-    const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?`<button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+    const isAcc=myA&&myA.status==='accepted';const live=d.status==='live';
+    const enter=(live&&isAcc)?`<button class="btn p" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
+    const spectate=(live&&!isAcc)?`<button class="btn" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`:'';
+    const watch=(d.status==='done'||d.status==='settled')?`<button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
     let scoreBlock='';
     if(d.status==='done'||d.status==='settled'){const sc=SCORES[d.id];
       if(!sc){ensureScore(d.id);scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';}
@@ -680,7 +708,7 @@ function renderLobbyAll(){
       else if(!sc.hasRosters)scoreBlock='';
       else scoreBlock=`<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">`+sc.standings.map((s,i)=>`<div>${['🥇','🥈'][i]||'• '}${s.name} — <b>${f1(s.total)}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`).join('')+'</div>';
     }
-    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${scoreBlock}<br>${enter}${watch}</div>`;
+    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${scoreBlock}<br>${enter}${spectate}${watch}</div>`;
   }).join(''):'<div class="empty">Драфтов пока нет.</div>';
 }
 function renderAdminDrafts(){
@@ -837,9 +865,11 @@ function renderFixtures(){
 }
 function renderRibbon(){
   const el=document.getElementById('ribbon');
-  if(!S.started){el.innerHTML=S.lobby.seats.map(s=>`<div class="chip ${s.id===me?'me':''}"><b>${s.name}</b> · ${s.ready?'✓ готов':'…'}</div>`).join('')||'<span class="mut">ждём игроков…</span>';return;}
+  const sp=(S.lobby&&S.lobby.spectators)||[];
+  const spChip=sp.length?`<div class="chip" style="opacity:.85"><span class="mut">Зрители (${sp.length}):</span> ${sp.join(', ')}</div>`:'';
+  if(!S.started){el.innerHTML=(S.lobby.seats.map(s=>`<div class="chip ${s.id===me?'me':''}"><b>${s.name}</b> · ${s.ready?'✓ готов':'…'}</div>`).join('')||'<span class="mut">ждём игроков…</span>')+spChip;return;}
   const d=S.draft;
-  el.innerHTML=ordered().map(m=>`<div class="chip ${m.id===d.actor?'act':''} ${m.id===me?'me':''}"><b>${m.name}</b>${m.finished?' ✓':''} · ${m.size}/12 · <span class="b">$${m.budget}</span>${m.id===d.actor?' · ход':''}</div>`).join('');
+  el.innerHTML=ordered().map(m=>`<div class="chip ${m.id===d.actor?'act':''} ${m.id===me?'me':''}"><b>${m.name}</b>${m.finished?' ✓':''} · ${m.size}/12 · <span class="b">$${m.budget}</span>${m.id===d.actor?' · ход':''}</div>`).join('')+spChip;
 }
 function renderCols(){
   const el=document.getElementById('cols');
