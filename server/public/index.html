@@ -37,7 +37,7 @@
   .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
-  .cam{height:48px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px}
+  .cam{height:84px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
   .phead .nm{font-weight:800}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
@@ -263,7 +263,7 @@
     <button class="btn" onclick="leaveDraft()">← Разделы</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn p" id="rtcBtn" onclick="rtcStart()" style="display:none">Вкл видео</button><button class="btn" id="rtcCamBtn" onclick="toggleCockpitCam()" style="display:none">Камера</button><button class="btn" id="rtcMicBtn" onclick="toggleCockpitMic()" style="display:none">Микрофон</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </header>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -305,7 +305,67 @@ ws.onmessage=e=>{const m=JSON.parse(e.data);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();}
   else if(m.type==='joined'){me=m.you;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
+  else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){S=m.state;render();}};
+// --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
+const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},camOn:true,micOn:true};
+function rtcVideoEl(seat){
+  if(!RTC.videoEls[seat]){const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=(seat===me);v.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:7px;background:#000';RTC.videoEls[seat]=v;}
+  return RTC.videoEls[seat];
+}
+function placeVideos(){
+  document.querySelectorAll('#cols .cam[data-seat]').forEach(cam=>{
+    const seat=+cam.dataset.seat;const v=RTC.videoEls[seat];
+    if(v&&v.srcObject){if(v.parentNode!==cam){cam.textContent='';cam.appendChild(v);}}
+    else if(!cam.querySelector('video')){cam.textContent=(seat===me&&RTC.on&&!RTC.camOn)?'камера выкл':'камера';}
+  });
+}
+function rtcSignal(peer,data){send({type:'rtc',to:peer,data});}
+function rtcMakePc(peer,initiator){
+  if(RTC.pcs[peer])return RTC.pcs[peer];
+  const pc=new RTCPeerConnection({iceServers:RTC.ice||[]});
+  RTC.pcs[peer]=pc;
+  if(RTC.stream)RTC.stream.getTracks().forEach(t=>pc.addTrack(t,RTC.stream));
+  pc.onicecandidate=ev=>{if(ev.candidate)rtcSignal(peer,{ice:ev.candidate});};
+  pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];placeVideos();};
+  if(initiator)rtcOffer(peer);
+  return pc;
+}
+async function rtcOffer(peer){const pc=RTC.pcs[peer];if(!pc)return;try{const o=await pc.createOffer();await pc.setLocalDescription(o);rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}}
+async function onRtcSignal(from,data){
+  if(me==null||!RTC.on)return;
+  let pc=RTC.pcs[from];if(!pc)pc=rtcMakePc(from,false);
+  try{
+    if(data.sdp){await pc.setRemoteDescription(data.sdp);if(data.sdp.type==='offer'){const a=await pc.createAnswer();await pc.setLocalDescription(a);rtcSignal(from,{sdp:pc.localDescription});}}
+    else if(data.ice){await pc.addIceCandidate(data.ice);}
+  }catch(e){}
+}
+function rtcClosePc(peer){const pc=RTC.pcs[peer];if(pc){try{pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}}
+function connectPeers(){
+  if(!RTC.on||me==null||!S||!S.lobby)return;
+  const seats=(S.lobby.seats||[]).map(s=>s.id).filter(id=>id!==me);
+  for(const peer of seats)if(!RTC.pcs[peer])rtcMakePc(peer,me<peer); // инициатор оффера = меньший seatId (без glare)
+  for(const k of Object.keys(RTC.pcs))if(!seats.includes(+k))rtcClosePc(+k);
+}
+async function rtcStart(){
+  if(RTC.on||me==null)return;
+  try{
+    if(!RTC.ice)RTC.ice=((await (await fetch('/api/ice')).json()).iceServers)||[];
+    RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    RTC.on=true;RTC.camOn=true;RTC.micOn=true;
+    rtcVideoEl(me).srcObject=RTC.stream;
+    placeVideos();connectPeers();updateRtcBtns();
+  }catch(e){RTC.on=false;updateRtcBtns();showErr('Камера/микрофон: '+((e&&e.message)||e));}
+}
+function toggleCockpitCam(){if(!RTC.stream)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);updateRtcBtns();placeVideos();}
+function toggleCockpitMic(){if(!RTC.stream)return;RTC.micOn=!RTC.micOn;RTC.stream.getAudioTracks().forEach(t=>t.enabled=RTC.micOn);updateRtcBtns();}
+function updateRtcBtns(){
+  const b=document.getElementById('rtcBtn'),c=document.getElementById('rtcCamBtn'),mi=document.getElementById('rtcMicBtn');if(!b)return;
+  if(me==null){[b,c,mi].forEach(x=>x.style.display='none');return;}
+  b.style.display=RTC.on?'none':'inline-block';
+  c.style.display=mi.style.display=RTC.on?'inline-block':'none';
+  if(RTC.on){c.textContent='Камера: '+(RTC.camOn?'вкл':'выкл');mi.textContent='Микрофон: '+(RTC.micOn?'вкл':'выкл');}
+}
 
 // --- Supabase авторизация ---
 async function initAuth(){
@@ -860,7 +920,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();
+  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -897,7 +957,7 @@ function renderCols(){
   const d=S.draft;
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
-      <div class="cam">камера</div>
+      <div class="cam" data-seat="${m.id}"></div>
       <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}</div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
