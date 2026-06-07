@@ -51,12 +51,12 @@
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* --- просмотрщик итогов: полноэкранная страница (раскладка как кокпит) --- */
-  .vteam{flex:1;min-width:258px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .vteam{flex:1;min-width:290px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
   .vthead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.vthead .vtn{font-weight:800}.vthead .vtp{color:var(--gold);font-weight:800;font-size:15px}
-  .vteam table{table-layout:fixed;width:100%}
+  .vteam table{width:100%}
   .vteam th,.vteam td{text-align:center;padding:2px 5px}
-  .vteam th.pl,.vteam td.nm{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vteam th.pl,.vteam td.nm{text-align:left;white-space:nowrap}
   .vok{color:var(--acc)}.vno{color:var(--miss)}.vlive{color:var(--gold);font-weight:700}
   .vteam tfoot td{border-top:1px solid var(--line);font-weight:800;padding-top:4px}
   .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:5px;font-size:11px}
@@ -482,12 +482,12 @@ function renderViewerTeams(){
     const starters=t.players.filter(p=>!p.isSub).slice().sort((a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position));
     const sub=t.players.find(p=>p.isSub);
     let n=0;
-    let body=starters.map(p=>{n++;return `<tr><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${p.counted?'<b>'+f1(p.points)+'</b>':f1(p.points)}</td></tr>`;}).join('');
+    let body=starters.map(p=>{n++;return `<tr><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${p.counted?'<b>'+f1(p.points)+'</b>':f1(p.points)}</td></tr>`;}).join('');
     if(sub)body+=`<tr class="subr${sub.counted?' counted':''}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td>${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td>${sub.cost!=null?'$'+sub.cost:''}</td><td>${sub.counted?'<b>'+f1(sub.points)+'</b>':f1(sub.points)}</td></tr>`;
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     return `<div class="vteam${i===0?' lead':''}"><div class="vthead"><span class="vtn">${i===0?'🥇 ':''}${t.name}${fin}</span><span class="vtp">${f1(t.total)}</span></div>
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
-      <table><colgroup><col style="width:20px"><col style="width:30px"><col style="width:22px"><col><col style="width:38px"><col style="width:44px"><col style="width:40px"></colgroup><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td>${f1(t.total)}</td></tr></tfoot></table></div>`;
+      <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td>${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
   const right=`<div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3>${renderViewerSchedule()}</div><div class="clubs"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div>`;
   const legend=`<div class="mut" style="font-size:11px;margin-top:10px">Статус: <span class="vok">✓</span> сыграл · <span class="vno">✗</span> не вышел (матч прошёл) · <span class="vlive">●</span> идёт · ⏳ ждёт матч</div>`;
@@ -515,9 +515,9 @@ function viewerHist(){
     const codeOf={};(sc.matches||[]).forEach(m=>{if(m.home)codeOf[m.home]=m.homeCode||m.home;if(m.away)codeOf[m.away]=m.awayCode||m.away;});
     const cl=p=>p.code||codeOf[p.club]||p.club;
     b.innerHTML='<table style="font-size:12px;width:100%"><thead><tr><th>#</th><th style="text-align:left">Игрок</th><th>Клуб</th><th>Поз</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th><th class="right">Ставок</th><th class="right">Время</th></tr></thead><tbody>'+
-      sc.picks.map(p=>`<tr${p.sub?' style="opacity:.75"':''}><td style="text-align:center">${p.sub?'S':(p.no!=null?p.no:'')}</td><td style="white-space:nowrap">${p.unitName||''}</td><td style="text-align:center">${cl(p)}</td><td style="text-align:center">${posShort(p.position||'')}</td><td style="white-space:nowrap">${p.winnerName||''}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td><td class="right">${p.bids!=null?p.bids:'—'}</td><td class="right">${p.durationMs!=null?Math.round(p.durationMs/1000)+'с':'—'}</td></tr>`).join('')+'</tbody></table>';
+      sc.picks.map(p=>`<tr${p.sub?' style="opacity:.75"':''}><td style="text-align:center">${p.sub?'S':(p.no!=null?p.no:'')}</td><td style="white-space:nowrap">${p.position==='COACH'?'Coach '+cl(p):(p.unitName||'')}</td><td style="text-align:center">${cl(p)}</td><td style="text-align:center">${posShort(p.position||'')}</td><td style="white-space:nowrap">${p.winnerName||''}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td><td class="right">${p.bids!=null?p.bids:'—'}</td><td class="right">${p.durationMs!=null?Math.round(p.durationMs/1000)+'с':'—'}</td></tr>`).join('')+'</tbody></table>';
   } else if(sc&&sc.teams&&sc.teams.length){
-    const picks=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(!p.isSub)picks.push({name:p.name,club:p.code||p.club,owner:t.name,price:p.cost});}));
+    const picks=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(!p.isSub)picks.push({name:p.position==='COACH'?'Coach '+(p.code||p.club):p.name,club:p.code||p.club,owner:t.name,price:p.cost});}));
     picks.sort((a,b)=>(b.price||0)-(a.price||0));
     b.innerHTML='<p class="mut" style="font-size:11px;margin:0 0 8px">Старый драфт без сохранённого лога — список восстановлен из составов (по цене).</p><table style="font-size:12px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th>Клуб</th><th style="text-align:left">Менеджер</th><th class="right">Цена</th></tr></thead><tbody>'+
       picks.map(p=>`<tr><td>${p.name}</td><td style="text-align:center">${p.club}</td><td>${p.owner}</td><td class="right">${p.price!=null?'$'+p.price:'—'}</td></tr>`).join('')+'</tbody></table>';
@@ -541,14 +541,17 @@ function renderMatchStats(j){
   const byClub={};j.players.forEach(p=>{if((p.minutes||0)>0)(byClub[p.club]||(byClub[p.club]=[])).push(p);});
   let html=`<div style="margin-bottom:8px"><b>${j.home} — ${j.away}</b> <span class="badge">${j.status||''}</span></div>`;
   const rowHtml=p=>{const fp=FTPOS[p.position]||[p.position,''];return `<tr><td style="white-space:nowrap">${p.name}</td><td class="${fp[1]}">${fp[0]}</td><td class="right">${p.minutes}</td>`+COLS.map(c=>`<td class="right ${p.stats[c[1]]?'':'mut'}">${p.stats[c[1]]||0}</td>`).join('')+`<td class="right"><b>${f1(p.total)}</b></td></tr>`;};
+  const ncol=COLS.length+4; // Игрок,POS,MP + COLS + Σ
+  // один общий стол на обе команды → колонки выровнены (auto-layout), имена не режутся; команда = строка-заголовок colspan
+  html+=`<div style="overflow-x:auto"><table style="font-size:11px"><thead><tr><th style="text-align:left">Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`;
   for(const club of Object.keys(byClub)){
     const start=byClub[club].filter(p=>p.lineup!=='bench').sort((a,b)=>prank(a)-prank(b));
     const subs=byClub[club].filter(p=>p.lineup==='bench').sort((a,b)=>prank(a)-prank(b));
-    html+=`<h4 style="margin:12px 0 4px">${club}</h4><div style="overflow-x:auto"><table style="font-size:11px"><thead><tr><th>Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`
+    html+=`<tr><td colspan="${ncol}" style="padding-top:12px"><b>${club}</b></td></tr>`
       +start.map(rowHtml).join('')
-      +(subs.length?`<tr><td colspan="${COLS.length+4}" style="border-top:2px dashed #34495e;padding-top:6px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Вышли на замену</td></tr>`+subs.map(rowHtml).join(''):'')
-      +`</tbody></table></div>`;
+      +(subs.length?`<tr><td colspan="${ncol}" style="border-top:2px dashed #34495e;padding-top:6px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Вышли на замену</td></tr>`+subs.map(rowHtml).join(''):'');
   }
+  html+=`</tbody></table></div>`;
   return html;
 }
 function renderLobbyReg(){
