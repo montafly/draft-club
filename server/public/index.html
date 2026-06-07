@@ -271,11 +271,11 @@
       <div class="left">
         <div class="cols" id="cols"></div>
         <div id="bottom"></div>
+        <div class="clubs" style="margin-top:10px"><h3>Лог драфта</h3><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div>
       </div>
       <div class="right">
         <div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
         <div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div>
-        <div class="clubs" style="margin-top:10px"><h3>Лог драфта</h3><div id="draftLog" style="max-height:240px;overflow-y:auto;font-size:11px;line-height:1.5"></div></div>
       </div>
     </div>
   </div></main>
@@ -365,7 +365,10 @@ function tick(){
   document.querySelectorAll('.countdown').forEach(el=>{el.textContent=cdText(el.dataset.start);});
 }
 setInterval(tick,1000);
-setInterval(()=>{if(authedOnce&&document.getElementById('viewer').style.display!=='block'&&document.getElementById('draft').style.display!=='block')loadDrafts();},12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
+function maybeRefreshDrafts(){if(authedOnce&&!document.hidden&&document.getElementById('viewer').style.display!=='block'&&document.getElementById('draft').style.display!=='block')loadDrafts();}
+setInterval(maybeRefreshDrafts,12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeRefreshDrafts();}); // вернулись на вкладку — сразу обновить (фоновые таймеры тормозят)
+window.addEventListener('focus',maybeRefreshDrafts);
 function showSection(sec){
   document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
@@ -865,12 +868,17 @@ function renderFixtures(){
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
   el.innerHTML='<table style="font-size:11px"><tbody>'+MATCHES.map(m=>`<tr><td style="text-align:right">${m.home}</td><td class="mut" style="padding:0 4px">—</td><td>${m.away}</td></tr>`).join('')+'</tbody></table>';
 }
+const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
   const el=document.getElementById('draftLog');if(!el)return;
   const ev=(S.lobby&&S.lobby.events)||[];
   if(!ev.length){el.innerHTML='<span class="mut">—</span>';return;}
   const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<32;
-  el.innerHTML=ev.map(e=>`<div style="padding:1px 0;border-bottom:1px solid #1d2935">${e}</div>`).join('');
+  el.innerHTML=ev.map(e=>{
+    const o=(typeof e==='string')?{text:e}:e;
+    const tm=o.t?new Date(o.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
+    return `<div style="text-align:left;padding:1px 0;color:${LOGCOL[o.kind]||'var(--txt)'}"><span class="mut" style="font-size:10px;margin-right:6px">${tm}</span>${o.text}</div>`;
+  }).join('');
   if(atBottom)el.scrollTop=el.scrollHeight;
 }
 function renderRibbon(){

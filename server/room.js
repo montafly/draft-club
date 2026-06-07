@@ -31,15 +31,15 @@ export class Room {
   join(userId, name) {
     // переподключение по аккаунту (userId)
     const existing = this.seats.find((s) => s.userId === userId);
-    if (existing) { existing.connected = true; existing.name = name; this.logEvent(`${name} — переподключился`); return existing.id; }
+    if (existing) { existing.connected = true; existing.name = name; this.logEvent('join', `${name} — переподключился`); return existing.id; }
     if (this.allowedUserIds && !this.allowedUserIds.has(userId)) return null; // не принят → зритель
     if (this.seats.length >= this.maxSeats) return null; // мест нет → зритель
     const id = this.seats.length + 1;
     this.seats.push({ id, userId, name, ready: false, connected: true });
-    this.logEvent(`${name} — вошёл (участник)`);
+    this.logEvent('join', `${name} — вошёл (участник)`);
     return id;
   }
-  logEvent(text) { this.events.push(text); if (this.events.length > 300) this.events.shift(); }
+  logEvent(kind, text) { this.events.push({ t: Date.now(), kind, text }); if (this.events.length > 300) this.events.shift(); }
 
   setReady(seatId, ready = true) {
     const s = this.seats.find((x) => x.id === seatId);
@@ -48,11 +48,11 @@ export class Room {
 
   disconnect(seatId) {
     const s = this.seats.find((x) => x.id === seatId);
-    if (s) { s.connected = false; this.logEvent(`${s.name} — отключился`); }
+    if (s) { s.connected = false; this.logEvent('leave', `${s.name} — отключился`); }
   }
 
-  addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId) && !this.spectators.has(userId)) { this.spectators.set(userId, name); this.logEvent(`${name} — смотрит (зритель)`); } }
-  removeSpectator(userId) { const n = this.spectators.get(userId); if (n) { this.spectators.delete(userId); this.logEvent(`${n} (зритель) — вышел`); } }
+  addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId) && !this.spectators.has(userId)) { this.spectators.set(userId, name); this.logEvent('join', `${name} — смотрит (зритель)`); } }
+  removeSpectator(userId) { const n = this.spectators.get(userId); if (n) { this.spectators.delete(userId); this.logEvent('leave', `${n} (зритель) — вышел`); } }
 
   startable() {
     if (this.draft || !this.seats.length || !this.seats.every((s) => s.ready)) return false;
@@ -64,7 +64,7 @@ export class Room {
     if (!this.startable()) throw new Error('start: не все готовы / мало игроков');
     const players = this.seats.map((s) => ({ id: s.id, name: s.name }));
     const order = players.map((p) => p.id).sort(() => Math.random() - 0.5); // жеребьёвка
-    this.logEvent('— Аукцион начался —');
+    this.logEvent('info', '— Аукцион начался —');
     this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now, log: this.events });
     this.draft.start();
   }
@@ -94,7 +94,7 @@ export class Room {
     restoreDraft(this.draft, top.snap);
     this.history.pop();
     const s = this.seats.find((x) => x.id === seatId);
-    this.logEvent(`${s ? s.name : 'игрок'} — отменил последнее действие`);
+    this.logEvent('info', `${s ? s.name : 'игрок'} — отменил последнее действие`);
   }
 
   // ТОЛЬКО ДЛЯ ТЕСТА: авто-доиграть драфт (каждый номинирует дешёвого, остальные пасуют → забор за старт)
