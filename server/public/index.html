@@ -489,17 +489,17 @@ function renderViewerTeams(){
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
       <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td>${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
-  const right=`<div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3>${renderViewerSchedule()}</div><div class="clubs"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div>`;
+  const right=`<div class="clubs" style="margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs"><h3>Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const legend=`<div class="mut" style="font-size:11px;margin-top:10px">Статус: <span class="vok">✓</span> сыграл · <span class="vno">✗</span> не вышел (матч прошёл) · <span class="vlive">●</span> идёт · ⏳ ждёт матч</div>`;
   el.innerHTML=`<div class="layout"><div class="left"><div class="cols">${cols}</div></div><div class="right">${right}</div></div>`+legend;
 }
 function renderViewerSchedule(){
   const ms=(VIEW.score&&VIEW.score.matches)||[];
   if(!ms.length)return '<span class="mut">—</span>';
-  return '<table style="font-size:11px"><tbody>'+ms.map(m=>{
+  return '<table style="font-size:11px;width:auto;margin:0 auto"><tbody>'+ms.map(m=>{
     const scr=m.score?`${m.score[0]}:${m.score[1]}`:'—';
     const stt=m.status==='confirmed'?'<span class="mut">FT</span>':(m.status==='live'?'<span class="vlive">LIVE</span>':'');
-    return `<tr><td style="text-align:right">${m.homeCode||m.home}</td><td style="padding:0 6px;font-weight:700;text-align:center">${scr}</td><td>${m.awayCode||m.away}</td><td class="right">${stt}</td></tr>`;
+    return `<tr><td style="text-align:right;padding:1px 4px">${m.homeCode||m.home}</td><td style="padding:1px 6px;font-weight:700;text-align:center">${scr}</td><td style="padding:1px 4px">${m.awayCode||m.away}</td><td style="padding:1px 4px 1px 12px" class="mut">${stt}</td></tr>`;
   }).join('')+'</tbody></table>';
 }
 function renderViewerClubs(){
