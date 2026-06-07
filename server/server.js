@@ -190,6 +190,28 @@ async function persistRosters(e) {
   catch (err) { await svcPost('dc_draft_rosters', rows.map(({ finish_order, ...x }) => x)); } // колонки finish_order ещё нет — сохраняем без неё
   // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
+  // DCC: списываем бай-ины с сыгравших участников (идемпотентно через dc_drafts.charged_at)
+  try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
+}
+// --- DCC: операции (леджер) + движение баланса (read-modify-write; один сервер) ---
+async function ledger(userId, draftId, type, amount, note) {
+  await svcPost('dc_ledger', [{ user_id: userId, draft_id: draftId, type, amount, note: note || null }]);
+  const pf = await svcGet(`dc_profiles?id=eq.${userId}&select=dcc_balance`);
+  const bal = (pf[0] && pf[0].dcc_balance != null) ? pf[0].dcc_balance : 0;
+  await svcPatch(`dc_profiles?id=eq.${userId}`, { dcc_balance: bal + amount });
+}
+async function chargeBuyins(draftId, userIds) {
+  const dr = await svcGet(`dc_drafts?id=eq.${draftId}&select=buyin,charged_at`); const d = dr[0];
+  if (!d || d.charged_at) return;                       // нет драфта или уже списано
+  const buyin = d.buyin || 0;
+  if (buyin > 0) for (const uid of [...new Set(userIds)]) await ledger(uid, draftId, 'buyin', -buyin, 'бай-ин');
+  await svcPatch(`dc_drafts?id=eq.${draftId}`, { charged_at: new Date().toISOString() });
+}
+async function payPrizes(draftId, standings, d) {
+  if (d.paid_at) return;                                // уже выплачено
+  const prizes = [d.prize1 || 0, d.prize2 || 0];
+  for (let i = 0; i < 2; i++) { const s = standings[i]; if (s && prizes[i] > 0) await ledger(s.user_id, draftId, 'prize', prizes[i], `приз за ${i + 1} место`); }
+  await svcPatch(`dc_drafts?id=eq.${draftId}`, { paid_at: new Date().toISOString() });
 }
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
@@ -256,7 +278,10 @@ async function scoreDraft(draftId) {
   }
   standings.sort((a, b) => b.total - a.total); teams.sort((a, b) => b.total - a.total);
   let status = d.status;
-  if (allConfirmed && d.status === 'done') { await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled'; }
+  if (allConfirmed && d.status === 'done') {
+    await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled';
+    try { await payPrizes(draftId, standings, d); } catch (err) { console.error('payPrizes', err.message); }
+  }
   return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, hasRosters: rosters.length > 0 };
 }
 
