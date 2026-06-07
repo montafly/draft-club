@@ -190,8 +190,8 @@
           <button class="btn r" id="mtStop" onclick="stopMediaTest()" disabled>Выключить</button>
         </div>
         <div class="row" style="gap:8px;margin-top:8px">
-          <select id="mtCamSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option>Камера</option></select>
-          <select id="mtMicSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option>Микрофон</option></select>
+          <select id="mtCamSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option value="">Камера</option></select>
+          <select id="mtMicSel" onchange="changeMediaDevice()" style="max-width:230px" disabled><option value="">Микрофон</option></select>
         </div>
         <div style="margin-top:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
           <video id="mtVideo" autoplay muted playsinline style="width:260px;height:160px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;object-fit:cover"></video>
@@ -275,6 +275,7 @@
       <div class="right">
         <div class="clubs" style="margin-bottom:10px"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
         <div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div>
+        <div class="clubs" style="margin-top:10px"><h3>Лог драфта</h3><div id="draftLog" style="max-height:240px;overflow-y:auto;font-size:11px;line-height:1.5"></div></div>
       </div>
     </div>
   </div></main>
@@ -445,7 +446,8 @@ async function mtAcquire(){
   const video=(camSel&&camSel.value)?{deviceId:{exact:camSel.value}}:true;
   const audio=(micSel&&micSel.value)?{deviceId:{exact:micSel.value}}:true;
   if(mtStream)mtStream.getTracks().forEach(t=>t.stop());
-  mtStream=await navigator.mediaDevices.getUserMedia({video,audio});
+  try{ mtStream=await navigator.mediaDevices.getUserMedia({video,audio}); }
+  catch(e){ if(e&&e.name==='OverconstrainedError'){ mtStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); } else throw e; } // выбранное устройство не подошло → дефолтное
   document.getElementById('mtVideo').srcObject=mtStream;
   mtSetupMic();syncMediaBtns();
 }
@@ -853,7 +855,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();
+  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -862,6 +864,14 @@ function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
   el.innerHTML='<table style="font-size:11px"><tbody>'+MATCHES.map(m=>`<tr><td style="text-align:right">${m.home}</td><td class="mut" style="padding:0 4px">—</td><td>${m.away}</td></tr>`).join('')+'</tbody></table>';
+}
+function renderLog(){
+  const el=document.getElementById('draftLog');if(!el)return;
+  const ev=(S.lobby&&S.lobby.events)||[];
+  if(!ev.length){el.innerHTML='<span class="mut">—</span>';return;}
+  const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<32;
+  el.innerHTML=ev.map(e=>`<div style="padding:1px 0;border-bottom:1px solid #1d2935">${e}</div>`).join('');
+  if(atBottom)el.scrollTop=el.scrollHeight;
 }
 function renderRibbon(){
   const el=document.getElementById('ribbon');

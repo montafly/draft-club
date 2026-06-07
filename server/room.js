@@ -24,19 +24,22 @@ export class Room {
     this.history = [];                   // стек снапшотов для отмены: {seatId, snap}
     this.seats = [];                     // {id,name,ready,connected}
     this.spectators = new Map();         // userId -> name (зрители без места)
+    this.events = [];                    // единый лог комнаты (вход/выход + действия аукциона)
     this.draft = null;
   }
 
   join(userId, name) {
     // переподключение по аккаунту (userId)
     const existing = this.seats.find((s) => s.userId === userId);
-    if (existing) { existing.connected = true; existing.name = name; return existing.id; }
+    if (existing) { existing.connected = true; existing.name = name; this.logEvent(`${name} — переподключился`); return existing.id; }
     if (this.allowedUserIds && !this.allowedUserIds.has(userId)) return null; // не принят → зритель
     if (this.seats.length >= this.maxSeats) return null; // мест нет → зритель
     const id = this.seats.length + 1;
     this.seats.push({ id, userId, name, ready: false, connected: true });
+    this.logEvent(`${name} — вошёл (участник)`);
     return id;
   }
+  logEvent(text) { this.events.push(text); if (this.events.length > 300) this.events.shift(); }
 
   setReady(seatId, ready = true) {
     const s = this.seats.find((x) => x.id === seatId);
@@ -45,11 +48,11 @@ export class Room {
 
   disconnect(seatId) {
     const s = this.seats.find((x) => x.id === seatId);
-    if (s) s.connected = false;
+    if (s) { s.connected = false; this.logEvent(`${s.name} — отключился`); }
   }
 
-  addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId)) this.spectators.set(userId, name); }
-  removeSpectator(userId) { this.spectators.delete(userId); }
+  addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId) && !this.spectators.has(userId)) { this.spectators.set(userId, name); this.logEvent(`${name} — смотрит (зритель)`); } }
+  removeSpectator(userId) { const n = this.spectators.get(userId); if (n) { this.spectators.delete(userId); this.logEvent(`${n} (зритель) — вышел`); } }
 
   startable() {
     if (this.draft || !this.seats.length || !this.seats.every((s) => s.ready)) return false;
@@ -61,7 +64,8 @@ export class Room {
     if (!this.startable()) throw new Error('start: не все готовы / мало игроков');
     const players = this.seats.map((s) => ({ id: s.id, name: s.name }));
     const order = players.map((p) => p.id).sort(() => Math.random() - 0.5); // жеребьёвка
-    this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now });
+    this.logEvent('— Аукцион начался —');
+    this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now, log: this.events });
     this.draft.start();
   }
 
@@ -89,6 +93,8 @@ export class Room {
     if (!top || top.seatId !== seatId) throw new Error('нечего отменять (сверху не ваше действие)');
     restoreDraft(this.draft, top.snap);
     this.history.pop();
+    const s = this.seats.find((x) => x.id === seatId);
+    this.logEvent(`${s ? s.name : 'игрок'} — отменил последнее действие`);
   }
 
   // ТОЛЬКО ДЛЯ ТЕСТА: авто-доиграть драфт (каждый номинирует дешёвого, остальные пасуют → забор за старт)
@@ -139,6 +145,7 @@ export class Room {
       startable: this.startable(),
       need: this.allowedUserIds ? this.allowedUserIds.size : null,
       spectators: [...this.spectators.values()],
+      events: this.events.slice(-150),
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;
@@ -175,6 +182,6 @@ function countPos(roster) {
 }
 
 // снапшот/восстановление состояния движка для отмены (units/config/now не меняются — не клонируем)
-const SNAP_FIELDS = ['taken', 'clubCounts', 'managers', 'order', 'orderIdx', 'phase', 'nominatorPtr', 'lot', 'actor', '_finishCounter', 'subOrder', 'subPtr', 'log', 'picks', 'lotNo'];
+const SNAP_FIELDS = ['taken', 'clubCounts', 'managers', 'order', 'orderIdx', 'phase', 'nominatorPtr', 'lot', 'actor', '_finishCounter', 'subOrder', 'subPtr', 'picks', 'lotNo']; // 'log' исключён — общий лог комнаты не откатывается отменой
 function snapDraft(d) { const o = {}; for (const k of SNAP_FIELDS) o[k] = structuredClone(d[k]); return o; }
 function restoreDraft(d, s) { for (const k of SNAP_FIELDS) d[k] = structuredClone(s[k]); }

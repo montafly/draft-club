@@ -32,7 +32,7 @@ export class Draft {
     this._finishCounter = 0;
     this.subOrder = [];
     this.subPtr = 0;
-    this.log = [];
+    this.log = opts.log || [];   // общий лог комнаты (если передан) — иначе свой
     this.picks = [];   // хронология: {no, unitName, club, position, price, winnerId, winnerName, sub?}
     this.lotNo = 0;
   }
@@ -89,7 +89,7 @@ export class Draft {
                  lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo,
                  startAt: this.now(), bids: 1, bidsBy: { [managerId]: openingBid } };
     this.phase = 'bidding';
-    this.log.push(`NOMINATE ${m.name} -> ${unit.name} @${openingBid}`);
+    this.log.push(`${m.name} выставил ${unit.name} (${unit.club}) — старт $${openingBid}`);
     this._advance();
     return this.state();
   }
@@ -108,7 +108,7 @@ export class Draft {
     lot.lastIdx = this.orderIdx.get(managerId);
     lot.bids++;
     lot.bidsBy[managerId] = amount;
-    this.log.push(`BID ${m.name} @${amount}`);
+    this.log.push(`${m.name} — ставка $${amount}`);
     this._advance();
     return this.state();
   }
@@ -117,7 +117,7 @@ export class Draft {
   pass(managerId) {
     this._expect('bidding', managerId);
     this.lot.passed.add(managerId);
-    this.log.push(`PASS ${this.m(managerId).name}`);
+    this.log.push(`${this.m(managerId).name} — пас`);
     this._advance();
     return this.state();
   }
@@ -160,11 +160,11 @@ export class Draft {
                       bids: lot.bids, durationMs: this.now() - lot.startAt });
     this.taken.add(lot.unit.id);
     this.clubCounts[lot.unit.club] = (this.clubCounts[lot.unit.club] || 0) + 1;
-    this.log.push(`WIN ${w.name} <- ${lot.unit.name} @${lot.highBid} (budget ${w.budget})`);
+    this.log.push(`${w.name} забрал ${lot.unit.name} за $${lot.highBid} (бюджет $${w.budget})`);
     if (w.roster.length >= this.config.squadSize) {
       w.finished = true;
       w.finishOrder = ++this._finishCounter;
-      this.log.push(`DONE ${w.name} (place in finish order ${w.finishOrder})`);
+      this.log.push(`${w.name} собрал состав (#${w.finishOrder})`);
     }
     this.lot = null;
     // очередь номинаций фиксированная по кругу, независимо от победителя
@@ -199,7 +199,7 @@ export class Draft {
     this.clubCounts[unit.club] = (this.clubCounts[unit.club] || 0) + 1;
     this.picks.push({ no: null, sub: true, unitName: unit.name, club: unit.club, code: unit.code,
                       position: unit.position, price: 0, winnerId: m.id, winnerName: m.name });
-    this.log.push(`SUB ${m.name} <- ${unit.name}`);
+    this.log.push(`${m.name} выбрал замену: ${unit.name}`);
     this.subPtr++;
     if (this.subPtr >= this.subOrder.length) { this.phase = 'done'; this.actor = null; }
     else this.actor = this.subOrder[this.subPtr];
