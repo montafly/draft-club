@@ -263,7 +263,7 @@
     <button class="btn" onclick="leaveDraft()">← Разделы</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn p" id="rtcBtn" onclick="rtcStart()" style="display:none">Вкл видео</button><button class="btn" id="rtcCamBtn" onclick="toggleCockpitCam()" style="display:none">Камера</button><button class="btn" id="rtcMicBtn" onclick="toggleCockpitMic()" style="display:none">Микрофон</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </header>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -308,7 +308,13 @@ ws.onmessage=e=>{const m=JSON.parse(e.data);
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){S=m.state;render();}};
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
-const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},camOn:true,micOn:true};
+const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},camState:{},camOn:false,micOn:true};
+const IC={
+  mic:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
+  micOff:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v3a3 3 0 0 0 5 2.2"/><path d="M15 11V5a3 3 0 0 0-5.5-1.7"/><path d="M5 10v1a7 7 0 0 0 11 5.5"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
+  cam:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4z"/></svg>',
+  camOff:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2m4 0h2a2 2 0 0 1 2 2v6"/><path d="M22 8l-6 4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>'
+};
 function rtcVideoEl(seat){
   if(!RTC.videoEls[seat]){const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=(seat===me);v.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:7px;background:#000';RTC.videoEls[seat]=v;}
   return RTC.videoEls[seat];
@@ -316,8 +322,9 @@ function rtcVideoEl(seat){
 function placeVideos(){
   document.querySelectorAll('#cols .cam[data-seat]').forEach(cam=>{
     const seat=+cam.dataset.seat;const v=RTC.videoEls[seat];
-    if(v&&v.srcObject){if(v.parentNode!==cam){cam.textContent='';cam.appendChild(v);}}
-    else if(!cam.querySelector('video')){cam.textContent=(seat===me&&RTC.on&&!RTC.camOn)?'камера выкл':'камера';}
+    const off=(seat===me)?(RTC.on&&!RTC.camOn):(RTC.camState[seat]===false); // выкл камера → заглушка, не замороженный кадр
+    if(v&&v.srcObject&&!off){ if(cam.firstElementChild!==v){cam.innerHTML='';cam.appendChild(v);} }
+    else { const vid=cam.querySelector('video'); if(vid)vid.remove(); if(cam.textContent!=='камера')cam.textContent='камера'; }
   });
 }
 function rtcSignal(peer,data){send({type:'rtc',to:peer,data});}
@@ -333,10 +340,12 @@ async function rtcMakePc(peer){
   pc.onicecandidate=ev=>{if(ev.candidate)rtcSignal(peer,{ice:ev.candidate});};
   pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];placeVideos();};
   pc.onnegotiationneeded=async()=>{try{st.makingOffer=true;await pc.setLocalDescription();rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}finally{st.makingOffer=false;}};
+  if(RTC.on)rtcSignal(peer,{cam:RTC.camOn}); // сообщить новому пиру текущее состояние камеры
   return st;
 }
 async function onRtcSignal(from,data){
   if(me==null)return;                                  // зрители не в mesh; своё видео не обязательно (можно принимать чужое до включения)
+  if(data.cam!==undefined){RTC.camState[from]=data.cam;placeVideos();return;} // статус камеры пира
   const st=await rtcMakePc(from);const pc=st.pc;
   try{
     if(data.sdp){
@@ -360,21 +369,26 @@ async function rtcStart(){
   try{
     await rtcEnsureIce();
     RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-    RTC.on=true;RTC.camOn=true;RTC.micOn=true;
+    RTC.on=true;RTC.micOn=true;RTC.camOn=false;
+    RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео (включается отдельной иконкой)
     rtcVideoEl(me).srcObject=RTC.stream;
     await connectPeers();
     for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
+    for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});
     placeVideos();updateRtcBtns();
   }catch(e){RTC.on=false;updateRtcBtns();showErr('Камера/микрофон: '+((e&&e.message)||e));}
 }
-function toggleCockpitCam(){if(!RTC.stream)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);updateRtcBtns();placeVideos();}
+async function rtcMicClick(){ if(!RTC.on)await rtcStart(); else toggleCockpitMic(); }
+async function rtcCamClick(){ if(!RTC.on){await rtcStart();toggleCockpitCam();} else toggleCockpitCam(); }
+function toggleCockpitCam(){if(!RTC.stream)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});updateRtcBtns();placeVideos();}
 function toggleCockpitMic(){if(!RTC.stream)return;RTC.micOn=!RTC.micOn;RTC.stream.getAudioTracks().forEach(t=>t.enabled=RTC.micOn);updateRtcBtns();}
 function updateRtcBtns(){
-  const b=document.getElementById('rtcBtn'),c=document.getElementById('rtcCamBtn'),mi=document.getElementById('rtcMicBtn');if(!b)return;
-  if(me==null){[b,c,mi].forEach(x=>x.style.display='none');return;}
-  b.style.display=RTC.on?'none':'inline-block';
-  c.style.display=mi.style.display=RTC.on?'inline-block':'none';
-  if(RTC.on){c.textContent='Камера: '+(RTC.camOn?'вкл':'выкл');mi.textContent='Микрофон: '+(RTC.micOn?'вкл':'выкл');}
+  const c=document.getElementById('rtcCamBtn'),mi=document.getElementById('rtcMicBtn');if(!c||!mi)return;
+  if(me==null){c.style.display=mi.style.display='none';return;}
+  c.style.display=mi.style.display='inline-flex';
+  const micOn=RTC.on&&RTC.micOn,camOn=RTC.on&&RTC.camOn;
+  mi.innerHTML=micOn?IC.mic:IC.micOff;mi.style.color=micOn?'var(--acc)':'var(--mut)';mi.title=!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен');
+  c.innerHTML=camOn?IC.cam:IC.camOff;c.style.color=camOn?'var(--acc)':'var(--mut)';c.title=!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена');
 }
 
 // --- Supabase авторизация ---
@@ -963,7 +977,7 @@ function renderRibbon(){
 }
 function renderCols(){
   const el=document.getElementById('cols');
-  if(!S.started){el.innerHTML='<div class="pcol mut">Составы появятся после старта.</div>';return;}
+  if(!S.started){el.innerHTML=(S.lobby.seats||[]).map(s=>`<div class="pcol ${s.id===me?'me':''}"><div class="cam" data-seat="${s.id}"></div><div class="phead"><span class="nm">${s.name}</span> · ${s.ready?'✓ готов':'…'}</div></div>`).join('')||'<div class="pcol mut">Ждём игроков…</div>';return;}
   const d=S.draft;
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">

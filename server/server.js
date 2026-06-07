@@ -101,7 +101,7 @@ async function buildDraftPool(seasonId, round, matchIds) {
     }
     await sleep(250); // вежливый троттлинг FanTeam
   }
-  for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
+  for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (abbr[tid] || teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
   const matches = sel.map((m) => { const ids = (m.realTeamIds || [null, null]).slice(0, 2); return { home: teams[ids[0]] || '', away: teams[ids[1]] || '', startTime: m.startTime || null }; });
   return { units, clubOdds, matches };
 }
