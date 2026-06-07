@@ -168,6 +168,7 @@
       <div class="card2">
         <h3>Баланс</h3>
         <div class="statline"><div class="stat"><span class="v gold" id="profCoin">0</span><span class="k">Draft Coins</span></div></div>
+        <div id="profLedger" style="margin-top:12px"></div>
         <p class="mut" style="font-size:11px;margin:10px 0 0">1 USDT = 1 DCC. Пополнение через Telegram-бота — позже; пока начисляет админ. Списание бай-ина — при завершении драфта.</p>
       </div>
       <div class="card2">
@@ -186,6 +187,11 @@
         <label><input type="checkbox" id="autoToggle" onchange="toggleAutoplay()"> Разрешить авто-доигрывание драфта (для теста)</label>
         <span id="autoToggleMsg" class="mut" style="margin-left:8px"></span>
         <p class="mut" style="font-size:11px;margin:6px 0 0">В проде держать выключенным: при включении в кокпите появляется кнопка «⚡ Авто-доиграть», мгновенно завершающая аукцион. Нужно, чтобы соло прогнать драфт до итоговой картинки с очками.</p>
+      </div>
+      <div class="card2">
+        <h2>Начисление DCC</h2>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">Начисли баланс игроку (1 USDT = 1 DCC). Можно и со знаком минус (списание/корректировка). Списание бай-инов происходит автоматически при завершении драфта.</p>
+        <div id="adminUsers"><span class="mut">загрузка…</span></div>
       </div>
       <div class="card2">
         <h2>Создать драфт</h2>
@@ -345,8 +351,38 @@ function showSection(sec){
   document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
   const map={lobby:'secLobby',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
   document.getElementById(map[sec]).classList.add('active');
-  if(sec==='admin')refreshAdminTime();
+  if(sec==='admin'){refreshAdminTime();renderAdminUsers();}
+  if(sec==='profile')renderLedger();
   if(sec==='lobby'||sec==='admin'||sec==='mine')loadDrafts();
+}
+async function renderLedger(){
+  const el=document.getElementById('profLedger');if(!el||!session)return;
+  try{
+    const {data}=await sb.from('dc_ledger').select('*').order('created_at',{ascending:false}).limit(50);
+    if(!data||!data.length){el.innerHTML='<p class="mut" style="font-size:11px">Операций пока нет.</p>';return;}
+    const TYP={buyin:'Бай-ин',prize:'Приз',admin_credit:'Начисление',refund:'Возврат'};
+    el.innerHTML='<div class="mut" style="font-size:11px;margin-bottom:2px">История операций:</div><table style="font-size:12px;width:auto"><tbody>'+
+      data.map(r=>`<tr><td style="padding-right:14px">${TYP[r.type]||r.type}${r.note?' <span class="mut">('+r.note+')</span>':''}</td><td class="right" style="font-weight:700;color:${r.amount<0?'var(--miss)':'var(--acc)'};padding-right:14px">${r.amount>0?'+':''}${r.amount}</td><td class="mut" style="font-size:10px">${fmtStart(r.created_at)}</td></tr>`).join('')+'</tbody></table>';
+  }catch(e){el.innerHTML='<p class="mut" style="font-size:11px">не удалось загрузить историю</p>';}
+}
+async function renderAdminUsers(){
+  const el=document.getElementById('adminUsers');if(!el)return;
+  try{
+    const t=await authToken();const r=await fetch('/api/admin/users',{headers:{authorization:'Bearer '+t}});const j=await r.json();
+    if(!r.ok)throw new Error(j.error||r.status);
+    el.innerHTML='<table style="font-size:13px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th class="right">Баланс</th><th style="width:230px"></th></tr></thead><tbody>'+
+      j.users.map(u=>`<tr><td>${u.display_name||u.id.slice(0,8)}${u.role==='admin'?' <span class="badge admin">admin</span>':''}</td><td class="right" style="font-weight:700;color:var(--gold)" id="bal-${u.id}">${u.dcc_balance||0}</td><td><div class="row" style="gap:4px;justify-content:flex-end"><input id="cr-${u.id}" type="number" placeholder="±DCC" style="width:90px"><button class="btn p qbid" onclick="creditUser('${u.id}')">Начислить</button></div></td></tr>`).join('')+'</tbody></table><div id="creditMsg" class="mut" style="font-size:12px;margin-top:6px"></div>';
+  }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
+}
+async function creditUser(id){
+  const inp=document.getElementById('cr-'+id);const amt=Math.round(Number(inp.value));if(!amt)return;
+  const msg=document.getElementById('creditMsg');msg.textContent='…';
+  try{
+    const t=await authToken();const r=await fetch('/api/admin/credit',{method:'POST',headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:JSON.stringify({userId:id,amount:amt})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    document.getElementById('bal-'+id).textContent=j.balance;inp.value='';msg.textContent='начислено ✓';
+    if(session&&id===session.user.id){PROFILE.dcc_balance=j.balance;renderProfileUI();}
+  }catch(e){msg.textContent='ошибка: '+e.message;}
 }
 // --- Лобби: подвкладки Запись / Все драфты ---
 function showLobbyTab(t){
@@ -489,7 +525,7 @@ function renderViewerTeams(){
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
       <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td>${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
-  const right=`<div class="clubs" style="margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs"><h3>Матчи тура</h3>${renderViewerSchedule()}</div>`;
+  const right=`<div class="clubs" style="margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const legend=`<div class="mut" style="font-size:11px;margin-top:10px">Статус: <span class="vok">✓</span> сыграл · <span class="vno">✗</span> не вышел (матч прошёл) · <span class="vlive">●</span> идёт · ⏳ ждёт матч</div>`;
   el.innerHTML=`<div class="layout"><div class="left"><div class="cols">${cols}</div></div><div class="right">${right}</div></div>`+legend;
 }

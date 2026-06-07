@@ -366,6 +366,35 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/admin/users') {
+    (async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const users = await svcGet('dc_profiles?select=id,display_name,dcc_balance,role,games_played,wins&order=display_name.asc');
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ users }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    })();
+    return;
+  }
+  if (url === '/api/admin/credit' && req.method === 'POST') {
+    let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { userId, amount, note } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const amt = Math.round(Number(amount) || 0);
+        if (!userId || !amt) throw new Error('нужен userId и ненулевая сумма');
+        await ledger(userId, null, 'admin_credit', amt, note || 'начисление админом');
+        const pf = await svcGet(`dc_profiles?id=eq.${userId}&select=dcc_balance`);
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ balance: pf[0] ? pf[0].dcc_balance : null }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   let file = url === '/' ? '/index.html' : url;
   if (file.endsWith('/')) file += 'index.html';
   const full = path.join(__dirname, 'public', file);
