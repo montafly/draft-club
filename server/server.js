@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
 import { authUser, getProfile, clientConfig } from './auth.js';
@@ -190,7 +191,7 @@ async function persistRosters(e) {
   catch (err) { await svcPost('dc_draft_rosters', rows.map(({ finish_order, ...x }) => x)); } // колонки finish_order ещё нет — сохраняем без неё
   // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
-  try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-800) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
+  try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-5000) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
   // DCC: списываем бай-ины с сыгравших участников (идемпотентно через dc_drafts.charged_at)
   try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
 }
@@ -402,6 +403,20 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/ice') {
+    const secret = process.env.TURN_SECRET;
+    const turnUrl = process.env.TURN_URL || ('turn:' + (req.headers.host || '147.45.158.66').split(':')[0] + ':3478');
+    const stunUrl = turnUrl.replace(/^turns?:/, 'stun:').split('?')[0];
+    const iceServers = [{ urls: stunUrl }];
+    if (secret) {
+      const username = String(Math.floor(Date.now() / 1000) + 12 * 3600); // эфемерный логин = срок жизни (12ч)
+      const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
+      iceServers.push({ urls: turnUrl, username, credential });
+      iceServers.push({ urls: turnUrl + '?transport=tcp', username, credential });
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ iceServers }));
+    return;
+  }
   let file = url === '/' ? '/index.html' : url;
   if (file.endsWith('/')) file += 'index.html';
   const full = path.join(__dirname, 'public', file);
@@ -466,6 +481,12 @@ wss.on('connection', (ws) => {
       } else {
         const e = rooms.get(ws.roomCode);
         if (!e) return sendErr(ws, 'Сначала создай или войди в комнату');
+        if (msg.type === 'rtc') { // сигналинг WebRTC: точечно пересылаем целевому месту, без рассылки стейта
+          if (ws.seatId == null) return;
+          const target = [...e.clients].find((c) => c.seatId === msg.to);
+          if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.seatId, data: msg.data }));
+          return;
+        }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
         else if (msg.type === 'start') { e.room.start(); }
         else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
