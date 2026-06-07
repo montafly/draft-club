@@ -180,6 +180,21 @@
         </div>
         <p class="mut" style="font-size:11px;margin:10px 0 0">Ачивки добавим позже.</p>
       </div>
+      <div class="card2">
+        <h3>Камера и микрофон (проверка)</h3>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">Проверь, что браузер видит камеру и микрофон — это понадобится для видеосвязи в драфте. Сама видеосвязь между участниками подключается отдельно (WebRTC).</p>
+        <div class="row" style="gap:8px">
+          <button class="btn p" id="mtStart" onclick="startMediaTest()">Включить</button>
+          <button class="btn" id="mtCam" onclick="toggleCam()" disabled>Камера: —</button>
+          <button class="btn" id="mtMic" onclick="toggleMic()" disabled>Микрофон: —</button>
+          <button class="btn r" id="mtStop" onclick="stopMediaTest()" disabled>Выключить</button>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <video id="mtVideo" autoplay muted playsinline style="width:260px;height:160px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;object-fit:cover"></video>
+          <div style="flex:1;min-width:180px;max-width:260px"><div class="mut" style="font-size:11px;margin-bottom:4px">Уровень микрофона:</div><div style="height:12px;background:#0a0f14;border:1px solid var(--line);border-radius:6px;overflow:hidden"><div id="mtMicBar" style="height:100%;width:0;background:var(--acc)"></div></div></div>
+        </div>
+        <div id="mtMsg" class="mut" style="font-size:12px;margin-top:6px"></div>
+      </div>
     </div>
     <!-- АДМИНКА (только для админа) -->
     <div id="secAdmin" class="view">
@@ -397,6 +412,38 @@ async function creditUser(id){
     const u=ADMIN_USERS.find(x=>x.id===id);if(u)u.dcc_balance=j.balance;
     if(session&&id===session.user.id){PROFILE.dcc_balance=j.balance;renderProfileUI();}
   }catch(e){msg.textContent='ошибка: '+e.message;}
+}
+// --- самопроверка камеры/микрофона (изолированно от кокпита; обкатка getUserMedia + тумблеров) ---
+let mtStream=null,mtAudioCtx=null,mtRAF=null;
+function syncMediaBtns(){
+  const v=mtStream&&mtStream.getVideoTracks()[0],a=mtStream&&mtStream.getAudioTracks()[0];
+  document.getElementById('mtCam').textContent='Камера: '+(v&&v.enabled?'вкл':'выкл');
+  document.getElementById('mtMic').textContent='Микрофон: '+(a&&a.enabled?'вкл':'выкл');
+}
+async function startMediaTest(){
+  const msg=document.getElementById('mtMsg');msg.textContent='запрашиваю доступ к камере и микрофону…';
+  try{
+    mtStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    document.getElementById('mtVideo').srcObject=mtStream;
+    document.getElementById('mtStart').disabled=true;document.getElementById('mtStop').disabled=false;
+    document.getElementById('mtCam').disabled=false;document.getElementById('mtMic').disabled=false;syncMediaBtns();
+    mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const srcNode=mtAudioCtx.createMediaStreamSource(mtStream),an=mtAudioCtx.createAnalyser();an.fftSize=256;srcNode.connect(an);
+    const buf=new Uint8Array(an.frequencyBinCount);
+    const loop=()=>{an.getByteTimeDomainData(buf);let peak=0;for(const v of buf)peak=Math.max(peak,Math.abs(v-128));document.getElementById('mtMicBar').style.width=Math.min(100,Math.round(peak/128*200))+'%';mtRAF=requestAnimationFrame(loop);};loop();
+    msg.textContent='работает: ты должен видеть себя, полоска двигается при звуке. Кнопками выше можно вкл/выкл камеру и микрофон.';
+  }catch(e){msg.textContent='не удалось: '+(e.message||e)+' — проверь разрешения браузера на камеру/микрофон.';}
+}
+function toggleCam(){const v=mtStream&&mtStream.getVideoTracks()[0];if(v){v.enabled=!v.enabled;syncMediaBtns();}}
+function toggleMic(){const a=mtStream&&mtStream.getAudioTracks()[0];if(a){a.enabled=!a.enabled;syncMediaBtns();}}
+function stopMediaTest(){
+  if(mtRAF)cancelAnimationFrame(mtRAF);mtRAF=null;
+  if(mtAudioCtx){mtAudioCtx.close().catch(()=>{});mtAudioCtx=null;}
+  if(mtStream){mtStream.getTracks().forEach(t=>t.stop());mtStream=null;}
+  const vid=document.getElementById('mtVideo');if(vid)vid.srcObject=null;
+  document.getElementById('mtMicBar').style.width='0';
+  document.getElementById('mtStart').disabled=false;['mtStop','mtCam','mtMic'].forEach(i=>document.getElementById(i).disabled=true);
+  document.getElementById('mtMsg').textContent='выключено';
 }
 // --- Лобби: подвкладки Запись / Все драфты ---
 function showLobbyTab(t){
@@ -716,8 +763,16 @@ async function toggleAutoplay(){
 async function setApp(appId,status){await sb.from('dc_applications').update({status}).eq('id',appId);await loadDrafts();}
 async function setDraftStatus(id,status){await sb.from('dc_drafts').update({status}).eq('id',id);await loadDrafts();}
 async function launchDraftBtn(id){
-  const m=document.getElementById('adminMsg');if(m)m.textContent='собираю пул игроков по матчам и поднимаю комнату… (может занять до минуты)';
+  const m=document.getElementById('adminMsg');
   try{
+    const d=DRAFTS.find(x=>x.id===id);const buyin=(d&&d.buyin)||0;
+    if(buyin>0){
+      const t0=await authToken();const uj=await (await fetch('/api/admin/users',{headers:{authorization:'Bearer '+t0}})).json();
+      const bal={};(uj.users||[]).forEach(u=>bal[u.id]=u.dcc_balance||0);
+      const short=APPS.filter(a=>a.draft_id===id&&a.status==='accepted'&&(bal[a.user_id]||0)<buyin).map(a=>`${PROFNAMES[a.user_id]||a.user_id.slice(0,6)} (${bal[a.user_id]||0}/${buyin})`);
+      if(short.length&&!confirm(`Не хватает на бай-ин ${buyin} DCC (баланс уйдёт в минус при завершении):\n${short.join(', ')}\n\nЗапустить всё равно?`))return;
+    }
+    if(m)m.textContent='собираю пул игроков по матчам и поднимаю комнату… (может занять до минуты)';
     const t=await authToken();
     const r=await fetch('/api/draft/launch',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
     const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
