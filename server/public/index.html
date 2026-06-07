@@ -37,7 +37,7 @@
   .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
-  .cam{height:84px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
+  .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
   .phead .nm{font-weight:800}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
@@ -321,40 +321,50 @@ function placeVideos(){
   });
 }
 function rtcSignal(peer,data){send({type:'rtc',to:peer,data});}
-function rtcMakePc(peer,initiator){
+function rtcEnsureIce(){if(!RTC.icePromise)RTC.icePromise=fetch('/api/ice').then(r=>r.json()).then(j=>{RTC.ice=j.iceServers||[];},()=>{RTC.ice=[];});return RTC.icePromise;}
+async function rtcMakePc(peer){
+  if(RTC.pcs[peer])return RTC.pcs[peer];
+  await rtcEnsureIce();
   if(RTC.pcs[peer])return RTC.pcs[peer];
   const pc=new RTCPeerConnection({iceServers:RTC.ice||[]});
-  RTC.pcs[peer]=pc;
-  if(RTC.stream)RTC.stream.getTracks().forEach(t=>pc.addTrack(t,RTC.stream));
+  const st={pc,polite:me>peer,makingOffer:false,ignoreOffer:false,hasLocal:false};
+  RTC.pcs[peer]=st;
+  if(RTC.stream){RTC.stream.getTracks().forEach(t=>pc.addTrack(t,RTC.stream));st.hasLocal=true;}
   pc.onicecandidate=ev=>{if(ev.candidate)rtcSignal(peer,{ice:ev.candidate});};
   pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];placeVideos();};
-  if(initiator)rtcOffer(peer);
-  return pc;
+  pc.onnegotiationneeded=async()=>{try{st.makingOffer=true;await pc.setLocalDescription();rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}finally{st.makingOffer=false;}};
+  return st;
 }
-async function rtcOffer(peer){const pc=RTC.pcs[peer];if(!pc)return;try{const o=await pc.createOffer();await pc.setLocalDescription(o);rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}}
 async function onRtcSignal(from,data){
-  if(me==null||!RTC.on)return;
-  let pc=RTC.pcs[from];if(!pc)pc=rtcMakePc(from,false);
+  if(me==null)return;                                  // зрители не в mesh; своё видео не обязательно (можно принимать чужое до включения)
+  const st=await rtcMakePc(from);const pc=st.pc;
   try{
-    if(data.sdp){await pc.setRemoteDescription(data.sdp);if(data.sdp.type==='offer'){const a=await pc.createAnswer();await pc.setLocalDescription(a);rtcSignal(from,{sdp:pc.localDescription});}}
-    else if(data.ice){await pc.addIceCandidate(data.ice);}
+    if(data.sdp){
+      const collision=data.sdp.type==='offer'&&(st.makingOffer||pc.signalingState!=='stable');
+      st.ignoreOffer=!st.polite&&collision;                 // невежливый (меньший seat) игнорит при коллизии
+      if(st.ignoreOffer)return;
+      await pc.setRemoteDescription(data.sdp);
+      if(data.sdp.type==='offer'){await pc.setLocalDescription();rtcSignal(from,{sdp:pc.localDescription});}
+    } else if(data.ice){ try{await pc.addIceCandidate(data.ice);}catch(e){if(!st.ignoreOffer)throw e;} }
   }catch(e){}
 }
-function rtcClosePc(peer){const pc=RTC.pcs[peer];if(pc){try{pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}}
-function connectPeers(){
+function rtcClosePc(peer){const st=RTC.pcs[peer];if(st){try{st.pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}}
+async function connectPeers(){
   if(!RTC.on||me==null||!S||!S.lobby)return;
   const seats=(S.lobby.seats||[]).map(s=>s.id).filter(id=>id!==me);
-  for(const peer of seats)if(!RTC.pcs[peer])rtcMakePc(peer,me<peer); // инициатор оффера = меньший seatId (без glare)
+  for(const peer of seats)if(!RTC.pcs[peer])await rtcMakePc(peer);
   for(const k of Object.keys(RTC.pcs))if(!seats.includes(+k))rtcClosePc(+k);
 }
 async function rtcStart(){
   if(RTC.on||me==null)return;
   try{
-    if(!RTC.ice)RTC.ice=((await (await fetch('/api/ice')).json()).iceServers)||[];
+    await rtcEnsureIce();
     RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     RTC.on=true;RTC.camOn=true;RTC.micOn=true;
     rtcVideoEl(me).srcObject=RTC.stream;
-    placeVideos();connectPeers();updateRtcBtns();
+    await connectPeers();
+    for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
+    placeVideos();updateRtcBtns();
   }catch(e){RTC.on=false;updateRtcBtns();showErr('Камера/микрофон: '+((e&&e.message)||e));}
 }
 function toggleCockpitCam(){if(!RTC.stream)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);updateRtcBtns();placeVideos();}
