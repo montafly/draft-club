@@ -13,7 +13,7 @@
   main{flex:1;overflow:auto;padding:12px}.wrap{max-width:1720px;margin:0 auto}
   /* --- оболочка приложения: навигация по разделам --- */
   .nav{display:flex;gap:4px}
-  .tab{background:transparent;color:var(--mut);border:1px solid transparent;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px}
+  .tab{background:transparent;color:var(--mut);border:1px solid transparent;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
   .tab:hover{color:var(--txt)}.tab.active{background:#22303d;color:var(--txt);border-color:var(--line)}
   .tab.admin{color:var(--gold)}
   .view{display:none;max-width:1100px;margin:0 auto}.view.active{display:block}
@@ -34,7 +34,7 @@
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
   .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:300px;flex:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-  .pcol{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol{flex:0 0 236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
@@ -97,8 +97,8 @@
 <div id="landing" style="position:fixed;inset:0;background:#0d1419;display:flex;align-items:center;justify-content:center;z-index:30">
   <div class="card2" style="width:360px">
     <h2 style="margin:0 0 12px">Draft Club</h2>
-    <input id="aemail" type="email" placeholder="email" style="width:100%;margin:4px 0">
-    <input id="apass" type="password" placeholder="пароль" style="width:100%;margin:4px 0 8px">
+    <input id="aemail" type="email" placeholder="email" style="width:100%;margin:4px 0" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('apass').focus();}">
+    <input id="apass" type="password" placeholder="пароль" style="width:100%;margin:4px 0 8px" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}">
     <button class="btn p" onclick="doLogin()">Войти</button>
     <button class="btn" onclick="doRegister()">Регистрация</button>
     <div id="amsg" class="mut" style="margin-top:8px;font-size:12px"></div>
@@ -110,10 +110,10 @@
   <header>
     <h1>Draft Club</h1>
     <nav class="nav">
-      <button class="tab" data-sec="lobby" onclick="showSection('lobby')">Лобби</button>
-      <button class="tab" data-sec="mine" onclick="showSection('mine')">Мои драфты</button>
-      <button class="tab" data-sec="profile" onclick="showSection('profile')">Профиль</button>
-      <button class="tab admin" data-sec="admin" onclick="showSection('admin')" style="display:none">Админка</button>
+      <a class="tab" data-sec="lobby" href="?view=lobby" onclick="navClick(event,'lobby')">Лобби</a>
+      <a class="tab" data-sec="mine" href="?view=mine" onclick="navClick(event,'mine')">Мои драфты</a>
+      <a class="tab" data-sec="profile" href="?view=profile" onclick="navClick(event,'profile')">Профиль</a>
+      <a class="tab admin" data-sec="admin" href="?view=admin" onclick="navClick(event,'admin')" style="display:none">Админка</a>
     </nav>
     <span class="sp"></span>
     <span class="pill" id="navClock" title="местное время · UTC+3"></span>
@@ -383,7 +383,7 @@ async function rtcStart(){
     RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     RTC.on=true;RTC.micOn=true;RTC.camOn=false;
     RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео (включается отдельной иконкой)
-    rtcVideoEl(me).srcObject=RTC.stream;spkAttach(me,RTC.stream);
+    rtcVideoEl(me).srcObject=new MediaStream(RTC.stream.getVideoTracks());spkAttach(me,RTC.stream); // своё превью — только видео, без аудио (иначе слышишь сам себя)
     await connectPeers();
     for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
     for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});
@@ -473,7 +473,7 @@ async function onAuthed(){
   initTzSelect();
   renderProfileUI();
   initAdminForm();
-  showApp(); showSection('lobby');
+  showApp(); showSection(viewFromUrl()||'lobby');
   tick(); loadDrafts(); loadFlags();
   const room=new URLSearchParams(location.search).get('room'); if(room) document.getElementById('lcode').value=room;
 }
@@ -514,6 +514,11 @@ function maybeRefreshDrafts(){if(authedOnce&&!document.hidden&&document.getEleme
 setInterval(maybeRefreshDrafts,12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeRefreshDrafts();}); // вернулись на вкладку — сразу обновить (фоновые таймеры тормозят)
 window.addEventListener('focus',maybeRefreshDrafts);
+function viewFromUrl(){const v=new URLSearchParams(location.search).get('view');return ['lobby','mine','profile','admin'].includes(v)?v:null;}
+function navClick(e,sec){
+  if(e.metaKey||e.ctrlKey||e.shiftKey||e.button){return;} // модификатор/средняя кнопка → нативное открытие в новой вкладке
+  e.preventDefault();showSection(sec);history.replaceState(null,'',location.pathname+'?view='+sec);
+}
 function showSection(sec){
   document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
