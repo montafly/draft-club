@@ -433,11 +433,16 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+let rtcSeq = 0;                                          // уникальный id соединения для WebRTC-mesh (игроки и зрители)
 
 function broadcast(code) {
   const e = rooms.get(code);
   if (!e) return;
-  const msg = JSON.stringify({ type: 'state', state: e.room.serialize() });
+  const state = e.room.serialize();
+  if (state.lobby) state.lobby.rtc = [...e.clients]    // все в комнате для mesh: {id(rtcId), name, seat|null}
+    .filter((c) => c.user && c.rtcId)
+    .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId }));
+  const msg = JSON.stringify({ type: 'state', state });
   for (const c of e.clients) if (c.readyState === 1) c.send(msg);
 }
 function sendErr(ws, message) { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'error', message })); }
@@ -454,16 +459,17 @@ async function joinAuthed(ws, msg) {
   const prof = await getProfile(user.id);
   const name = (prof && prof.display_name) || (user.email || 'Player').split('@')[0];
   ws.user = user;
+  ws.name = name;                                      // имя для списка rtc-пиров в стейте
   const e = ws.roomCode ? rooms.get(ws.roomCode) : null;
   const id = e ? e.room.join(user.id, name) : null;
   ws.seatId = id;                                      // null = зритель (не принят / мест нет)
   if (id === null && e) e.room.addSpectator(user.id, name);
-  ws.send(JSON.stringify({ type: 'joined', you: id, name }));
+  ws.send(JSON.stringify({ type: 'joined', you: id, name, rtc: ws.rtcId }));
   broadcast(ws.roomCode);
 }
 
 wss.on('connection', (ws) => {
-  ws.roomCode = null; ws.seatId = null; ws.user = null;
+  ws.roomCode = null; ws.seatId = null; ws.user = null; ws.rtcId = ++rtcSeq; ws.name = null;
   ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
@@ -481,10 +487,9 @@ wss.on('connection', (ws) => {
       } else {
         const e = rooms.get(ws.roomCode);
         if (!e) return sendErr(ws, 'Сначала создай или войди в комнату');
-        if (msg.type === 'rtc') { // сигналинг WebRTC: точечно пересылаем целевому месту, без рассылки стейта
-          if (ws.seatId == null) return;
-          const target = [...e.clients].find((c) => c.seatId === msg.to);
-          if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.seatId, data: msg.data }));
+        if (msg.type === 'rtc') { // сигналинг WebRTC: точечно пересылаем целевому пиру по rtcId (игроки и зрители), без рассылки стейта
+          const target = [...e.clients].find((c) => c.rtcId === msg.to);
+          if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.rtcId, data: msg.data }));
           return;
         }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }

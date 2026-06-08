@@ -60,6 +60,8 @@
   .pp.speaking{background:rgba(39,174,96,.16);box-shadow:0 0 0 1px var(--acc)}
   .pp.speaking .nm{font-weight:800;color:var(--txt)}
   .pp.speaking .dot{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 8px 1px var(--acc)}
+  .parts .ppsub{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:8px 0 3px;border-top:1px solid var(--line);padding-top:6px}
+  .pp.spec .nm{color:var(--mut)}
   .cam.speaking{border:2px solid var(--acc)!important;box-shadow:0 0 10px rgba(39,174,96,.55)}
   /* --- просмотрщик итогов: полноэкранная страница (раскладка как кокпит) --- */
   .vteam{flex:1;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
@@ -293,6 +295,8 @@
   </div></main>
 </div>
 
+<div id="rtcSink" style="display:none"></div>
+
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
 <div id="viewer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto">
@@ -311,93 +315,115 @@ const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
+let me=null,myRtc=null,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();}
-  else if(m.type==='joined'){me=m.you;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
+  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){S=m.state;render();}};
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
-const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},camState:{},camOn:false,micOn:true};
+const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},audioEls:{},streams:{},camState:{},camOn:false,micOn:true};
 const IC={
   mic:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
   micOff:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v3a3 3 0 0 0 5 2.2"/><path d="M15 11V5a3 3 0 0 0-5.5-1.7"/><path d="M5 10v1a7 7 0 0 0 11 5.5"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
   cam:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4z"/></svg>',
   camOff:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2m4 0h2a2 2 0 0 1 2 2v6"/><path d="M22 8l-6 4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>'
 };
-function rtcVideoEl(seat){
-  if(!RTC.videoEls[seat]){const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=(seat===me);v.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:7px;background:#000';RTC.videoEls[seat]=v;}
-  return RTC.videoEls[seat];
+function rtcList(){return (S&&S.lobby&&S.lobby.rtc)||[];}                               // [{id,name,seat}] всех в комнате (игроки+зрители)
+function seatToRtc(seat){const p=rtcList().find(x=>x.seat===seat);return p?String(p.id):null;}
+function rtcTileVideo(rid){ // видео-элемент для плитки .cam (muted — звук идёт через аудио-сток, не отсюда)
+  rid=String(rid);
+  if(!RTC.videoEls[rid]){const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=true;v.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:7px;background:#000';RTC.videoEls[rid]=v;}
+  return RTC.videoEls[rid];
 }
-function placeVideos(){
+function rtcAudioSink(rid,stream){ // скрытое воспроизведение аудио пира (своё аудио НЕ играем — иначе эхо)
+  rid=String(rid);if(rid===String(myRtc))return;
+  let a=RTC.audioEls[rid];const sink=document.getElementById('rtcSink');
+  if(!a){a=document.createElement('audio');a.autoplay=true;RTC.audioEls[rid]=a;if(sink)sink.appendChild(a);}
+  if(a.srcObject!==stream)a.srcObject=stream;
+}
+function placeVideos(){ // показываем видео пира в плитке его МЕСТА (зрители без камеры — тайла нет, только аудио в стоке)
   document.querySelectorAll('#cols .cam[data-seat]').forEach(cam=>{
-    const seat=+cam.dataset.seat;const v=RTC.videoEls[seat];
-    const off=(seat===me)?(RTC.on&&!RTC.camOn):(RTC.camState[seat]===false); // выкл камера → заглушка, не замороженный кадр
+    const seat=+cam.dataset.seat;const rid=seatToRtc(seat);const v=rid?RTC.videoEls[rid]:null;
+    const off=(seat===me)?(RTC.on&&!RTC.camOn):(RTC.camState[rid]===false); // выкл камера → заглушка, не замороженный кадр
     if(v&&v.srcObject&&!off){ if(cam.firstElementChild!==v){cam.innerHTML='';cam.appendChild(v);} }
     else { const vid=cam.querySelector('video'); if(vid)vid.remove(); if(cam.textContent!=='камера')cam.textContent='камера'; }
   });
 }
-function rtcSignal(peer,data){send({type:'rtc',to:peer,data});}
+function rtcSignal(peer,data){send({type:'rtc',to:+peer,data});}
 function rtcEnsureIce(){if(!RTC.icePromise)RTC.icePromise=fetch('/api/ice').then(r=>r.json()).then(j=>{RTC.ice=j.iceServers||[];},()=>{RTC.ice=[];});return RTC.icePromise;}
 async function rtcMakePc(peer){
-  if(RTC.pcs[peer])return RTC.pcs[peer];
+  peer=+peer;const key=String(peer);
+  if(RTC.pcs[key])return RTC.pcs[key];
   await rtcEnsureIce();
-  if(RTC.pcs[peer])return RTC.pcs[peer];
+  if(RTC.pcs[key])return RTC.pcs[key];
   const pc=new RTCPeerConnection({iceServers:RTC.ice||[]});
-  const st={pc,polite:me>peer,makingOffer:false,ignoreOffer:false,hasLocal:false};
-  RTC.pcs[peer]=st;
+  const st={pc,polite:myRtc>peer,makingOffer:false,ignoreOffer:false,hasLocal:false};
+  RTC.pcs[key]=st;
   if(RTC.stream){RTC.stream.getTracks().forEach(t=>pc.addTrack(t,RTC.stream));st.hasLocal=true;}
   pc.onicecandidate=ev=>{if(ev.candidate)rtcSignal(peer,{ice:ev.candidate});};
-  pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];spkAttach(peer,ev.streams[0]);placeVideos();};
+  pc.ontrack=ev=>{const stream=ev.streams[0];RTC.streams[key]=stream;if(stream.getVideoTracks().length)rtcTileVideo(key).srcObject=stream;rtcAudioSink(key,stream);spkAttach(key,stream);placeVideos();};
   pc.onnegotiationneeded=async()=>{try{st.makingOffer=true;await pc.setLocalDescription();rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}finally{st.makingOffer=false;}};
+  pc.onconnectionstatechange=()=>{const s=pc.connectionState;
+    if(s==='failed'){rtcClosePc(key);connectPeers();}                                              // связь умерла → пересобрать когда пир вернётся
+    else if(s==='disconnected'){const v=RTC.videoEls[key];if(v)v.srcObject=null;RTC.camState[key]=false;placeVideos();} // убрать застывший кадр
+  };
   if(RTC.on)rtcSignal(peer,{cam:RTC.camOn}); // сообщить новому пиру текущее состояние камеры
   return st;
 }
 async function onRtcSignal(from,data){
-  if(me==null)return;                                  // зрители не в mesh; своё видео не обязательно (можно принимать чужое до включения)
-  if(data.cam!==undefined){RTC.camState[from]=data.cam;placeVideos();return;} // статус камеры пира
+  if(myRtc==null)return;const key=String(from);
+  if(data.cam!==undefined){RTC.camState[key]=data.cam;placeVideos();return;} // статус камеры пира
   const st=await rtcMakePc(from);const pc=st.pc;
   try{
     if(data.sdp){
       const collision=data.sdp.type==='offer'&&(st.makingOffer||pc.signalingState!=='stable');
-      st.ignoreOffer=!st.polite&&collision;                 // невежливый (меньший seat) игнорит при коллизии
+      st.ignoreOffer=!st.polite&&collision;                 // невежливый (меньший rtcId) игнорит при коллизии
       if(st.ignoreOffer)return;
       await pc.setRemoteDescription(data.sdp);
       if(data.sdp.type==='offer'){await pc.setLocalDescription();rtcSignal(from,{sdp:pc.localDescription});}
     } else if(data.ice){ try{await pc.addIceCandidate(data.ice);}catch(e){if(!st.ignoreOffer)throw e;} }
   }catch(e){}
 }
-function rtcClosePc(peer){const st=RTC.pcs[peer];if(st){try{st.pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}spkDetach(peer);}
-async function connectPeers(){
-  if(!RTC.on||me==null||!S||!S.lobby)return;
-  const seats=(S.lobby.seats||[]).map(s=>s.id).filter(id=>id!==me);
-  for(const peer of seats)if(!RTC.pcs[peer])await rtcMakePc(peer);
-  for(const k of Object.keys(RTC.pcs))if(!seats.includes(+k))rtcClosePc(+k);
+function rtcClosePc(peer){const key=String(peer);
+  const st=RTC.pcs[key];if(st){try{st.pc.close()}catch{}delete RTC.pcs[key];}
+  const v=RTC.videoEls[key];if(v){v.srcObject=null;delete RTC.videoEls[key];}
+  const a=RTC.audioEls[key];if(a){a.srcObject=null;a.remove();delete RTC.audioEls[key];}
+  delete RTC.streams[key];delete RTC.camState[key];spkDetach(key);placeVideos();}
+async function connectPeers(){ // полный mesh: все в комнате, кроме себя (игроки и зрители)
+  if(!RTC.on||myRtc==null||!S||!S.lobby)return;
+  const peers=rtcList().map(p=>p.id).filter(id=>id!==myRtc);
+  for(const peer of peers)if(!RTC.pcs[String(peer)])await rtcMakePc(peer);
+  const keep=new Set(peers.map(String));
+  for(const k of Object.keys(RTC.pcs))if(!keep.has(k))rtcClosePc(k);
 }
 async function rtcStart(){
-  if(RTC.on||me==null)return;
+  if(RTC.on||myRtc==null)return;
   try{
     await rtcEnsureIce();
-    RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    const constraints=(me==null)?{audio:true}:{video:true,audio:true}; // зритель — только микрофон, без камеры
+    RTC.stream=await navigator.mediaDevices.getUserMedia(constraints);
     RTC.on=true;RTC.micOn=true;RTC.camOn=false;
-    RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео (включается отдельной иконкой)
-    rtcVideoEl(me).srcObject=new MediaStream(RTC.stream.getVideoTracks());spkAttach(me,RTC.stream); // своё превью — только видео, без аудио (иначе слышишь сам себя)
+    if(me!=null){RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео
+      rtcTileVideo(myRtc).srcObject=new MediaStream(RTC.stream.getVideoTracks());} // своё превью — только видео, без аудио (иначе слышишь себя)
+    spkAttach(myRtc,RTC.stream);
     await connectPeers();
     for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
-    for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});
+    for(const k in RTC.pcs)rtcSignal(k,{cam:RTC.camOn});
     placeVideos();updateRtcBtns();
   }catch(e){RTC.on=false;updateRtcBtns();showErr('Камера/микрофон: '+((e&&e.message)||e));}
 }
 async function rtcMicClick(){ if(!RTC.on)await rtcStart(); else toggleCockpitMic(); }
-async function rtcCamClick(){ if(!RTC.on){await rtcStart();toggleCockpitCam();} else toggleCockpitCam(); }
-function toggleCockpitCam(){if(!RTC.stream)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});updateRtcBtns();placeVideos();}
+async function rtcCamClick(){ if(me==null)return; if(!RTC.on){await rtcStart();toggleCockpitCam();} else toggleCockpitCam(); }
+function toggleCockpitCam(){if(!RTC.stream||me==null)return;RTC.camOn=!RTC.camOn;RTC.stream.getVideoTracks().forEach(t=>t.enabled=RTC.camOn);for(const k in RTC.pcs)rtcSignal(k,{cam:RTC.camOn});updateRtcBtns();placeVideos();}
 function toggleCockpitMic(){if(!RTC.stream)return;RTC.micOn=!RTC.micOn;RTC.stream.getAudioTracks().forEach(t=>t.enabled=RTC.micOn);updateRtcBtns();}
 function updateRtcBtns(){
   const c=document.getElementById('rtcCamBtn'),mi=document.getElementById('rtcMicBtn');if(!c||!mi)return;
-  if(me==null){c.style.display=mi.style.display='none';return;}
-  c.style.display=mi.style.display='inline-flex';
+  if(myRtc==null){c.style.display=mi.style.display='none';return;}
+  mi.style.display='inline-flex';                       // микрофон есть у всех в комнате (игроки и зрители)
+  c.style.display=(me!=null)?'inline-flex':'none';      // камера только у игроков; зритель без камеры
   const micOn=RTC.on&&RTC.micOn,camOn=RTC.on&&RTC.camOn;
   mi.innerHTML=micOn?IC.mic:IC.micOff;mi.style.color=micOn?'var(--acc)':'var(--mut)';mi.title=!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен');
   c.innerHTML=camOn?IC.cam:IC.camOff;c.style.color=camOn?'var(--acc)':'var(--mut)';c.title=!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена');
@@ -431,25 +457,28 @@ function spkLoop(){
     const n=SPK.nodes[k];n.an.getByteTimeDomainData(n.buf);
     let sum=0;for(let i=0;i<n.buf.length;i++){const v=(n.buf[i]-128)/128;sum+=v*v;}
     const rms=Math.sqrt(sum/n.buf.length);
-    const muted=(+k===me)&&!RTC.micOn; // свой мик выключен → не считаем говорящим
+    const muted=(k===String(myRtc))&&!RTC.micOn; // свой мик выключен → не считаем говорящим
     if(rms>SPK.TH&&!muted)n.last=now;
     SPK.spk[k]=(now-n.last)<SPK.HANG;
   }
   spkPaint();
   SPK.raf=Object.keys(SPK.nodes).length?requestAnimationFrame(spkLoop):0;
 }
-function spkPaint(){ // идемпотентно: переживает ре-рендер панели/колонок
-  document.querySelectorAll('#parts .pp').forEach(el=>el.classList.toggle('speaking',!!SPK.spk[el.dataset.seat]));
-  document.querySelectorAll('#cols .cam[data-seat]').forEach(el=>el.classList.toggle('speaking',!!SPK.spk[el.dataset.seat]));
+function spkPaint(){ // идемпотентно: переживает ре-рендер панели/колонок; по rtcId
+  document.querySelectorAll('#parts .pp').forEach(el=>{const r=el.dataset.rtc;el.classList.toggle('speaking',!!(r&&SPK.spk[r]));});
+  document.querySelectorAll('#cols .cam[data-seat]').forEach(el=>{const r=seatToRtc(+el.dataset.seat);el.classList.toggle('speaking',!!(r&&SPK.spk[r]));});
 }
 function renderParts(){
   const el=document.getElementById('parts');if(!el)return;
-  const rows=S.started?ordered():(S.lobby&&S.lobby.seats)||[];
-  if(!rows.length){el.innerHTML='<h3>Участники</h3><div class="mut" style="font-size:11px">—</div>';return;}
-  el.innerHTML='<h3>Участники</h3>'+rows.map(s=>
-    `<div class="pp${s.id===me?' me':''}" data-seat="${s.id}"><span class="dot" style="background:${seatColor(s.id)}"></span><span class="nm">${s.name}</span></div>`
-  ).join('');
-  spkPaint();
+  const players=S.started?ordered():((S.lobby&&S.lobby.seats)||[]);
+  const specs=rtcList().filter(p=>p.seat==null);
+  let html='<h3>Участники</h3>';
+  if(!players.length&&!specs.length){el.innerHTML=html+'<div class="mut" style="font-size:11px">—</div>';return;}
+  html+=players.map(s=>{const rid=seatToRtc(s.id);
+    return `<div class="pp${s.id===me?' me':''}" data-seat="${s.id}"${rid?` data-rtc="${rid}"`:''}><span class="dot" style="background:${seatColor(s.id)}"></span><span class="nm">${s.name}</span></div>`;}).join('');
+  if(specs.length)html+='<div class="ppsub">Зрители</div>'+specs.map(p=>
+    `<div class="pp spec${p.id===myRtc?' me':''}" data-rtc="${p.id}"><span class="dot" style="background:#7d8da0"></span><span class="nm">${p.name}</span></div>`).join('');
+  el.innerHTML=html;spkPaint();
 }
 
 // --- Supabase авторизация ---
