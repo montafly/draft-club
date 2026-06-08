@@ -50,6 +50,17 @@
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* --- панель участников (кто на драфте + детект говорящего) --- */
+  .parts{width:140px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .parts h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}
+  .pp{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:7px;font-size:12px;margin-bottom:2px;transition:background .12s,box-shadow .12s}
+  .pp .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.3)}
+  .pp .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+  .pp.me .nm{color:var(--gold)}
+  .pp.speaking{background:rgba(39,174,96,.16);box-shadow:0 0 0 1px var(--acc)}
+  .pp.speaking .nm{font-weight:800;color:var(--txt)}
+  .pp.speaking .dot{box-shadow:0 0 0 2px rgba(0,0,0,.3),0 0 8px 1px var(--acc)}
+  .cam.speaking{border:2px solid var(--acc)!important;box-shadow:0 0 10px rgba(39,174,96,.55)}
   /* --- просмотрщик итогов: полноэкранная страница (раскладка как кокпит) --- */
   .vteam{flex:1;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
@@ -268,6 +279,7 @@
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
     <div class="layout">
+      <div class="parts" id="parts"></div>
       <div class="left">
         <div class="cols" id="cols"></div>
         <div id="bottom"></div>
@@ -338,7 +350,7 @@ async function rtcMakePc(peer){
   RTC.pcs[peer]=st;
   if(RTC.stream){RTC.stream.getTracks().forEach(t=>pc.addTrack(t,RTC.stream));st.hasLocal=true;}
   pc.onicecandidate=ev=>{if(ev.candidate)rtcSignal(peer,{ice:ev.candidate});};
-  pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];placeVideos();};
+  pc.ontrack=ev=>{rtcVideoEl(peer).srcObject=ev.streams[0];spkAttach(peer,ev.streams[0]);placeVideos();};
   pc.onnegotiationneeded=async()=>{try{st.makingOffer=true;await pc.setLocalDescription();rtcSignal(peer,{sdp:pc.localDescription});}catch(e){}finally{st.makingOffer=false;}};
   if(RTC.on)rtcSignal(peer,{cam:RTC.camOn}); // сообщить новому пиру текущее состояние камеры
   return st;
@@ -357,7 +369,7 @@ async function onRtcSignal(from,data){
     } else if(data.ice){ try{await pc.addIceCandidate(data.ice);}catch(e){if(!st.ignoreOffer)throw e;} }
   }catch(e){}
 }
-function rtcClosePc(peer){const st=RTC.pcs[peer];if(st){try{st.pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}}
+function rtcClosePc(peer){const st=RTC.pcs[peer];if(st){try{st.pc.close()}catch{}delete RTC.pcs[peer];}const v=RTC.videoEls[peer];if(v){v.srcObject=null;delete RTC.videoEls[peer];}spkDetach(peer);}
 async function connectPeers(){
   if(!RTC.on||me==null||!S||!S.lobby)return;
   const seats=(S.lobby.seats||[]).map(s=>s.id).filter(id=>id!==me);
@@ -371,7 +383,7 @@ async function rtcStart(){
     RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
     RTC.on=true;RTC.micOn=true;RTC.camOn=false;
     RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео (включается отдельной иконкой)
-    rtcVideoEl(me).srcObject=RTC.stream;
+    rtcVideoEl(me).srcObject=RTC.stream;spkAttach(me,RTC.stream);
     await connectPeers();
     for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
     for(const k in RTC.pcs)rtcSignal(+k,{cam:RTC.camOn});
@@ -389,6 +401,55 @@ function updateRtcBtns(){
   const micOn=RTC.on&&RTC.micOn,camOn=RTC.on&&RTC.camOn;
   mi.innerHTML=micOn?IC.mic:IC.micOff;mi.style.color=micOn?'var(--acc)':'var(--mut)';mi.title=!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен');
   c.innerHTML=camOn?IC.cam:IC.camOff;c.style.color=camOn?'var(--acc)':'var(--mut)';c.title=!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена');
+}
+
+// --- детект говорящего: AnalyserNode на свой и чужие аудио-потоки, подсветка ника/плитки ---
+const SEATCOL=['#f1c40f','#5dade2','#58d68d','#ec7063','#bb8fce','#f5a25d'];
+function seatColor(id){const n=SEATCOL.length;return SEATCOL[((id%n)+n)%n];}
+const SPK={ctx:null,nodes:{},spk:{},raf:0,TH:0.025,HANG:380};
+function spkEnsureCtx(){
+  if(!SPK.ctx){try{SPK.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+  if(SPK.ctx.state==='suspended')SPK.ctx.resume();
+  return SPK.ctx;
+}
+function spkAttach(seat,stream){
+  if(!stream||stream.getAudioTracks().length===0)return;
+  const ctx=spkEnsureCtx();if(!ctx)return;const k=String(seat);
+  if(SPK.nodes[k]){try{SPK.nodes[k].src.disconnect()}catch{}}
+  try{
+    const src=ctx.createMediaStreamSource(stream);
+    const an=ctx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0.3;
+    src.connect(an); // только в анализатор, НЕ в destination — без эха
+    SPK.nodes[k]={src,an,buf:new Uint8Array(an.fftSize),last:0};
+  }catch(e){return;}
+  if(!SPK.raf)SPK.raf=requestAnimationFrame(spkLoop);
+}
+function spkDetach(seat){const k=String(seat);const n=SPK.nodes[k];if(n){try{n.src.disconnect()}catch{}}delete SPK.nodes[k];delete SPK.spk[k];}
+function spkLoop(){
+  const now=performance.now();
+  for(const k in SPK.nodes){
+    const n=SPK.nodes[k];n.an.getByteTimeDomainData(n.buf);
+    let sum=0;for(let i=0;i<n.buf.length;i++){const v=(n.buf[i]-128)/128;sum+=v*v;}
+    const rms=Math.sqrt(sum/n.buf.length);
+    const muted=(+k===me)&&!RTC.micOn; // свой мик выключен → не считаем говорящим
+    if(rms>SPK.TH&&!muted)n.last=now;
+    SPK.spk[k]=(now-n.last)<SPK.HANG;
+  }
+  spkPaint();
+  SPK.raf=Object.keys(SPK.nodes).length?requestAnimationFrame(spkLoop):0;
+}
+function spkPaint(){ // идемпотентно: переживает ре-рендер панели/колонок
+  document.querySelectorAll('#parts .pp').forEach(el=>el.classList.toggle('speaking',!!SPK.spk[el.dataset.seat]));
+  document.querySelectorAll('#cols .cam[data-seat]').forEach(el=>el.classList.toggle('speaking',!!SPK.spk[el.dataset.seat]));
+}
+function renderParts(){
+  const el=document.getElementById('parts');if(!el)return;
+  const rows=S.started?ordered():(S.lobby&&S.lobby.seats)||[];
+  if(!rows.length){el.innerHTML='<h3>Участники</h3><div class="mut" style="font-size:11px">—</div>';return;}
+  el.innerHTML='<h3>Участники</h3>'+rows.map(s=>
+    `<div class="pp${s.id===me?' me':''}" data-seat="${s.id}"><span class="dot" style="background:${seatColor(s.id)}"></span><span class="nm">${s.name}</span></div>`
+  ).join('');
+  spkPaint();
 }
 
 // --- Supabase авторизация ---
@@ -944,7 +1005,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
