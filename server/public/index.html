@@ -32,7 +32,7 @@
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
-  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.right{width:360px;flex:none}.collap.collapsed .collap-body{display:none}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.right{width:360px;flex:none;display:flex;gap:10px;align-items:flex-start}.collap.collapsed .collap-body{display:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .pcol{flex:0 0 236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
@@ -78,9 +78,9 @@
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
-  #matches{min-height:176px}#matches .mcols{display:flex;gap:14px}#matches .mcol{flex:1;min-width:0}
-  #matches .mrow{display:flex;gap:4px;font-size:11px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #matches .mrow .mn,#matches .mrow .md{color:var(--mut);flex:none}#matches .mrow .mh,#matches .mrow .ma{overflow:hidden;text-overflow:ellipsis}
+  .right>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:104px;padding:8px 6px;text-align:center}.mpanel h3{margin:0 0 6px}
+  #matches .mrow{display:flex;gap:3px;justify-content:flex-start;font-size:11px;line-height:1.65;white-space:nowrap;text-align:left}
+  #matches .mrow .mn,#matches .mrow .md{color:var(--mut)}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
   .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
@@ -300,7 +300,7 @@
       </div>
       <div class="right">
         <div id="bottom" style="min-height:470px"></div>
-        <div class="clubs" style="margin-top:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
+        <div class="clubs mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
     </div>
   </div></main>
@@ -1056,11 +1056,7 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  const row=(m,i)=>`<div class="mrow"><span class="mn">${i+1}.</span><span class="mh">${m.home}</span><span class="md">–</span><span class="ma">${m.away}</span></div>`;
-  if(MATCHES.length>10){
-    const a=MATCHES.slice(0,10),b=MATCHES.slice(10);
-    el.innerHTML=`<div class="mcols"><div class="mcol">${a.map((m,i)=>row(m,i)).join('')}</div><div class="mcol">${b.map((m,i)=>row(m,i+10)).join('')}</div></div>`;
-  } else el.innerHTML=`<div class="mcol">${MATCHES.map((m,i)=>row(m,i)).join('')}</div>`;
+  el.innerHTML=MATCHES.map((m,i)=>`<div class="mrow"><span class="mn">${i+1}.</span><span>${clubCode(m.home).toUpperCase()}</span><span class="md">-</span><span>${clubCode(m.away).toUpperCase()}</span></div>`).join('');
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
