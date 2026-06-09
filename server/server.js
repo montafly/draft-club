@@ -524,6 +524,7 @@ wss.on('connection', (ws) => {
           if (!ok) throw new Error('авто-доигрывание выключено (включается в Админке)');
           e.room.autoplay();
         }
+        else if (msg.type === 'chat') { if (!ws.user) throw new Error('войдите в комнату'); if (!e.room.addChat(ws.name, msg.text)) return; } // зрителям тоже можно; пустое — без рассылки
         else { if (!ws.seatId) throw new Error('вы зритель'); e.room.action(ws.seatId, msg); }
         broadcast(ws.roomCode);
         syncStatus(e);

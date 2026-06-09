@@ -25,6 +25,7 @@ export class Room {
     this.seats = [];                     // {id,name,ready,connected}
     this.spectators = new Map();         // userId -> name (зрители без места)
     this.events = [];                    // единый лог комнаты (вход/выход + действия аукциона)
+    this.chat = [];                      // эфемерный чат комнаты (в памяти процесса): {t,name,text}
     this.draft = null;
   }
 
@@ -40,6 +41,8 @@ export class Room {
     return id;
   }
   logEvent(kind, text) { this.events.push({ t: Date.now(), kind, text }); if (this.events.length > 5000) this.events.shift(); }
+  // чат: нормализуем (один абзац, без управляющих переносов), режем до 500 символов; пустое не пишем. Экранирование — на клиенте при рендере.
+  addChat(name, text) { const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim().slice(0, 500); if (!t) return false; this.chat.push({ t: Date.now(), name: name || 'Player', text: t }); if (this.chat.length > 200) this.chat.shift(); return true; }
 
   setReady(seatId, ready = true) {
     const s = this.seats.find((x) => x.id === seatId);
@@ -146,6 +149,7 @@ export class Room {
       need: this.allowedUserIds ? this.allowedUserIds.size : null,
       spectators: [...this.spectators.values()],
       events: this.events.slice(-400), // живое окно: только недавнее (payload не растёт с размером лога); полный лог — в dc_drafts.events на финише
+      chat: this.chat.slice(-100),     // последние сообщения чата (эфемерные, в памяти комнаты)
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;

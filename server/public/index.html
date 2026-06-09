@@ -303,7 +303,7 @@
       <div class="center">
         <div class="cols" id="cols"></div>
         <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
-        <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatBody" class="mut" style="font-size:11px;padding:2px 0">Чат — в одном из следующих обновлений.</div></div></div>
+        <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
       <div class="rightcol right">
         <div id="bottom" style="min-height:470px"></div>
@@ -1085,7 +1085,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderParts();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -1108,6 +1108,19 @@ function renderLog(){
   }).join('');
   el.scrollTop=0;
 }
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function renderChat(){
+  const el=document.getElementById('chatLog');if(!el)return;
+  const ch=(S&&S.lobby&&S.lobby.chat)||[];
+  const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<30; // автоскролл только если уже внизу (не дёргаем читающего историю)
+  if(!ch.length){el.innerHTML='<span class="mut">Сообщений пока нет.</span>';return;}
+  el.innerHTML=ch.map(c=>{
+    const tm=c.t?new Date(c.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
+    return `<div style="text-align:left;padding:1px 0"><span class="mut" style="font-size:10px;margin-right:5px">${tm}</span><b style="color:var(--gold)">[${esc(c.name)}]</b> ${esc(c.text)}</div>`;
+  }).join('');
+  if(atBottom)el.scrollTop=el.scrollHeight;
+}
+function sendChat(){const i=document.getElementById('chatInput');if(!i)return;const t=(i.value||'').trim();if(!t)return;send({type:'chat',text:t.slice(0,500)});i.value='';i.focus();}
 function renderRibbon(){
   const el=document.getElementById('ribbon');
   const sp=(S.lobby&&S.lobby.spectators)||[];
