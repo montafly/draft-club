@@ -50,7 +50,8 @@
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .clubs tr.sl-g td{background:rgba(39,174,96,.16)}.clubs tr.sl-lg td{background:rgba(39,174,96,.08)}.clubs tr.sl-y td{background:rgba(232,195,114,.16)}.clubs tr.sl-lr td{background:rgba(236,112,99,.12)}.clubs tr.sl-r td{background:rgba(236,112,99,.30)}
+  .clubs table.ctab{margin:0 auto}.clubs .sar{opacity:.85;font-size:9px;margin-left:2px}
+  .clubs tr.sl-g td{background:rgba(39,174,96,.30)}.clubs tr.sl-lg td{background:rgba(39,174,96,.15)}.clubs tr.sl-y td{background:rgba(232,195,114,.28)}.clubs tr.sl-lr td{background:rgba(236,112,99,.20)}.clubs tr.sl-r td{background:rgba(236,112,99,.42)}
   /* --- панель участников (кто на драфте + детект говорящего) --- */
   .parts{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .parts h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}
@@ -77,6 +78,9 @@
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
+  #matches{min-height:176px}#matches .mcols{display:flex;gap:14px}#matches .mcol{flex:1;min-width:0}
+  #matches .mrow{display:flex;gap:4px;font-size:11px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #matches .mrow .mn,#matches .mrow .md{color:var(--mut);flex:none}#matches .mrow .mh,#matches .mrow .ma{overflow:hidden;text-overflow:ellipsis}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
   .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
@@ -90,7 +94,7 @@
   .st-high{color:var(--gold);font-weight:700}.st-act{color:var(--acc)}.st-pass{color:var(--mut)}.st-in{color:var(--txt)}.st-out{color:var(--miss);font-weight:600}
   .bids .b.out{color:var(--miss);background:#3a1a17;border-radius:4px;padding:2px 6px}
   .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1 1 100%;min-width:0}.filters select{flex:1 1 0;min-width:0}
-  .plist{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
+  .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
   .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
   .err{color:var(--miss)}
   #hist{display:none;position:fixed;inset:0;background:#000a;padding:40px;overflow:auto;z-index:10}
@@ -287,7 +291,7 @@
     <div class="layout">
       <div class="side">
         <div class="parts" id="parts"></div>
-        <div class="clubs" style="margin-top:10px"><h3>Клубы · П% · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку). Слоты 0 — исчерпан.</p></div>
+        <div class="clubs" style="margin-top:10px"><h3>Клубы · П% · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Клик по заголовку — сортировка.<br>Слоты 0 — исчерпан.</p></div>
       </div>
       <div class="center">
         <div class="cols" id="cols"></div>
@@ -295,7 +299,7 @@
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatBody" class="mut" style="font-size:11px;padding:2px 0">Чат — в одном из следующих обновлений.</div></div></div>
       </div>
       <div class="right">
-        <div id="bottom" style="min-height:600px"></div>
+        <div id="bottom" style="min-height:470px"></div>
         <div class="clubs" style="margin-top:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
     </div>
@@ -1052,7 +1056,11 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  el.innerHTML='<table style="font-size:11px"><tbody>'+MATCHES.map(m=>`<tr><td style="text-align:right">${m.home}</td><td class="mut" style="padding:0 4px">—</td><td>${m.away}</td></tr>`).join('')+'</tbody></table>';
+  const row=(m,i)=>`<div class="mrow"><span class="mn">${i+1}.</span><span class="mh">${m.home}</span><span class="md">–</span><span class="ma">${m.away}</span></div>`;
+  if(MATCHES.length>10){
+    const a=MATCHES.slice(0,10),b=MATCHES.slice(10);
+    el.innerHTML=`<div class="mcols"><div class="mcol">${a.map((m,i)=>row(m,i)).join('')}</div><div class="mcol">${b.map((m,i)=>row(m,i+10)).join('')}</div></div>`;
+  } else el.innerHTML=`<div class="mcol">${MATCHES.map((m,i)=>row(m,i)).join('')}</div>`;
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
@@ -1095,6 +1103,8 @@ function renderCols(){
     </div>`).join('');
 }
 let clubSortK='xg',clubSortDir=-1;
+function clubCode(club){const u=POOL.find(x=>x.club===club&&x.code);return u&&u.code?u.code:(club||'').slice(0,3).toUpperCase();}
+function oppInfo(club){for(const m of (MATCHES||[])){if(m.home===club)return{opp:m.away,home:true};if(m.away===club)return{opp:m.home,home:false};}return null;}
 function renderClubs(){
   const el=document.getElementById('clubs');
   if(!S.started){el.innerHTML='<span class="mut">—</span>';return;}
@@ -1105,7 +1115,8 @@ function renderClubs(){
   rows.sort((a,b)=>{const an=a[clubSortK]==null?-Infinity:a[clubSortK],bn=b[clubSortK]==null?-Infinity:b[clubSortK];return (an>bn?1:an<bn?-1:0)*clubSortDir || a.club.localeCompare(b.club);});
   // подсветка строки по остатку слотов: full(0/зачёркнуто) → красный(1) → по числу занятых: зелёный(0)/св.-зел(−1)/жёлтый(−2)/св.-красн(−3)
   const slotCls=(left)=>{if(left<=0)return'full';if(left===1)return'sl-r';const t=lim-left;return t<=0?'sl-g':t===1?'sl-lg':t===2?'sl-y':'sl-lr';};
-  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" style="text-align:center;min-width:32px">СЛОТ</th></tr></thead><tbody>'+
+  const ar=(k)=>clubSortK===k?`<span class="sar">${clubSortDir<0?'▾':'▴'}</span>`:'';
+  el.innerHTML='<table class="ctab" style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win'+ar('win')+'</th><th data-k="xg" class="right">xG'+ar('xg')+'</th><th data-k="cs" class="right">CS'+ar('cs')+'</th><th data-k="left" style="text-align:center;min-width:32px">СЛОТ'+ar('left')+'</th></tr></thead><tbody>'+
     rows.map(r=>`<tr class="${slotCls(r.left)}"><td class="cn" title="${r.club}">${r.code}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
   el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
@@ -1125,9 +1136,10 @@ function renderBottom(){
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
   if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
+    const op=oppInfo(u.club);const oppTxt=op?(op.home?clubCode(op.opp).toUpperCase():clubCode(op.opp).toLowerCase()):'—';
     lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
       <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-ph">⚽</div><div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
-      <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span></div></div>
+      <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
       ${actionBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
         if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
