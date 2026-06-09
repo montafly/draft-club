@@ -143,7 +143,25 @@ export class Draft {
     return null;
   }
 
+  // проактивно авто-пасуем всех, кто заведомо не может перебить текущий лот,
+  // чтобы выбытие показывалось сразу, а не когда круг торгов дойдёт до игрока (#9)
+  _autoPassIneligible() {
+    const lot = this.lot;
+    if (!lot) return;
+    const thr = lot.highBid + this.config.minIncrement;
+    for (const id of this.order) {
+      if (id === lot.highBidder || lot.passed.has(id)) continue;
+      const m = this.m(id);
+      if (m.finished) continue;
+      if (!canAdd(m, lot.unit, this.clubCounts, this.config) || maxBid(m, this.config) < thr) {
+        lot.passed.add(id);
+        this.log.push({ t: this.now(), kind: 'pass', text: `${m.name} — авто-пас (не может перебить)` });
+      }
+    }
+  }
+
   _advance() {
+    this._autoPassIneligible();
     const next = this._nextBidder();
     if (next === null) { this._resolveLot(); return; }
     this.actor = next;

@@ -1149,54 +1149,71 @@ function renderBottom(){
   lotH+='</div>';
   const np=nomPanel(d);const nomH=np?'<div class="panel">'+np+'</div>':'';
   el.innerHTML='<div class="bottom">'+lotH+nomH+'</div>';
-  if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub');
+  if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub',false);
+  else if(d.phase==='nominating'||d.phase==='substitutes'||d.phase==='bidding') renderNom('browse',true);
 }
 function actionBox(d){
   if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
-  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
+  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='doBid(${v})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
   return `<div style="margin-top:8px">
-    <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" oninput="upRaise()" style="width:50px;flex:none"><button id="raiseBtn" class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE ($${o.minAmount})</button></div>
+    <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" oninput="upRaise()" style="width:50px;flex:none"><button id="raiseBtn" class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='doBid(+document.getElementById("bidA").value)' ${o.canBid?'':'disabled'}>RAISE ($${o.minAmount})</button></div>
     <div style="margin-top:6px;display:flex;gap:4px;align-items:stretch">
       <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${quick}</div>
-      <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>MAX<br>${o.maxAmount}</button>
+      <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='doBid(${o.maxAmount})' ${o.canBid?'':'disabled'}>MAX<br>${o.maxAmount}</button>
     </div></div>`;
+}
+// ва-банк: ставка во весь доступный максимум — предупреждаем (как при авто-заборе), кроме случая макс.бид=1 млн (#N2)
+function doBid(amount){
+  const o=S.draft&&S.draft.actorOptions;if(!o)return;
+  amount=+amount;
+  if(amount>=o.maxAmount&&o.maxAmount>1&&!confirm(`Ва-банк: ставка $${amount} — весь ваш доступный максимум. Если выиграете, на каждый оставшийся слот останется по 1 млн. Точно ставим?`))return;
+  send({type:'bid',amount});
 }
 function upRaise(){const i=document.getElementById('bidA'),b=document.getElementById('raiseBtn');if(!i||!b)return;const mn=+i.min,v=parseInt(i.value,10);b.textContent=(!i.value||isNaN(v)||v<mn)?`RAISE (мин ${mn})`:`RAISE ($${v})`;}
 function nomPanel(d){
   const mine=d.actor===me;
   if(d.phase==='nominating'){
-    if(!mine)return `<h3>Выставление</h3><span class="mut">Сейчас выставляет ${d.managers.find(m=>m.id===d.actor)?.name}.</span>`;
-    return `<h3>Выставить игрока на торги</h3>`+filterUI('nominate');
+    if(!mine)return `<h3>Выставление</h3><span class="mut">Сейчас выставляет ${d.managers.find(m=>m.id===d.actor)?.name}. Список — для просмотра.</span>`+filterUI('browse',true);
+    return `<h3>Выставить игрока на торги</h3>`+filterUI('nominate',false);
   }
   if(d.phase==='substitutes'){
-    if(!mine)return `<h3>Замены</h3><span class="mut">Замену выбирает ${d.managers.find(m=>m.id===d.actor)?.name}.</span>`;
-    return `<h3>Выбрать замену</h3>`+filterUI('sub');
+    if(!mine)return `<h3>Замены</h3><span class="mut">Замену выбирает ${d.managers.find(m=>m.id===d.actor)?.name}. Список — для просмотра.</span>`+filterUI('browse',true);
+    return `<h3>Выбрать замену</h3>`+filterUI('sub',false);
   }
-  if(d.phase==='bidding')return '';
+  if(d.phase==='bidding')return `<h3>Доступные игроки</h3><span class="mut">Идут торги — список для просмотра.</span>`+filterUI('browse',true);
   return '';
 }
-function filterUI(mode){
-  const units=S.draft.actorOptions.units||[];
+// юниты для панели пиков: ходящему — движковый eligible-список; остальным (read-only) — всё, что ещё на доске (#11)
+function availUnits(){
+  const d=S.draft;
+  if(d.actor===me&&d.actorOptions&&d.actorOptions.units)return d.actorOptions.units;
+  const taken=new Set(d.taken||[]);
+  return POOL.filter(u=>!taken.has(u.id));
+}
+let nomFilt={q:'',t:'',p:''}; // сохраняем фильтр между ререндерами (#bottom перерисовывается на каждую ставку)
+function filterUI(mode,ro){
+  const units=availUnits();
   const teams=[...new Set(units.map(u=>u.club))].sort();
   const poss=POSORD.filter(p=>units.some(u=>u.position===p));
   return `<div class="filters">
-    <input id="fq" placeholder="поиск по фамилии…" oninput="renderNom('${mode}')">
-    <select id="ft" onchange="renderNom('${mode}')"><option value="">все клубы</option>${teams.map(t=>`<option>${t}</option>`).join('')}</select>
-    <select id="fp" onchange="renderNom('${mode}')"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}">${posShort(p)}</option>`).join('')}</select>
-  </div><div class="plist" id="plist"></div><div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`;
+    <input id="fq" placeholder="поиск по фамилии…" value="${nomFilt.q||''}" oninput="renderNom('${mode}',${!!ro})">
+    <select id="ft" onchange="renderNom('${mode}',${!!ro})"><option value="">все клубы</option>${teams.map(t=>`<option ${t===nomFilt.t?'selected':''}>${t}</option>`).join('')}</select>
+    <select id="fp" onchange="renderNom('${mode}',${!!ro})"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}" ${p===nomFilt.p?'selected':''}>${posShort(p)}</option>`).join('')}</select>
+  </div><div class="plist" id="plist"></div>`+(ro?'':`<div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`);
 }
-function renderNom(mode){
-  const units=S.draft.actorOptions.units||[];
+function renderNom(mode,ro){
+  const units=availUnits();
   const q=(document.getElementById('fq')?.value||'').toLowerCase();
   const t=document.getElementById('ft')?.value||'';const p=document.getElementById('fp')?.value||'';
+  nomFilt={q,t,p};
   const list=units.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
   const el=document.getElementById('plist');if(!el)return;
   let html='';
   for(const pos of POSORD){
     const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span></div>`).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span></div>`).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
