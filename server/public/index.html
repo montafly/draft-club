@@ -32,7 +32,7 @@
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
-  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.right{width:300px;flex:none}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.right{width:360px;flex:none}.collap.collapsed .collap-body{display:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .pcol{flex:0 0 236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
@@ -41,7 +41,7 @@
   .phead .nm{font-weight:800}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
-  .form{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.seg{font-size:11px;border-radius:5px;padding:1px 6px;font-weight:600}
+  .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.seg{flex:1;display:flex;flex-direction:column;align-items:center;font-size:11px;border-radius:5px;padding:2px 3px;font-weight:600;text-align:center}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
   .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#3a3320;color:var(--gold)}.seg.ok{background:#22303d}.needline{font-size:10px;color:var(--miss)}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
   .pcol table{table-layout:fixed}.pcol td:nth-child(3),.pcol th:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
@@ -51,7 +51,7 @@
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* --- панель участников (кто на драфте + детект говорящего) --- */
-  .parts{width:140px;flex:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .parts{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .parts h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}
   .pp{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:7px;font-size:12px;margin-bottom:2px;transition:background .12s,box-shadow .12s}
   .pp .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.3)}
@@ -75,12 +75,13 @@
   .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:5px;font-size:11px}
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
-  .bottom{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;margin-top:10px}
+  .bottom{display:flex;flex-direction:column;gap:10px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{display:flex;gap:12px;align-items:center}
-  .card{width:84px;height:112px;border-radius:10px;padding:8px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f);position:relative;flex:none}
-  .card .pos{position:absolute;top:28px;left:9px;font-weight:800;font-size:11px}.card .ph{width:44px;height:44px;border-radius:50%;margin:18px auto 4px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center}
-  .card .nm{font-weight:800;font-size:12px;text-align:center}.card .cl{font-size:9px;text-align:center;opacity:.8}
+  .card{width:84px;min-height:112px;border-radius:10px;padding:8px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f);position:relative;flex:none}
+  .card.gk{background:linear-gradient(160deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.card.def{background:linear-gradient(160deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.card.mid{background:linear-gradient(160deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.card.fwd{background:linear-gradient(160deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.card.coach{background:linear-gradient(160deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
+  .card .pos{position:absolute;top:28px;left:9px;font-weight:800;font-size:11px}.card .ph{width:44px;height:44px;border-radius:50%;margin:14px auto 4px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center}
+  .card .nm{font-weight:800;font-size:11px;line-height:1.1;text-align:center;white-space:normal;word-break:break-word}.card .cl{font-size:9px;text-align:center;opacity:.8}
   .bid{font-size:22px;font-weight:800;color:var(--gold)}
   .bids{margin-top:8px}.bids .b{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1d2935}
   .st-high{color:var(--gold);font-weight:700}.st-act{color:var(--acc)}.st-pass{color:var(--mut)}.st-in{color:var(--txt)}.st-out{color:var(--miss);font-weight:600}
@@ -275,21 +276,24 @@
     <h1>Draft Club</h1>
     <button class="btn" onclick="leaveDraft()">← Разделы</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
-    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
+    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span><span id="timer" class="pill" style="display:none"></span>
     <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </header>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
     <div class="layout">
-      <div class="parts" id="parts"></div>
-      <div class="left">
+      <div class="side">
+        <div class="parts" id="parts"></div>
+        <div class="clubs" style="margin-top:10px"><h3>Клубы · П% · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку). Слоты 0 — исчерпан.</p></div>
+      </div>
+      <div class="center">
         <div class="cols" id="cols"></div>
-        <div id="bottom"></div>
-        <div class="clubs" style="margin-top:10px"><h3>Лог драфта</h3><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div>
+        <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
+        <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatBody" class="mut" style="font-size:11px;padding:2px 0">Чат — в одном из следующих обновлений.</div></div></div>
       </div>
       <div class="right">
-        <div class="clubs" style="margin-bottom:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
-        <div class="clubs"><h3>Клубы · коэф · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Сорт по xG ↓ (клик по заголовку меняет). Слоты 0 — клуб исчерпан.</p></div>
+        <div id="bottom"></div>
+        <div class="clubs" style="margin-top:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
     </div>
   </div></main>
@@ -1029,10 +1033,8 @@ initAuth();
 function send(o){ws.send(JSON.stringify(o));}
 function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
 function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
-function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const cls=(c[k]||0)<mn?'need':(c[k]||0)>=mx?'full':'ok';return `<span class="seg ${cls}">${posShort(k)} ${c[k]||0}</span>`;}).join('');
-  const needs=POSORD.filter(k=>(c[k]||0)<LIM[k][0]).map(k=>`${LIM[k][0]-(c[k]||0)} ${posShort(k)}`);
-  const tail=done?'':(needs.length?`<span class="needline">нужно: +${needs.join(', +')}</span>`:'<span class="needline" style="color:var(--acc)">минимумы собраны</span>');
-  return `<div class="form">${seg}${tail}</div>`;}
+function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)} ${n}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
+  return `<div class="form">${seg}</div>`;}
 
 function render(){
   const d=S.draft;
@@ -1054,13 +1056,12 @@ function renderLog(){
   const el=document.getElementById('draftLog');if(!el)return;
   const ev=(S.lobby&&S.lobby.events)||[];
   if(!ev.length){el.innerHTML='<span class="mut">—</span>';return;}
-  const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<32;
-  el.innerHTML=ev.map(e=>{
+  el.innerHTML=ev.slice().reverse().map(e=>{
     const o=(typeof e==='string')?{text:e}:e;
     const tm=o.t?new Date(o.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
     return `<div style="text-align:left;padding:1px 0;color:${LOGCOL[o.kind]||'var(--txt)'}"><span class="mut" style="font-size:10px;margin-right:6px">${tm}</span>${o.text}</div>`;
   }).join('');
-  if(atBottom)el.scrollTop=el.scrollHeight;
+  el.scrollTop=0;
 }
 function renderRibbon(){
   const el=document.getElementById('ribbon');
@@ -1118,7 +1119,7 @@ function renderBottom(){
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
   if(d.lot){const u=d.lot.unit;const hb=d.managers.find(m=>m.id===d.lot.highBidder)?.name;
-    lotH+=`<div class="lotcard"><div class="card"><div class="pos">${posShort(u.position)}</div><div class="ph">⚽</div><div class="nm">${u.name}</div><div class="cl">${u.club}</div></div>
+    lotH+=`<div class="lotcard"><div class="card ${u.position.toLowerCase()}"><div class="pos">${posShort(u.position)}</div><div class="ph">⚽</div><div class="nm">${u.name}</div><div class="cl">${u.club}</div></div>
       <div><div class="bid">$${d.lot.highBid}</div><div class="mut">лидирует ${hb}</div>${actionBox(d)}</div></div>
       <div class="bids">${ordered().map(m=>{let s,c,row='';
         if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
@@ -1130,7 +1131,7 @@ function renderBottom(){
   } else if(d.phase==='substitutes') lotH+='<span class="mut">Каждый участник по очереди (по порядку завершения) выбирает замену.</span>';
   else lotH+='<div class="mut">ожидается номинация</div>'+actionBox(d);
   lotH+='</div>';
-  let nomH='<div class="panel">'+nomPanel(d)+'</div>';
+  const np=nomPanel(d);const nomH=np?'<div class="panel">'+np+'</div>':'';
   el.innerHTML='<div class="bottom">'+lotH+nomH+'</div>';
   if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub');
 }
@@ -1154,7 +1155,7 @@ function nomPanel(d){
     if(!mine)return `<h3>Замены</h3><span class="mut">Замену выбирает ${d.managers.find(m=>m.id===d.actor)?.name}.</span>`;
     return `<h3>Выбрать замену</h3>`+filterUI('sub');
   }
-  if(d.phase==='bidding')return `<h3>Идут торги</h3><span class="mut">Реагируй слева: RAISE или FOLD.</span>`;
+  if(d.phase==='bidding')return '';
   return '';
 }
 function filterUI(mode){
@@ -1177,7 +1178,7 @@ function renderNom(mode){
   for(const pos of POSORD){
     const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.name} · ${u.club}</div>`).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem" onclick="selectPlayer(${u.id},'${mode}')"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · ${u.club}</div>`).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
@@ -1187,11 +1188,11 @@ function selectPlayer(id,mode){
   if(mode==='nominate'){
     const mx=S.draft.actorOptions.maxOpen;
     const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid" onclick="document.getElementById('open').value=${v}" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
-    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
+    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
       <div style="margin:6px 0;display:flex;gap:4px;flex-wrap:wrap">${q}<button class="btn qbid" style="background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx}">макс ${mx}</button></div>
       <button class="btn p" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
   }else{
-    sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.name} · ${u.club}
+    sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club}
       <button class="btn p" onclick='send({type:"pickSubstitute",unitId:${id}})'>Подтвердить замену</button>`;
   }
 }
@@ -1225,5 +1226,9 @@ function renderHist(){const b=document.getElementById('histBody');if(!S||!S.star
   const p=S.draft.picks||[];
   b.innerHTML=p.length?'<table style="width:auto;margin-top:6px"><thead><tr><th>#</th><th>поз</th><th style="padding-right:12px">игрок</th><th style="padding-right:12px">клуб</th><th style="padding-right:6px">купил</th><th style="padding-right:12px">цена</th><th style="padding-right:10px">ставок</th><th>время</th></tr></thead><tbody>'+p.map(x=>`<tr><td>${x.sub?'зам':'#'+x.no}</td><td class="${x.position.toLowerCase()}">${posShort(x.position)}</td><td style="padding-right:12px">${x.unitName}</td><td style="padding-right:12px">${x.club}</td><td style="padding-right:6px">${x.winnerName}</td><td style="padding-right:12px">$${x.price}</td><td style="padding-right:10px">${x.sub?'—':(x.bids??'—')}</td><td>${x.sub?'—':mmss(x.durationMs)}</td></tr>`).join('')+'</tbody></table>':'<p>Пока пусто</p>';}
 document.getElementById('hist').addEventListener('click',e=>{if(e.target.id==='hist')toggleHist();});
+function toggleCollap(id){const b=document.getElementById(id);if(!b)return;const c=b.classList.toggle('collapsed');const h=b.querySelector('h3');if(h)h.textContent=h.textContent.replace(/^[▾▸]/,c?'▸':'▾');}
+function hhmmss(ms){const s=Math.max(0,Math.floor(ms/1000));return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(x=>String(x).padStart(2,'0')).join(':');}
+function draftStartMs(){const ev=(typeof S!=='undefined'&&S&&S.lobby&&S.lobby.events)||[];const n=ev.find(e=>e&&e.kind==='nominate');const f=n||ev[0];return f&&f.t?new Date(f.t).getTime():null;}
+setInterval(()=>{const el=document.getElementById('timer');if(!el)return;const st=(typeof S!=='undefined'&&S&&S.started)?draftStartMs():null;if(!st){el.style.display='none';return;}el.style.display='inline';el.textContent='⏱ '+hhmmss(Date.now()-st);},1000);
 </script>
 </body></html>

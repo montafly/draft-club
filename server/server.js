@@ -97,7 +97,7 @@ async function buildDraftPool(seasonId, round, matchIds) {
       const pos = POSMAP[mem.position]; if (!pos) continue;
       seen.add(pid);
       const p = mem.realPlayer || {}; const tid = mem.realTeamId; involved.add(tid);
-      units.push({ id: pid, name: p.lastName || p.firstName || String(pid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
+      units.push({ id: pid, name: p.lastName || p.firstName || String(pid), first: (p.lastName && p.firstName) ? p.firstName : '', club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
     }
     await sleep(250); // вежливый троттлинг FanTeam
   }
