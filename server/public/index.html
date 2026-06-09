@@ -50,6 +50,7 @@
   .right{text-align:right}.gk{color:#f1c40f}.def{color:#5dade2}.mid{color:#58d68d}.fwd{color:#ec7063}.coach{color:#bb8fce}
   .clubs{position:sticky;top:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .clubs h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}.clubs tr.full{opacity:.4;text-decoration:line-through}.clubs td.cn{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .clubs tr.sl-g td{background:rgba(39,174,96,.16)}.clubs tr.sl-lg td{background:rgba(39,174,96,.08)}.clubs tr.sl-y td{background:rgba(232,195,114,.16)}.clubs tr.sl-lr td{background:rgba(236,112,99,.12)}.clubs tr.sl-r td{background:rgba(236,112,99,.30)}
   /* --- панель участников (кто на драфте + детект говорящего) --- */
   .parts{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
   .parts h3{margin:0 0 8px;font-size:11px;color:var(--mut);text-transform:uppercase}
@@ -324,7 +325,7 @@ const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.
 let me=null,myRtc=null,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
-  else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();}
+  else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
   else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
@@ -1097,12 +1098,15 @@ let clubSortK='xg',clubSortDir=-1;
 function renderClubs(){
   const el=document.getElementById('clubs');
   if(!S.started){el.innerHTML='<span class="mut">—</span>';return;}
-  const cc=S.draft.clubCounts||{};const odds={};(CLUBODDS||[]).forEach(o=>{odds[o.club]=o;});
+  const cc=S.draft.clubCounts||{};const lim=S.draft.teamLimit||5;const odds={};(CLUBODDS||[]).forEach(o=>{odds[o.club]=o;});
+  const codeOf={};POOL.forEach(u=>{if(u.code&&!codeOf[u.club])codeOf[u.club]=u.code;});
   const clubs=[...new Set(POOL.map(u=>u.club))];
-  const rows=clubs.map(c=>({club:c,left:5-(cc[c]||0),win:odds[c]?.win,xg:odds[c]?.xg,cs:odds[c]?.cs}));
+  const rows=clubs.map(c=>({club:c,code:codeOf[c]||c,left:lim-(cc[c]||0),win:odds[c]?.win,xg:odds[c]?.xg,cs:odds[c]?.cs}));
   rows.sort((a,b)=>{const an=a[clubSortK]==null?-Infinity:a[clubSortK],bn=b[clubSortK]==null?-Infinity:b[clubSortK];return (an>bn?1:an<bn?-1:0)*clubSortDir || a.club.localeCompare(b.club);});
-  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" style="text-align:center;min-width:36px">СЛОТ</th></tr></thead><tbody>'+
-    rows.map(r=>`<tr class="${r.left<=0?'full':''}"><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
+  // подсветка строки по остатку слотов: full(0/зачёркнуто) → красный(1) → по числу занятых: зелёный(0)/св.-зел(−1)/жёлтый(−2)/св.-красн(−3)
+  const slotCls=(left)=>{if(left<=0)return'full';if(left===1)return'sl-r';const t=lim-left;return t<=0?'sl-g':t===1?'sl-lg':t===2?'sl-y':'sl-lr';};
+  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" style="text-align:center;min-width:32px">СЛОТ</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr class="${slotCls(r.left)}"><td class="cn" title="${r.club}">${r.code}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
   el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
 

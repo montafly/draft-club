@@ -154,6 +154,7 @@ async function launchDraft(draftId) {
   if (!pool.units.length) throw new Error('не собрался пул игроков по матчам');
   const code = (d.room_code && !rooms.has(d.room_code)) ? d.room_code : makeCode();
   const room = new Room(undefined, d.slots, pool.units, pool.clubOdds, pool.matches);
+  room.draftMeta = { seasonId: d.season_id, round: d.round, matchIds: d.match_ids }; // для refreshOdds: коэф снапшотятся на launch, обновляем при старте аукциона
   room.allowedUserIds = new Set(acc.map((a) => a.user_id));
   room.draftId = draftId;
   room.persistedStatus = 'live';
@@ -454,6 +455,28 @@ function attach(ws, code) {
   ws.send(JSON.stringify({ type: 'room', code }));
   ws.send(JSON.stringify({ type: 'pool', units: e.room.pool, clubOdds: e.room.clubOdds, matches: e.room.matches }));
 }
+function broadcastPool(e) {
+  const msg = JSON.stringify({ type: 'pool', units: e.room.pool, clubOdds: e.room.clubOdds, matches: e.room.matches });
+  for (const c of e.clients) if (c.readyState === 1) c.send(msg);
+}
+// Коэф/xG/CS снапшотятся в комнату на launchDraft — часто задолго до матчей, когда FanTeam их ещё не опубликовал (→ нули у части клубов).
+// На старте аукциона (ближе к матчам) подтягиваем свежие через лёгкий tourInfo (один запрос) и доливаем недостающие поля, не затирая уже валидные.
+async function refreshOdds(e) {
+  const meta = e.room && e.room.draftMeta;
+  if (!meta) return;
+  let fresh;
+  try { ({ clubOdds: fresh } = await tourInfo(meta.seasonId, meta.round, meta.matchIds)); } catch (err) { return console.error('refreshOdds', err.message); }
+  if (!fresh || !fresh.length || !fresh.some((o) => o.win != null || o.xg != null || o.cs != null)) return; // всё ещё пусто — оставляем как было
+  const freshBy = {}; for (const o of fresh) freshBy[o.club] = o;
+  let changed = false;
+  e.room.clubOdds = (e.room.clubOdds || []).map((o) => {
+    const f = freshBy[o.club]; if (!f) return o;
+    const merged = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
+    if (merged.win !== o.win || merged.xg !== o.xg || merged.cs !== o.cs) changed = true;
+    return merged;
+  });
+  if (changed) broadcastPool(e);
+}
 async function joinAuthed(ws, msg) {
   const user = await authUser(msg.token);              // валидация токена → {id,email}
   const prof = await getProfile(user.id);
@@ -493,7 +516,7 @@ wss.on('connection', (ws) => {
           return;
         }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
-        else if (msg.type === 'start') { e.room.start(); }
+        else if (msg.type === 'start') { e.room.start(); refreshOdds(e).catch(() => {}); }
         else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
         else if (msg.type === 'autoplay') {
           let ok = !e.room.allowedUserIds;                       // тестовая комната — всегда можно

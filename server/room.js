@@ -160,6 +160,7 @@ export class Room {
         order: d.order,
         lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed], bidsBy: d.lot.bidsBy },
         clubCounts: d.clubCounts,
+        teamLimit: this.config.teamLimit,
         taken: [...d.taken],
         picks: d.picks,
         actorOptions: this._actorOptions(),
