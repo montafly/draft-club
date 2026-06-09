@@ -95,7 +95,7 @@
   .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1 1 100%;min-width:0}.filters select{flex:1 1 0;min-width:0}
   .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
   .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
-  .panel.pickactive{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}.panel.pickro{opacity:.62}.panel.pickro .pitem{cursor:default}.panel.pickro .pitem:hover{background:none}.badge.go{background:#1f3a2a;color:var(--acc)}
+  .panel.pickactive{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}.panel.pickro{opacity:.62}.panel.pickro .pitem{cursor:default}.panel.pickro .pitem:hover{background:none}.badge.go{background:#1f3a2a;color:var(--acc)}.pickgo{margin:-2px 0 8px}
   .err{color:var(--miss)}
   #hist{display:none;position:fixed;inset:0;background:#000a;padding:40px;overflow:auto;z-index:10}
 </style>
@@ -1175,15 +1175,16 @@ function doBid(amount){
 function upRaise(){const i=document.getElementById('bidA'),b=document.getElementById('raiseBtn');if(!i||!b)return;const mn=+i.min,v=parseInt(i.value,10);b.textContent=(!i.value||isNaN(v)||v<mn)?`RAISE (мин ${mn})`:`RAISE ($${v})`;}
 function nomPanel(d){
   const mine=d.actor===me;
+  const who=id=>`<b style="color:var(--txt)">${d.managers.find(m=>m.id===id)?.name}</b>`;
   if(d.phase==='nominating'){
-    if(!mine)return `<h3>Выставление <span class="badge">просмотр</span></h3><span class="mut">Сейчас выставляет ${d.managers.find(m=>m.id===d.actor)?.name}. Список — только для просмотра.</span>`+filterUI('browse',true);
-    return `<h3>Выставить игрока на торги <span class="badge go">ваш ход</span></h3>`+filterUI('nominate',false);
+    if(!mine)return `<h3>Выставление <span class="badge">просмотр</span></h3><span class="mut">Сейчас выставляет ${who(d.actor)}.</span>`+filterUI('browse',true);
+    return `<h3>Выставить игрока на торги</h3><div class="pickgo"><span class="badge go">ваш ход</span></div>`+filterUI('nominate',false);
   }
   if(d.phase==='substitutes'){
-    if(!mine)return `<h3>Замены <span class="badge">просмотр</span></h3><span class="mut">Замену выбирает ${d.managers.find(m=>m.id===d.actor)?.name}. Список — только для просмотра.</span>`+filterUI('browse',true);
-    return `<h3>Выбрать замену <span class="badge go">ваш ход</span></h3>`+filterUI('sub',false);
+    if(!mine)return `<h3>Замены <span class="badge">просмотр</span></h3><span class="mut">Замену выбирает ${who(d.actor)}.</span>`+filterUI('browse',true);
+    return `<h3>Выбрать замену</h3><div class="pickgo"><span class="badge go">ваш ход</span></div>`+filterUI('sub',false);
   }
-  if(d.phase==='bidding')return `<h3>Доступные игроки <span class="badge">просмотр</span></h3><span class="mut">Идут торги — список только для просмотра.</span>`+filterUI('browse',true);
+  if(d.phase==='bidding')return `<h3>Доступные игроки <span class="badge">просмотр</span></h3>`+filterUI('browse',true);
   return '';
 }
 // юниты для панели пиков: ходящему — движковый eligible-список; остальным (read-only) — всё, что ещё на доске (#11)
