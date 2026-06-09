@@ -78,9 +78,8 @@
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
-  .rightcol>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:96px;padding:8px 5px;text-align:center}.mpanel h3{margin:0 0 6px}
-  #matches .mtab{margin:0 auto;border-collapse:collapse}#matches .mtab td{font-size:11px;line-height:1.55;white-space:nowrap;padding:0}
-  #matches .mn{color:var(--mut);text-align:right;padding-right:4px}#matches .mh{text-align:right}#matches .md{color:var(--mut);padding:0 3px}#matches .ma{text-align:left}
+  .rightcol>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:96px;padding:8px 4px;text-align:center}.mpanel h3{margin:0 0 6px}
+  #matches .mpre{margin:0;display:inline-block;text-align:left;font:11px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
   .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
@@ -1056,7 +1055,8 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  el.innerHTML='<table class="mtab">'+MATCHES.map((m,i)=>`<tr><td class="mn">${i+1}.</td><td class="mh">${clubCode(m.home).toUpperCase()}</td><td class="md">-</td><td class="ma">${clubCode(m.away).toUpperCase()}</td></tr>`).join('')+'</table>';
+  const lines=MATCHES.map((m,i)=>`<span class="mut">${String(i+1).padStart(2)}.</span> ${clubCode(m.home).toUpperCase().padEnd(3)} <span class="mut">-</span> ${clubCode(m.away).toUpperCase()}`).join('\n');
+  el.innerHTML=`<pre class="mpre">${lines}</pre>`;
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
