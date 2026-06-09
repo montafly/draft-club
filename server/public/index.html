@@ -27,7 +27,7 @@
   .applist div{padding:2px 0;border-bottom:1px solid #1d2935;font-size:12px}.applist div:last-child{border-bottom:none}
   .dcard{border-left:4px solid var(--line)}
   .dcard.st-recruiting{border-left-color:#5d7488}.dcard.st-finalized{border-left-color:#a569bd}.dcard.st-live{border-left-color:var(--acc)}.dcard.st-done{border-left-color:#3498db}.dcard.st-settled{border-left-color:var(--gold)}.dcard.st-cancelled{border-left-color:var(--miss)}
-  .qbid{padding:2px 7px!important;font-size:11px!important;border-radius:6px!important}
+  .qbid{padding:2px 7px!important;font-size:11px!important;border-radius:6px!important}.qb.qsel{box-shadow:0 0 0 2px var(--acc);position:relative;z-index:1}
   .plist .pblockh{position:sticky;top:0;background:#1a2733;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-bottom:1px solid var(--line)}
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -1201,15 +1201,17 @@ function renderNom(mode){
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
 let selId=null;
+function pickQuick(el){const r=el.closest('.qrow');if(r)r.querySelectorAll('.qb').forEach(b=>b.classList.toggle('qsel',b===el));}
+function clrQuick(){document.querySelectorAll('.qrow .qb.qsel').forEach(b=>b.classList.remove('qsel'));}
 function selectPlayer(id,mode){
   selId=id;const u=(S.draft.actorOptions.units||[]).find(x=>x.id===id);const sel=document.getElementById('sel');
   if(mode==='nominate'){
     const mx=S.draft.actorOptions.maxOpen;
-    const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid" onclick="document.getElementById('open').value=${v}" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
-    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
-      <div style="margin:6px 0;display:flex;gap:4px;align-items:stretch">
+    const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid qb" onclick="document.getElementById('open').value=${v};pickQuick(this)" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
+    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" oninput="clrQuick()" style="width:54px"> (макс ${mx})
+      <div class="qrow" style="margin:6px 0;display:flex;gap:4px;align-items:stretch">
         <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${q}</div>
-        <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx}">MAX<br>${mx}</button>
+        <button class="btn qbid qb" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx};pickQuick(this)">MAX<br>${mx}</button>
       </div>
       <button class="btn p" style="width:100%" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
   }else{
