@@ -42,7 +42,7 @@
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
   .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.seg{flex:1;display:flex;flex-direction:column;align-items:center;font-size:11px;border-radius:5px;padding:2px 3px;font-weight:600;text-align:center}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
-  .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#3a3320;color:var(--gold)}.seg.ok{background:#22303d}.needline{font-size:10px;color:var(--miss)}
+  .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#22303d}.seg.ok{background:#16351f;color:#7ee0a0}.needline{font-size:10px;color:var(--miss)}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
   .pcol table{table-layout:fixed}.pcol td:nth-child(3),.pcol th:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
   .pcol tr.subrow td{border-top:2px dashed #34495e;padding-top:3px}
@@ -77,17 +77,19 @@
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
-  .lotcard{display:flex;gap:12px;align-items:center}
-  .card{width:84px;min-height:112px;border-radius:10px;padding:8px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f);position:relative;flex:none}
-  .card.gk{background:linear-gradient(160deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.card.def{background:linear-gradient(160deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.card.mid{background:linear-gradient(160deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.card.fwd{background:linear-gradient(160deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.card.coach{background:linear-gradient(160deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
-  .card .pos{position:absolute;top:28px;left:9px;font-weight:800;font-size:11px}.card .ph{width:44px;height:44px;border-radius:50%;margin:14px auto 4px;background:#0d2a1c33;display:flex;align-items:center;justify-content:center}
-  .card .nm{font-weight:800;font-size:11px;line-height:1.1;text-align:center;white-space:normal;word-break:break-word}.card .cl{font-size:9px;text-align:center;opacity:.8}
+  .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
+  .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
+  .lc-top{display:flex;align-items:center;gap:12px}
+  .lc-pos{font-weight:800;font-size:14px;opacity:.8;min-width:36px;text-align:center}
+  .lc-ph{width:50px;height:50px;border-radius:50%;background:#0d2a1c2e;display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
+  .lc-id{min-width:0;flex:1}.lc-nm{font-weight:800;font-size:21px;line-height:1.05}.lc-cl{font-size:14px;font-weight:700;opacity:.8;margin-top:2px}
+  .lc-odds{display:flex;gap:8px;margin-top:9px;padding-top:7px;border-top:1px solid rgba(0,0,0,.18);font-size:12px}.lc-odds span{flex:1;text-align:center}.lc-odds b{display:block;font-size:16px;font-weight:800}
   .bid{font-size:22px;font-weight:800;color:var(--gold)}
   .bids{margin-top:8px}.bids .b{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1d2935}
   .st-high{color:var(--gold);font-weight:700}.st-act{color:var(--acc)}.st-pass{color:var(--mut)}.st-in{color:var(--txt)}.st-out{color:var(--miss);font-weight:600}
   .bids .b.out{color:var(--miss);background:#3a1a17;border-radius:4px;padding:2px 6px}
-  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1;min-width:110px}
-  .plist{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1 1 100%;min-width:0}.filters select{flex:1 1 0;min-width:0}
+  .plist{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
   .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
   .err{color:var(--miss)}
   #hist{display:none;position:fixed;inset:0;background:#000a;padding:40px;overflow:auto;z-index:10}
@@ -292,7 +294,7 @@
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatBody" class="mut" style="font-size:11px;padding:2px 0">Чат — в одном из следующих обновлений.</div></div></div>
       </div>
       <div class="right">
-        <div id="bottom"></div>
+        <div id="bottom" style="min-height:600px"></div>
         <div class="clubs" style="margin-top:10px;position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
     </div>
@@ -1099,8 +1101,8 @@ function renderClubs(){
   const clubs=[...new Set(POOL.map(u=>u.club))];
   const rows=clubs.map(c=>({club:c,left:5-(cc[c]||0),win:odds[c]?.win,xg:odds[c]?.xg,cs:odds[c]?.cs}));
   rows.sort((a,b)=>{const an=a[clubSortK]==null?-Infinity:a[clubSortK],bn=b[clubSortK]==null?-Infinity:b[clubSortK];return (an>bn?1:an<bn?-1:0)*clubSortDir || a.club.localeCompare(b.club);});
-  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">П%</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" class="right">СЛОТ</th></tr></thead><tbody>'+
-    rows.map(r=>`<tr class="${r.left<=0?'full':''}"><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win??'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs??'—'}</td><td class="right">${r.left}</td></tr>`).join('')+'</tbody></table>';
+  el.innerHTML='<table style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win</th><th data-k="xg" class="right">xG</th><th data-k="cs" class="right">CS</th><th data-k="left" style="text-align:center;min-width:36px">СЛОТ</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr class="${r.left<=0?'full':''}"><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
   el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
 
@@ -1118,9 +1120,11 @@ function renderBottom(){
   if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div>';return;}
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
-  if(d.lot){const u=d.lot.unit;const hb=d.managers.find(m=>m.id===d.lot.highBidder)?.name;
-    lotH+=`<div class="lotcard"><div class="card ${u.position.toLowerCase()}"><div class="pos">${posShort(u.position)}</div><div class="ph">⚽</div><div class="nm">${u.name}</div><div class="cl">${u.club}</div></div>
-      <div><div class="bid">$${d.lot.highBid}</div><div class="mut">лидирует ${hb}</div>${actionBox(d)}</div></div>
+  if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
+    lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
+      <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-ph">⚽</div><div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
+      <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span></div></div>
+      ${actionBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
         if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
         else if((d.lot.passed||[]).includes(m.id)){s='выбыл';c='st-out';row='out';}
@@ -1138,12 +1142,11 @@ function renderBottom(){
 function actionBox(d){
   if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
-  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
-  const allin=`<button class="btn qbid" style="background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>all-in ${o.maxAmount}</button>`;
-  return `<div style="margin-top:8px"><button class="btn r" onclick='send({type:"pass"})'>FOLD</button>
-    <input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:58px">
-    <button class="btn p" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button>
-    <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${quick}${allin}</div></div>`;
+  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" style="flex:1;min-width:0" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
+  return `<div style="margin-top:8px">
+    <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:56px;flex:none"><button class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button></div>
+    <div style="margin-top:6px;display:flex;gap:4px">${quick}</div>
+    <button class="btn qbid" style="width:100%;margin-top:5px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>all-in ${o.maxAmount}</button></div>`;
 }
 function nomPanel(d){
   const mine=d.actor===me;
