@@ -32,9 +32,9 @@
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
-  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.right{width:360px;flex:none;display:flex;gap:10px;align-items:flex-start}.collap.collapsed .collap-body{display:none}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.rightcol{width:360px;flex:none;display:flex;gap:10px;align-items:flex-start}.collap.collapsed .collap-body{display:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-  .pcol{flex:0 0 236px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol{flex:0 0 252px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
@@ -78,9 +78,9 @@
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
-  .right>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:104px;padding:8px 6px;text-align:center}.mpanel h3{margin:0 0 6px}
-  #matches .mrow{display:flex;gap:3px;justify-content:flex-start;font-size:11px;line-height:1.65;white-space:nowrap;text-align:left}
-  #matches .mrow .mn,#matches .mrow .md{color:var(--mut)}
+  .rightcol>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:96px;padding:8px 5px;text-align:center}.mpanel h3{margin:0 0 6px}
+  #matches .mtab{margin:0 auto;border-collapse:collapse}#matches .mtab td{font-size:11px;line-height:1.55;white-space:nowrap;padding:0}
+  #matches .mn{color:var(--mut);text-align:right;padding-right:4px}#matches .mh{text-align:right}#matches .md{color:var(--mut);padding:0 3px}#matches .ma{text-align:left}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
   .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
@@ -298,7 +298,7 @@
         <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatBody" class="mut" style="font-size:11px;padding:2px 0">Чат — в одном из следующих обновлений.</div></div></div>
       </div>
-      <div class="right">
+      <div class="rightcol right">
         <div id="bottom" style="min-height:470px"></div>
         <div class="clubs mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
@@ -1056,7 +1056,7 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  el.innerHTML=MATCHES.map((m,i)=>`<div class="mrow"><span class="mn">${i+1}.</span><span>${clubCode(m.home).toUpperCase()}</span><span class="md">-</span><span>${clubCode(m.away).toUpperCase()}</span></div>`).join('');
+  el.innerHTML='<table class="mtab">'+MATCHES.map((m,i)=>`<tr><td class="mn">${i+1}.</td><td class="mh">${clubCode(m.home).toUpperCase()}</td><td class="md">-</td><td class="ma">${clubCode(m.away).toUpperCase()}</td></tr>`).join('')+'</table>';
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
@@ -1092,7 +1092,7 @@ function renderCols(){
         <div class="sb"><div class="lbl">Пики</div><div class="val">${m.size}/12</div></div>
       </div>
       ${formBlock(m.counts, m.finished)}
-      <table><thead><tr><th style="width:18px">#</th><th style="width:28px">POS</th><th>PLAYER</th><th style="width:38px">TEAM</th><th class="right" style="width:44px">COST</th></tr></thead>
+      <table><thead><tr><th style="width:16px">#</th><th style="width:26px">POS</th><th>PLAYER</th><th style="width:34px">TEAM</th><th class="right" style="width:40px">COST</th></tr></thead>
       <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.name}</td><td>${u.code||u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
       ${Array.from({length:Math.max(0,12-m.roster.length)},(_,i)=>`<tr><td class="mut">${m.roster.length+i+1}</td><td></td><td class="mut">—</td><td></td><td></td></tr>`).join('')}
       ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.code||m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
@@ -1134,7 +1134,7 @@ function renderBottom(){
   if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
     const op=oppInfo(u.club);const oppTxt=op?(op.home?clubCode(op.opp).toUpperCase():clubCode(op.opp).toLowerCase()):'—';
     lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
-      <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-ph">⚽</div><div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
+      <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
       <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
       ${actionBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
@@ -1154,12 +1154,15 @@ function renderBottom(){
 function actionBox(d){
   if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
-  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" style="flex:1;min-width:0" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
+  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='send({type:"bid",amount:${v}})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
   return `<div style="margin-top:8px">
-    <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" style="width:56px;flex:none"><button class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE (мин ${o.minAmount})</button></div>
-    <div style="margin-top:6px;display:flex;gap:4px">${quick}</div>
-    <button class="btn qbid" style="width:100%;margin-top:5px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>all-in ${o.maxAmount}</button></div>`;
+    <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" oninput="upRaise()" style="width:50px;flex:none"><button id="raiseBtn" class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='send({type:"bid",amount:+document.getElementById("bidA").value})' ${o.canBid?'':'disabled'}>RAISE ($${o.minAmount})</button></div>
+    <div style="margin-top:6px;display:flex;gap:4px;align-items:stretch">
+      <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${quick}</div>
+      <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='send({type:"bid",amount:${o.maxAmount}})' ${o.canBid?'':'disabled'}>MAX<br>${o.maxAmount}</button>
+    </div></div>`;
 }
+function upRaise(){const i=document.getElementById('bidA'),b=document.getElementById('raiseBtn');if(!i||!b)return;const mn=+i.min,v=parseInt(i.value,10);b.textContent=(!i.value||isNaN(v)||v<mn)?`RAISE (мин ${mn})`:`RAISE ($${v})`;}
 function nomPanel(d){
   const mine=d.actor===me;
   if(d.phase==='nominating'){
@@ -1204,8 +1207,11 @@ function selectPlayer(id,mode){
     const mx=S.draft.actorOptions.maxOpen;
     const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid" onclick="document.getElementById('open').value=${v}" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
     sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" style="width:54px"> (макс ${mx})
-      <div style="margin:6px 0;display:flex;gap:4px;flex-wrap:wrap">${q}<button class="btn qbid" style="background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx}">макс ${mx}</button></div>
-      <button class="btn p" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
+      <div style="margin:6px 0;display:flex;gap:4px;align-items:stretch">
+        <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${q}</div>
+        <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx}">MAX<br>${mx}</button>
+      </div>
+      <button class="btn p" style="width:100%" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
   }else{
     sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club}
       <button class="btn p" onclick='send({type:"pickSubstitute",unitId:${id}})'>Подтвердить замену</button>`;
