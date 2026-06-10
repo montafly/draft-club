@@ -291,7 +291,7 @@
     <button class="btn" onclick="leaveDraft()">← Разделы</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span><span id="timer" class="pill" style="display:none"></span>
-    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </header>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -340,7 +340,7 @@ ws.onmessage=e=>{const m=JSON.parse(e.data);
   else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
-  else if(m.type==='state'){S=m.state;render();}};
+  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);}};
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
 const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},audioEls:{},streams:{},camState:{},micState:{},localMute:{},camOn:false,micOn:true};
 const IC={
@@ -1076,6 +1076,56 @@ function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
 function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
+// --- Звуки событий аукциона: синтез коротких тонов через WebAudio (без файлов). Мотивы тюнятся с Матвеем. ---
+const SND={ctx:null,master:null,enabled:(localStorage.getItem('dcSound')!=='0')};
+function sndCtx(){
+  if(!SND.ctx){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)();SND.master=SND.ctx.createGain();SND.master.gain.value=0.5;SND.master.connect(SND.ctx.destination);}catch(e){return null;}}
+  if(SND.ctx.state==='suspended')SND.ctx.resume();
+  return SND.ctx;
+}
+// одна нота: частота(Гц), длительность(с), форма волны, громкость(0..1), задержка старта(с)
+function tone(freq,dur,type,vol,at){
+  const ctx=sndCtx();if(!ctx)return;
+  const t0=ctx.currentTime+(at||0),g=ctx.createGain(),o=ctx.createOscillator();
+  o.type=type||'sine';o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.linearRampToValueAtTime(vol||0.3,t0+0.012);          // быстрая атака
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);         // плавный спад (без щелчка)
+  o.connect(g);g.connect(SND.master);o.start(t0);o.stop(t0+dur+0.03);
+}
+const SFX={
+  turnNominate:()=>{tone(660,0.16,'triangle',0.45,0);tone(990,0.30,'triangle',0.45,0.14);},                                  // твоя очередь выставлять — заметный восходящий
+  turnBid:()=>{tone(784,0.20,'triangle',0.40,0);},                                                                            // твоя очередь делать бид
+  bidUp:()=>{tone(523,0.09,'square',0.16,0);},                                                                                // участник поднял ставку — короткий блип
+  pass:()=>{tone(300,0.13,'sine',0.20,0);},                                                                                   // участник спасовал
+  roundFinal:()=>{tone(523,0.14,'sine',0.30,0);tone(392,0.22,'sine',0.30,0.12);},                                            // лот закрыт (для тех, к кому ход НЕ переходит)
+  teamDone:()=>{tone(523,0.12,'triangle',0.35,0);tone(659,0.12,'triangle',0.35,0.10);tone(784,0.24,'triangle',0.35,0.20);}, // участник собрал команду
+  draftDone:()=>{tone(523,0.14,'triangle',0.42,0);tone(659,0.14,'triangle',0.42,0.13);tone(784,0.14,'triangle',0.42,0.26);tone(1047,0.42,'triangle',0.42,0.39);}, // драфт завершён
+};
+function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(f){try{f();}catch(e){}}}
+function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b)b.textContent='Звук: '+(SND.enabled?'вкл':'выкл');}
+function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sfx('turnBid');}}
+window.addEventListener('pointerdown',()=>{if(SND.enabled)sndCtx();},{once:true}); // праймим контекст на первом клике (автоплей-политика)
+// детект событий диффом прошлого и нового стейта
+function soundsFromState(prev,next){
+  if(!next||!next.started||!next.draft)return;          // звуки только во время аукциона
+  if(!prev)return;                                       // прямой вход в идущий драфт — задаём базу без звука
+  const nd=next.draft,pd=(prev.draft)?prev.draft:null;
+  if(nd.phase==='done'&&(!pd||pd.phase!=='done')){sfx('draftDone');return;} // финал перекрывает остальное
+  const myTurnNom=(nd.phase==='nominating'&&nd.actor===me);
+  if(myTurnNom&&!(pd&&pd.phase==='nominating'&&pd.actor===me))sfx('turnNominate'); // твоя очередь выставлять
+  if(nd.phase==='bidding'&&nd.actor===me&&!(pd&&pd.phase==='bidding'&&pd.actor===me))sfx('turnBid'); // твоя очередь делать бид
+  if(!pd)return;                                         // дальше — диффы, требующие прошлого стейта драфта (переход лобби→старт без них)
+  const finN=nd.managers.filter(m=>m.finished).length,finP=pd.managers.filter(m=>m.finished).length;
+  if(finN>finP)sfx('teamDone');                          // участник собрал команду
+  if((nd.picks?nd.picks.length:0)>(pd.picks?pd.picks.length:0)&&!myTurnNom)sfx('roundFinal'); // лот закрыт, слышат все кроме нового номинатора
+  const sameLot=nd.lot&&pd.lot&&nd.lot.unit&&pd.lot.unit&&nd.lot.unit.id===pd.lot.unit.id;
+  if(sameLot){
+    if(nd.lot.highBid>pd.lot.highBid&&nd.lot.highBidder!==me)sfx('bidUp'); // чужое повышение ставки (своё не озвучиваем)
+    if((nd.lot.passed?nd.lot.passed.length:0)>(pd.lot.passed?pd.lot.passed.length:0))sfx('pass');
+  }
+}
+updateSoundBtn();
 function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
 function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)} ${n}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
   return `<div class="form">${seg}</div>`;}
