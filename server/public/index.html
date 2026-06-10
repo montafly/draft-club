@@ -10,7 +10,7 @@
   .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}.pill.coin{background:#2a2410;color:var(--gold);font-weight:700}
   .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
   input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px}
-  main{flex:1;overflow:auto;padding:12px}.wrap{max-width:1720px;margin:0 auto}
+  main{flex:1;overflow:auto;padding:12px}.wrap{max-width:2000px;margin:0 auto}
   /* --- оболочка приложения: навигация по разделам --- */
   .nav{display:flex;gap:4px}
   .tab{background:transparent;color:var(--mut);border:1px solid transparent;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
@@ -32,9 +32,9 @@
   /* --- кокпит драфта (без изменений) --- */
   .ribbon{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px 11px}.chip.act{border-color:var(--acc)}.chip.me b{color:var(--gold)}.chip .b{color:var(--gold)}
-  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side .clubs,.center .clubs{position:static}.rightcol{width:360px;flex:none;display:flex;gap:10px;align-items:flex-start}.collap.collapsed .collap-body{display:none}
+  .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side.lobby{width:240px}.side .clubs,.center .clubs{position:static}.rightcol{width:300px;flex:none;display:flex;flex-direction:column;gap:10px}.collap.collapsed .collap-body{display:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-  .pcol{flex:0 0 252px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol{flex:1 1 0;min-width:218px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
@@ -86,8 +86,10 @@
   .vteam tr.subr.counted td{background:#16351f}
   .vbadge{font-size:10px;padding:1px 6px;border-radius:6px;background:#22303d;color:var(--gold);font-weight:700}
   .bottom{display:flex;flex-direction:column;gap:10px}
-  .rightcol>#bottom{flex:1;min-width:0}.mpanel{flex:none;width:96px;padding:8px 4px;text-align:center}.mpanel h3{margin:0 0 6px}
-  #matches .mpre{margin:0;display:inline-block;text-align:left;font:11px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+  .rightcol>#bottom{min-width:0;min-height:470px}.mpanel{width:auto;padding:8px;text-align:center}.mpanel h3{margin:0 0 6px}
+  #matches .mlist{font-size:11px;line-height:1.4}
+  #matches .mrow{display:grid;grid-template-columns:18px 1fr auto 1fr;gap:4px;align-items:baseline;padding:2px 0}
+  #matches .mnum{text-align:right}#matches .mh{text-align:right}#matches .ma{text-align:left}#matches .mdash{opacity:.6}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}.panel h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase}
   .lotcard{border-radius:12px;padding:11px 13px;color:#1b1206;background:linear-gradient(160deg,#f3d79a,#b8893f)}
   .lotcard.gk{background:linear-gradient(150deg,color-mix(in srgb,#f1c40f 55%,#fff),#f1c40f)}.lotcard.def{background:linear-gradient(150deg,color-mix(in srgb,#5dade2 55%,#fff),#5dade2)}.lotcard.mid{background:linear-gradient(150deg,color-mix(in srgb,#58d68d 55%,#fff),#58d68d)}.lotcard.fwd{background:linear-gradient(150deg,color-mix(in srgb,#ec7063 55%,#fff),#ec7063)}.lotcard.coach{background:linear-gradient(150deg,color-mix(in srgb,#bb8fce 55%,#fff),#bb8fce)}
@@ -305,7 +307,7 @@
     <div class="layout">
       <div class="side">
         <div class="parts" id="parts"></div>
-        <div class="clubs" style="margin-top:10px"><h3>Клубы · П% · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Клик по заголовку — сортировка.<br>Слоты 0 — исчерпан.</p></div>
+        <div class="clubs" id="clubsBox" style="margin-top:10px"><h3>Клубы · П% · xG · CS · слоты</h3><div id="clubs"></div><p class="mut" style="font-size:10px;margin:8px 0 0">Клик по заголовку — сортировка.<br>Слоты 0 — исчерпан.</p></div>
       </div>
       <div class="center">
         <div class="cols" id="cols"></div>
@@ -313,8 +315,8 @@
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
       <div class="rightcol right">
-        <div id="bottom" style="min-height:470px"></div>
-        <div class="clubs mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
+        <div id="bottom"></div>
+        <div class="clubs mpanel" id="mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
     </div>
   </div></main>
@@ -1175,8 +1177,28 @@ function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]))
 function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)} ${n}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
   return `<div class="form">${seg}</div>`;}
 
+// раскладка зависит от фазы: в лобби блок «Лобби» + «Матчи тура» уезжают в левую колонку (под участников),
+// правая колонка прячется → камеры занимают всю ширину. В аукционе всё возвращается в правую колонку (стопкой).
+function applyLayoutMode(){
+  const started=!!(S&&S.started);
+  const side=document.querySelector('.side'),right=document.querySelector('.rightcol');
+  const clubsBox=document.getElementById('clubsBox'),bottom=document.getElementById('bottom'),mpanel=document.getElementById('mpanel');
+  if(!side||!right||!bottom||!mpanel)return;
+  if(!started){
+    if(clubsBox)clubsBox.style.display='none';
+    right.style.display='none';side.classList.add('lobby');
+    if(bottom.parentNode!==side)side.appendChild(bottom);
+    if(mpanel.parentNode!==side)side.appendChild(mpanel); // матчи под блоком лобби
+  }else{
+    if(clubsBox)clubsBox.style.display='';
+    right.style.display='';side.classList.remove('lobby');
+    if(bottom.parentNode!==right)right.appendChild(bottom);
+    if(mpanel.parentNode!==right)right.appendChild(mpanel); // матчи под лотом/выставлением
+  }
+}
 function render(){
   const d=S.draft;
+  applyLayoutMode();
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
@@ -1188,8 +1210,7 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  const lines=MATCHES.map((m,i)=>`<span class="mut">${String(i+1).padStart(2)}.</span> <span title="${m.home}">${clubCode(m.home).toUpperCase().padEnd(3)}</span> <span class="mut">-</span> <span title="${m.away}">${clubCode(m.away).toUpperCase()}</span>`).join('\n');
-  el.innerHTML=`<pre class="mpre">${lines}</pre>`;
+  el.innerHTML='<div class="mlist">'+MATCHES.map((m,i)=>`<div class="mrow"><span class="mut mnum">${i+1}.</span><span class="mh" title="${clubCode(m.home).toUpperCase()}">${m.home}</span><span class="mut mdash">–</span><span class="ma" title="${clubCode(m.away).toUpperCase()}">${m.away}</span></div>`).join('')+'</div>';
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
