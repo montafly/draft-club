@@ -257,35 +257,70 @@ async function scoreDraft(draftId) {
   const PMIN = { GK: 1, DEF: 3, MID: 2, FWD: 1, COACH: 1 }, PMAX = { GK: 1, DEF: 5, MID: 5, FWD: 3, COACH: 1 };
   const byUser = {}; for (const r of rosters) (byUser[r.user_id] || (byUser[r.user_id] = [])).push(r);
   const standings = [], teams = [];
+  // порядок приобретения игрока на драфте (индекс в логе пиков; winnerId=seat, unitName=name) — для переключателя сортировки в просмотрщике
+  const pickIdx = {}; (d.picks || []).forEach((p, idx) => { const k = `${p.winnerId}|${p.unitName}|${p.position}`; if (!(k in pickIdx)) pickIdx[k] = idx; });
+  const dOrd = (r) => (pickIdx[`${r.seat}|${r.name}|${r.position}`] ?? 1e9);
   for (const uid of Object.keys(byUser)) {
     const rs = byUser[uid], starters = rs.filter((r) => !r.is_sub), sub = rs.find((r) => r.is_sub);
     let total = 0; const players = [];
-    const counts = { GK: 0, DEF: 0, MID: 0, FWD: 0, COACH: 0 };
-    for (const r of starters) counts[r.position] = (counts[r.position] || 0) + 1;
     for (const r of starters) {
       const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
       total += pp;
-      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true });
+      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r) });
     }
-    // замена выходит только если ею можно заменить невышедшего стартового без нарушения минимумов формации
+    // Замена срабатывает, если есть несыгравший стартовый (матч завершён, 0 минут — pending/live НЕ считаем «не вышел», иначе замена
+    // зелёная по умолчанию, #15), которого она может закрыть. Проверяем КАЖДОГО несыгравшего отдельно: замена позиции P может закрыть
+    // несыгравшего позиции Q, если ввод не превышает максимум P (сыгравшие[P]+1 ≤ max) И не роняет минимум освобождаемой Q (сыгравшие[Q] ≥ min;
+    // для своей позиции — сыгравшие[Q]+1). Уже нарушенный минимум ДРУГОЙ линии не блокирует (напр. защита просела до 2, но форвард-замена
+    // закрывает несыгравшего ПЗ — срабатывает). Вратаря меняет только вратарь; тренера — никто. ЗАЩ/ПЗ/НАП взаимозаменяемы (ограничение — лимиты).
+    const isDnp = (r) => pstat(r.club, playerMin[r.player_id] || 0, false) === 'dnp';
     let subUsed = false;
     if (sub) {
       const P = sub.position;
-      const dnp = starters.filter((r) => r.position !== 'COACH' && (playerMin[r.player_id] || 0) === 0);
-      for (const r of dnp) {
-        if (r.position === P) { subUsed = true; break; }                                   // та же позиция — всегда валидно
-        if ((counts[r.position] - 1) >= PMIN[r.position] && (counts[P] + 1) <= PMAX[P]) { subUsed = true; break; }
+      if (P === 'GK') {
+        subUsed = starters.some((r) => r.position === 'GK' && isDnp(r));                            // вратаря заменяет только вратарь, и только если стартовый не вышел
+      } else {
+        const played = { DEF: 0, MID: 0, FWD: 0 };
+        for (const r of starters) if (['DEF', 'MID', 'FWD'].includes(r.position) && !isDnp(r)) played[r.position]++;
+        const dnpPos = new Set(starters.filter((r) => ['DEF', 'MID', 'FWD'].includes(r.position) && isDnp(r)).map((r) => r.position));
+        for (const Q of dnpPos) {
+          const newP = played[P] + 1;                                                              // замена выходит на свою позицию
+          const newQ = (P === Q) ? played[Q] + 1 : played[Q];                                      // освобождаем слот несыгравшего Q
+          if (newP <= PMAX[P] && newQ >= PMIN[Q]) { subUsed = true; break; }                       // не превышаем max своей позиции и не роняем min освобождаемой
+        }
       }
       const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
-      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed });
+      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub) });
     }
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });
-    const toPlay = players.filter((p) => p.mstatus === 'pending' || p.mstatus === 'live').length;
+    // «осталось сыграть»: стартовые (их 12, с тренером) всегда; замену добавляем ТОЛЬКО когда она сработала (стартовый не вышел) и сама ещё ждёт свой матч (#15)
+    const subP = players.find((p) => p.isSub);
+    const toPlay = players.filter((p) => !p.isSub && (p.mstatus === 'pending' || p.mstatus === 'live')).length
+      + (subUsed && subP && (subP.mstatus === 'pending' || subP.mstatus === 'live') ? 1 : 0);
     const finishOrder = rs.length && rs[0].finish_order != null ? rs[0].finish_order : null;
-    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, finishOrder, players });
+    const seat = rs.length ? rs[0].seat : null;
+    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, finishOrder, seat, players });
   }
-  standings.sort((a, b) => b.total - a.total); teams.sort((a, b) => b.total - a.total);
+  standings.sort((a, b) => b.total - a.total);
+  standings.forEach((s, i) => { s.place = i + 1; });                                  // место по очкам — для медалей/контура в просмотрщике
+  const placeByUser = {}; for (const s of standings) placeByUser[s.user_id] = s.place;
+  for (const t of teams) t.place = placeByUser[t.user_id] || null;
+  // Порядок блоков команд = порядок жеребьёвки (как колонки шли в кокпите, ф-я ordered() по d.order). d.order в БД не сохраняется →
+  // восстанавливаем по логу: аукцион пошаговый, ход идёт по жеребьёвке, поэтому порядок ПЕРВОГО действия участника (выставил/ставка/пас)
+  // на первом лоте = порядок жеребьёвки. Берём имена в порядке первого появления среди действий торгов. Fallback на seat, если лога нет.
+  const drawSeq = [];
+  const pushName = (nm) => { if (nm && !drawSeq.includes(nm)) drawSeq.push(nm); };
+  for (const ev of (d.events || [])) {
+    const kind = (ev && typeof ev === 'object') ? ev.kind : null;
+    if (kind && !['nominate', 'bid', 'pass'].includes(kind)) continue;                 // только действия торгов (не join/leave/chat/done/sub)
+    const tx = typeof ev === 'string' ? ev : (ev && ev.text) || '';
+    const m = tx.match(/^#\d+\s+(.+?)\s+выставил\s/) || tx.match(/^(.+?)\s+[—–-]\s+(?:ставка|пас|авто-пас)/);   // без \b — в JS он не работает на границе кириллица/пробел; тире любого типа
+    if (m) pushName(m[1]);
+  }
+  const drawPos = new Map(); drawSeq.forEach((nm, i) => drawPos.set(nm, i));
+  const ordKey = (t) => drawPos.has(t.name) ? drawPos.get(t.name) : (1000 + (t.seat || 0));
+  teams.sort((a, b) => ordKey(a) - ordKey(b));
   let status = d.status;
   if (allConfirmed && d.status === 'done') {
     await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled';
