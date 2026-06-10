@@ -1086,7 +1086,7 @@ function showErr(t){const el=document.getElementById('err');el.textContent=t;set
 // Сэмплы: gavel.mp3 (freesound #173941, CC0) · team_celebration.ogg (Google Sound Library "Female Crowd Celebration", CC BY 4.0 — атрибуция на лендинге). ---
 const SND={ctx:null,master:null,bus:null,enabled:(localStorage.getItem('dcSound')!=='0'),buf:{}};
 // громкость по событиям (множители) + общая; сохраняется в localStorage. Дефолты — отправная точка, после тюна можно зашить как глобальные.
-const SVOL_DEF={master:0.6,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:0.9,teamDone:0.5,draftDone:1};
+const SVOL_DEF={master:0.6,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:0.9,teamDone:0.5,draftDone:0.5}; // дефолты по live-тюну Матвея 2026-06-10
 let SVOL=(()=>{try{return Object.assign({},SVOL_DEF,JSON.parse(localStorage.getItem('dcSvol')||'{}'));}catch(e){return Object.assign({},SVOL_DEF);}})();
 function saveSvol(){try{localStorage.setItem('dcSvol',JSON.stringify(SVOL));}catch(e){}}
 function setSvol(name,v){SVOL[name]=+v;saveSvol();if(name==='master'&&SND.master)SND.master.gain.value=SVOL.master;}
