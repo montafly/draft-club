@@ -119,6 +119,7 @@
     <button class="btn p" onclick="doLogin()">Войти</button>
     <button class="btn" onclick="doRegister()">Регистрация</button>
     <div id="amsg" class="mut" style="margin-top:8px;font-size:12px"></div>
+    <div class="mut" style="margin-top:14px;font-size:10px;line-height:1.4;opacity:.7">Звуки: <a href="https://developers.google.com/assistant/tools/sound-library" target="_blank" rel="noopener" style="color:inherit">Google Sound Library</a> (CC BY 4.0) · <a href="https://freesound.org" target="_blank" rel="noopener" style="color:inherit">freesound.org</a> (CC0)</div>
   </div>
 </div>
 
@@ -234,6 +235,11 @@
         <label><input type="checkbox" id="autoToggle" onchange="toggleAutoplay()"> Разрешить авто-доигрывание драфта (для теста)</label>
         <span id="autoToggleMsg" class="mut" style="margin-left:8px"></span>
         <p class="mut" style="font-size:11px;margin:6px 0 0">В проде держать выключенным: при включении в кокпите появляется кнопка «⚡ Авто-доиграть», мгновенно завершающая аукцион. Нужно, чтобы соло прогнать драфт до итоговой картинки с очками.</p>
+      </div>
+      <div class="card2">
+        <h3>Звуки (громкость по событиям)</h3>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">0–150%. Сохраняется в этом браузере. ▶ — проба звука.</p>
+        <div id="soundVolPanel"></div>
       </div>
       <div class="card2">
         <h2>Начисление DCC</h2>
@@ -1076,36 +1082,64 @@ function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
 function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
-// --- Звуки событий аукциона: синтез коротких тонов через WebAudio (без файлов). Мотивы тюнятся с Матвеем. ---
-const SND={ctx:null,master:null,enabled:(localStorage.getItem('dcSound')!=='0')};
+// --- Звуки событий аукциона (WebAudio): синтез + 2 коротких сэмпла. Набор согласован с Матвеем.
+// Сэмплы: gavel.mp3 (freesound #173941, CC0) · team_celebration.ogg (Google Sound Library "Female Crowd Celebration", CC BY 4.0 — атрибуция на лендинге). ---
+const SND={ctx:null,master:null,bus:null,enabled:(localStorage.getItem('dcSound')!=='0'),buf:{}};
+// громкость по событиям (множители) + общая; сохраняется в localStorage. Дефолты — отправная точка, после тюна можно зашить как глобальные.
+const SVOL_DEF={master:0.6,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:0.9,teamDone:0.5,draftDone:1};
+let SVOL=(()=>{try{return Object.assign({},SVOL_DEF,JSON.parse(localStorage.getItem('dcSvol')||'{}'));}catch(e){return Object.assign({},SVOL_DEF);}})();
+function saveSvol(){try{localStorage.setItem('dcSvol',JSON.stringify(SVOL));}catch(e){}}
+function setSvol(name,v){SVOL[name]=+v;saveSvol();if(name==='master'&&SND.master)SND.master.gain.value=SVOL.master;}
 function sndCtx(){
-  if(!SND.ctx){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)();SND.master=SND.ctx.createGain();SND.master.gain.value=0.5;SND.master.connect(SND.ctx.destination);}catch(e){return null;}}
+  if(!SND.ctx){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)();SND.master=SND.ctx.createGain();SND.master.gain.value=SVOL.master;SND.master.connect(SND.ctx.destination);}catch(e){return null;}}
   if(SND.ctx.state==='suspended')SND.ctx.resume();
   return SND.ctx;
 }
-// одна нота: частота(Гц), длительность(с), форма волны, громкость(0..1), задержка старта(с)
-function tone(freq,dur,type,vol,at){
-  const ctx=sndCtx();if(!ctx)return;
-  const t0=ctx.currentTime+(at||0),g=ctx.createGain(),o=ctx.createOscillator();
-  o.type=type||'sine';o.frequency.value=freq;
-  g.gain.setValueAtTime(0.0001,t0);
-  g.gain.linearRampToValueAtTime(vol||0.3,t0+0.012);          // быстрая атака
-  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);         // плавный спад (без щелчка)
-  o.connect(g);g.connect(SND.master);o.start(t0);o.stop(t0+dur+0.03);
-}
+// нота с опц. глайдом частоты (o.f→o.f2), огибающая без щелчка
+function tone(o){const c=sndCtx();if(!c)return;const t0=c.currentTime+(o.at||0),osc=c.createOscillator(),g=c.createGain();
+  osc.type=o.type||'sine';osc.frequency.setValueAtTime(o.f,t0);if(o.f2)osc.frequency.exponentialRampToValueAtTime(o.f2,t0+o.dur);
+  g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(o.vol||0.3,t0+(o.attack||0.008));g.gain.exponentialRampToValueAtTime(0.0001,t0+o.dur);
+  osc.connect(g);g.connect(SND.bus||SND.master);osc.start(t0);osc.stop(t0+o.dur+0.03);}
+// свисток судьи: высокий тон с вибрато (трель) + воздух (шум)
+function whistle(at,dur,vol){const c=sndCtx();if(!c)return;at=at||0;dur=dur||0.16;vol=vol||0.3;const t0=c.currentTime+at;
+  const osc=c.createOscillator(),g=c.createGain(),lfo=c.createOscillator(),lg=c.createGain();
+  osc.type='sine';osc.frequency.value=2600;lfo.type='sine';lfo.frequency.value=28;lg.gain.value=70;lfo.connect(lg);lg.connect(osc.frequency);
+  g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(vol,t0+0.015);g.gain.setValueAtTime(vol,t0+dur-0.04);g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  const dest=SND.bus||SND.master;
+  osc.connect(g);g.connect(dest);osc.start(t0);osc.stop(t0+dur+0.02);lfo.start(t0);lfo.stop(t0+dur+0.02);
+  const n=Math.floor(c.sampleRate*dur),buf=c.createBuffer(1,n,c.sampleRate),dd=buf.getChannelData(0);for(let i=0;i<n;i++)dd[i]=Math.random()*2-1;
+  const src=c.createBufferSource();src.buffer=buf;const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=2600;f.Q.value=6;
+  const ng=c.createGain();ng.gain.setValueAtTime(0.0001,t0);ng.gain.exponentialRampToValueAtTime(vol*0.25,t0+0.02);ng.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  src.connect(f);f.connect(ng);ng.connect(dest);src.start(t0);src.stop(t0+dur+0.02);}
+// сэмплы: загрузка с кэшем + обрезанное воспроизведение (offset/dur, фейд в конце)
+function sndLoad(file){const c=sndCtx();if(!c)return Promise.reject();if(!SND.buf[file])SND.buf[file]=fetch('/sfx/'+file).then(r=>r.arrayBuffer()).then(ab=>c.decodeAudioData(ab));return SND.buf[file];}
+function playBuf(file,opt){opt=opt||{};const dest=SND.bus||SND.master;sndLoad(file).then(buf=>{const c=SND.ctx,src=c.createBufferSource();src.buffer=buf;const g=c.createGain();
+  const off=opt.offset||0,d=opt.dur||(buf.duration-off),vol=opt.vol==null?1:opt.vol,fade=opt.fade||0.12,t0=c.currentTime;
+  g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(vol,t0+0.012);g.gain.setValueAtTime(vol,t0+Math.max(0.03,d-fade));g.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+  src.connect(g);g.connect(dest);src.start(t0,off,d+0.03);src.stop(t0+d+0.06);}).catch(()=>{});}
+function sndPreload(){if(!SND.enabled)return;sndLoad('gavel.mp3').catch(()=>{});sndLoad('team_celebration.ogg').catch(()=>{});}
 const SFX={
-  turnNominate:()=>{tone(660,0.16,'triangle',0.45,0);tone(990,0.30,'triangle',0.45,0.14);},                                  // твоя очередь выставлять — заметный восходящий
-  turnBid:()=>{tone(784,0.20,'triangle',0.40,0);},                                                                            // твоя очередь делать бид
-  bidUp:()=>{tone(523,0.09,'square',0.16,0);},                                                                                // участник поднял ставку — короткий блип
-  pass:()=>{tone(300,0.13,'sine',0.20,0);},                                                                                   // участник спасовал
-  roundFinal:()=>{tone(523,0.14,'sine',0.30,0);tone(392,0.22,'sine',0.30,0.12);},                                            // лот закрыт (для тех, к кому ход НЕ переходит)
-  teamDone:()=>{tone(523,0.12,'triangle',0.35,0);tone(659,0.12,'triangle',0.35,0.10);tone(784,0.24,'triangle',0.35,0.20);}, // участник собрал команду
-  draftDone:()=>{tone(523,0.14,'triangle',0.42,0);tone(659,0.14,'triangle',0.42,0.13);tone(784,0.14,'triangle',0.42,0.26);tone(1047,0.42,'triangle',0.42,0.39);}, // драфт завершён
+  turnNominate:()=>{tone({f:587,dur:0.12,type:'square',vol:0.26,at:0});tone({f:784,dur:0.12,type:'square',vol:0.26,at:0.11});tone({f:1175,dur:0.30,type:'triangle',vol:0.32,at:0.22});}, // твоя очередь выставлять — восходящая фанфара
+  turnBid:()=>{tone({f:880,dur:0.11,type:'triangle',vol:0.34,at:0,attack:0.003});tone({f:880,dur:0.13,type:'triangle',vol:0.34,at:0.12,attack:0.003});}, // твоя очередь делать бид — двойной пульс «тук-тук»
+  bidUp:()=>{tone({f:659,dur:0.14,type:'sine',vol:0.34,at:0});tone({f:988,dur:0.20,type:'sine',vol:0.34,at:0.12});}, // чужое повышение ставки — две ноты вверх
+  pass:()=>{tone({f:392,f2:196,dur:0.22,type:'sawtooth',vol:0.18,at:0});}, // пас — глухой нисходящий
+  roundFinal:()=>{playBuf('gavel.mp3',{dur:0.7,vol:0.9});}, // лот закрыт — реальный молоток (CC0)
+  teamDone:()=>{playBuf('team_celebration.ogg',{offset:0,dur:1.8,vol:1});}, // собрал команду — celebration (CC BY)
+  draftDone:()=>{whistle(0,0.14,0.34);whistle(0.20,0.14,0.34);whistle(0.40,0.6,0.36);}, // драфт завершён — финальный свисток (2 коротких + длинный)
 };
-function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(f){try{f();}catch(e){}}}
+// каждое событие — через свою gain-шину (множитель SVOL[name]); синтез строит граф синхронно, playBuf захватывает шину до async
+function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(!f)return;const c=sndCtx();if(!c)return;
+  const bus=c.createGain();bus.gain.value=(SVOL[name]==null?1:SVOL[name]);bus.connect(SND.master);
+  const prev=SND.bus;SND.bus=bus;try{f();}catch(e){}SND.bus=prev;
+  setTimeout(()=>{try{bus.disconnect();}catch(e){}},5000);}
+const SND_LABELS={master:'Общая',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён'};
+function onSvol(k,v){setSvol(k,v);const s=document.getElementById('svv_'+k);if(s)s.textContent=Math.round(v*100)+'%';}
+function buildSoundPanel(){const el=document.getElementById('soundVolPanel');if(!el)return;
+  el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="sndCtx();sndPreload();sfx('${k}')">▶</button>`;
+    return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:210px;font-size:12.5px">${SND_LABELS[k]}</span><input type="range" min="0" max="1.5" step="0.05" value="${cur}" oninput="onSvol('${k}',this.value)" style="width:180px"><span class="mut" id="svv_${k}" style="width:42px;font-size:12px">${Math.round(cur*100)}%</span>${test}</div>`;}).join('');}
 function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b)b.textContent='Звук: '+(SND.enabled?'вкл':'выкл');}
-function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sfx('turnBid');}}
-window.addEventListener('pointerdown',()=>{if(SND.enabled)sndCtx();},{once:true}); // праймим контекст на первом клике (автоплей-политика)
+function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sndPreload();sfx('turnBid');}}
+window.addEventListener('pointerdown',()=>{if(SND.enabled){sndCtx();sndPreload();}},{once:true}); // праймим контекст + предзагрузка сэмплов на первом клике (автоплей-политика)
 // детект событий диффом прошлого и нового стейта
 function soundsFromState(prev,next){
   if(!next||!next.started||!next.draft)return;          // звуки только во время аукциона
@@ -1114,18 +1148,20 @@ function soundsFromState(prev,next){
   if(nd.phase==='done'&&(!pd||pd.phase!=='done')){sfx('draftDone');return;} // финал перекрывает остальное
   const myTurnNom=(nd.phase==='nominating'&&nd.actor===me);
   if(myTurnNom&&!(pd&&pd.phase==='nominating'&&pd.actor===me))sfx('turnNominate'); // твоя очередь выставлять
-  if(nd.phase==='bidding'&&nd.actor===me&&!(pd&&pd.phase==='bidding'&&pd.actor===me))sfx('turnBid'); // твоя очередь делать бид
+  const myTurnBid=(nd.phase==='bidding'&&nd.actor===me&&!(pd&&pd.phase==='bidding'&&pd.actor===me));
+  if(myTurnBid)sfx('turnBid'); // твоя очередь делать бид
   if(!pd)return;                                         // дальше — диффы, требующие прошлого стейта драфта (переход лобби→старт без них)
   const finN=nd.managers.filter(m=>m.finished).length,finP=pd.managers.filter(m=>m.finished).length;
-  if(finN>finP)sfx('teamDone');                          // участник собрал команду
-  if((nd.picks?nd.picks.length:0)>(pd.picks?pd.picks.length:0)&&!myTurnNom)sfx('roundFinal'); // лот закрыт, слышат все кроме нового номинатора
+  const teamJustDone=finN>finP;
+  if(teamJustDone)sfx('teamDone');                       // участник собрал команду
+  if((nd.picks?nd.picks.length:0)>(pd.picks?pd.picks.length:0)&&!myTurnNom&&!teamJustDone)sfx('roundFinal'); // лот закрыт; если этим же переходом кто-то собрал команду — только teamDone
   const sameLot=nd.lot&&pd.lot&&nd.lot.unit&&pd.lot.unit&&nd.lot.unit.id===pd.lot.unit.id;
   if(sameLot){
-    if(nd.lot.highBid>pd.lot.highBid&&nd.lot.highBidder!==me)sfx('bidUp'); // чужое повышение ставки (своё не озвучиваем)
+    if(nd.lot.highBid>pd.lot.highBid&&nd.lot.highBidder!==me&&!myTurnBid)sfx('bidUp'); // чужое повышение; если этим же переходом ход дошёл до меня — только turnBid
     if((nd.lot.passed?nd.lot.passed.length:0)>(pd.lot.passed?pd.lot.passed.length:0))sfx('pass');
   }
 }
-updateSoundBtn();
+updateSoundBtn();buildSoundPanel();
 function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
 function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)} ${n}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
   return `<div class="form">${seg}</div>`;}

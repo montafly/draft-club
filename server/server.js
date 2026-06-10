@@ -425,7 +425,7 @@ const server = http.createServer((req, res) => {
   fs.readFile(full, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
     const ext = path.extname(full);
-    const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }[ext] || 'text/plain';
+    const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' }[ext] || 'text/plain';
     const headers = { 'content-type': mime + '; charset=utf-8' };
     if (ext === '.html') headers['cache-control'] = 'no-cache, no-store, must-revalidate';
     res.writeHead(200, headers);
