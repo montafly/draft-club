@@ -67,6 +67,17 @@
   .rs.buy{border-left-color:#1abc9c;background:color-mix(in srgb,#1abc9c 20%,var(--panel))}
   .rs.buy.faded{border-left-color:var(--line);background:var(--panel);opacity:.62}
   .rs.empty{opacity:.5}
+  #drawOverlay{display:none;position:fixed;inset:0;background:rgba(8,12,16,.95);z-index:30;align-items:center;justify-content:center}
+  .dwbox{text-align:center;max-width:920px;padding:24px}
+  .dwhead{font-size:23px;font-weight:800;margin-bottom:20px;letter-spacing:.3px}
+  .dwgrid{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .dwchip{position:relative;min-width:120px;padding:18px 16px;border-radius:12px;background:var(--panel);border:1px solid var(--line);font-size:16px;font-weight:700;opacity:.8;transition:transform .08s,box-shadow .12s,background .2s,opacity .2s}
+  .dwchip.hot{background:color-mix(in srgb,var(--gold) 30%,var(--panel));border-color:var(--gold);box-shadow:0 0 0 3px var(--gold),0 0 26px var(--gold);transform:scale(1.09);opacity:1}
+  .dwchip.lock{background:color-mix(in srgb,var(--acc) 26%,var(--panel));border-color:var(--acc);opacity:1}
+  .dwchip.me{outline:2px dashed var(--gold);outline-offset:2px}
+  .dwpos{position:absolute;top:-11px;left:-11px;width:30px;height:30px;border-radius:50%;background:var(--acc);color:#06210f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .dwnm{display:block}
+  .dwsub{margin-top:18px;font-size:13px}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
   .pcol table{table-layout:fixed}.pcol td:nth-child(3),.pcol th:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
   .pcol td:nth-child(1),.pcol th:nth-child(1),.pcol td:nth-child(2),.pcol th:nth-child(2),.pcol td:nth-child(4),.pcol th:nth-child(4),.pcol td:nth-child(5),.pcol th:nth-child(5){text-align:center}
@@ -350,6 +361,8 @@
 </div>
 
 <div id="rtcSink" style="display:none"></div>
+
+<div id="drawOverlay"><div class="dwbox" id="drawBody"></div></div>
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
@@ -1265,7 +1278,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -1354,6 +1367,43 @@ function renderRoundStatus(){
   else b2=`<div class="rs rs2"><div class="rs-h">Драфт</div>Завершён</div>`;
   el.innerHTML=`<div class="rstat">${b1}${b2}</div>`;
 }
+// --- жеребьёвка: «колесо» с приземлением на серверный порядок, синхронно у всех по draw.at ---
+const DRAW_MS=28000; // длительность анимации (сервер стартует драфт через ~29.5с)
+let drawAnim=null;
+function renderDraw(){
+  const ov=document.getElementById('drawOverlay');if(!ov)return;
+  const dr=(!S.started&&S.lobby&&S.lobby.draw)?S.lobby.draw:null;
+  if(dr){ if(!drawAnim||drawAnim.at!==dr.at)startDrawAnim(dr); ov.style.display='flex'; }
+  else { ov.style.display='none'; if(drawAnim){cancelAnimationFrame(drawAnim.raf);drawAnim=null;} }
+}
+function startDrawAnim(dr){
+  if(drawAnim)cancelAnimationFrame(drawAnim.raf);
+  drawAnim={at:dr.at,order:dr.order.slice(),raf:0};
+  const loop=()=>{drawTick();if(drawAnim)drawAnim.raf=requestAnimationFrame(loop);};
+  loop();
+}
+function drawTick(){
+  if(!drawAnim)return;
+  const seats=(S.lobby&&S.lobby.seats)||[];
+  const order=drawAnim.order,n=order.length;if(!n)return;
+  const elapsed=Date.now()-drawAnim.at, slot=DRAW_MS/n;
+  let pick=Math.floor(elapsed/slot); if(pick>n)pick=n;
+  const assigned={}; for(let i=0;i<Math.min(pick,n);i++)assigned[order[i]]=i+1; // id→позиция (заблокированы)
+  let highId=null;
+  if(pick<n){
+    const active=seats.map(s=>s.id).filter(id=>!(id in assigned));
+    const target=order[pick], tIdx=Math.max(0,active.indexOf(target));
+    const p=Math.min(1,(elapsed-pick*slot)/slot), SPINS=3;
+    const idx=Math.floor((1-Math.pow(1-p,3))*(SPINS*active.length+tIdx))%active.length; // ease-out, приземление на target при p=1
+    highId=active[((idx%active.length)+active.length)%active.length];
+    if(p>=1){assigned[target]=pick+1;highId=null;}
+  }
+  const chips=seats.map(s=>{const pos=assigned[s.id],hot=s.id===highId;
+    return `<div class="dwchip ${pos?'lock':''} ${hot?'hot':''} ${s.id===me?'me':''}">${pos?`<span class="dwpos">${pos}</span>`:''}<span class="dwnm">${s.name}</span></div>`;}).join('');
+  const done=Object.keys(assigned).length>=n;
+  const body=document.getElementById('drawBody');
+  if(body)body.innerHTML=`<div class="dwhead">${done?'Порядок выбора определён':'Жеребьёвка — кто выбирает первым'}</div><div class="dwgrid">${chips}</div><div class="dwsub mut">${done?'Начинаем драфт…':'Крутим колесо…'}</div>`;
+}
 let clubSortK='xg',clubSortDir=-1;
 function clubCode(club){const u=POOL.find(x=>x.club===club&&x.code);return u&&u.code?u.code:(club||'').slice(0,3).toUpperCase();}
 function oppInfo(club){for(const m of (MATCHES||[])){if(m.home===club)return{opp:m.away,home:true};if(m.away===club)return{opp:m.home,home:false};}return null;}
@@ -1379,9 +1429,11 @@ function renderBottom(){
     const ms=S.lobby.seats.find(s=>s.id===me);
     const seats=S.lobby.seats||[];const rdy=seats.filter(s=>s.ready).length;const need=S.lobby.need;
     const wait=need?`<p class="mut">В комнате ${seats.length}/${need}, готовы ${rdy}/${seats.length}.${seats.length<need?' Ждём остальных участников.':(rdy<seats.length?' Ждём готовности всех.':'')}</p>`:'';
-    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Старт».</p>${wait}`+
+    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
       (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
-      <button class="btn p" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт</button>`:'<span class="mut">Ты зритель</span>')+`</div>`;
+      <button class="btn p" onclick='send({type:"draw"})' ${S.lobby.startable?'':'disabled'}>Жеребьёвка</button>`+
+      (S.isTest?` <button class="btn" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт (тест)</button>`:'')
+      :'<span class="mut">Ты зритель</span>')+`</div>`;
     return;
   }
   if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div>';return;}

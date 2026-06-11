@@ -471,6 +471,7 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 let rtcSeq = 0;                                          // уникальный id соединения для WebRTC-mesh (игроки и зрители)
 
+const DRAW_START_MS = 29500; // жеребьёвка: старт драфта через ~30с после запуска (клиент анимирует 28с + ~1.5с показ финального порядка)
 function broadcast(code) {
   const e = rooms.get(code);
   if (!e) return;
@@ -552,6 +553,19 @@ wss.on('connection', (ws) => {
         }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
         else if (msg.type === 'start') { e.room.start(); refreshOdds(e).catch(() => {}); }
+        else if (msg.type === 'draw') {
+          if (!ws.seatId) throw new Error('вы зритель');
+          const code = ws.roomCode;
+          if (e.room.draw()) {                                    // только что запустили жеребьёвку → стартуем драфт после анимации
+            setTimeout(() => {
+              const e2 = rooms.get(code);
+              if (e2 && e2.room.drawOrder && !e2.room.draft) {
+                try { e2.room.start(); refreshOdds(e2).catch(() => {}); } catch (err) { console.error('draw start', err.message); }
+                broadcast(code); syncStatus(e2);
+              }
+            }, DRAW_START_MS);
+          }
+        }
         else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
         else if (msg.type === 'autoplay') {
           let ok = !e.room.allowedUserIds;                       // тестовая комната — всегда можно

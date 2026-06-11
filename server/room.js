@@ -33,6 +33,19 @@ export class Room {
     this.seatMs = {};                    // «время на часах» по местам: сумма ≈ таймеру драфта
     this.onClock = null;                 // чьё место сейчас «на часах» (ждём его ход)
     this.clockSince = null;              // с какого момента тикает текущему onClock
+    this.drawOrder = null;               // жеребьёвка: предрассчитанный порядок выбора (до старта)
+    this.drawAt = null;                  // момент запуска жеребьёвки (для синхронной анимации у всех)
+  }
+
+  // жеребьёвка: фиксируем порядок выбора заранее, клиент анимирует «колесо» к нему. true = только что запущена
+  draw() {
+    if (this.draft) throw new Error('драфт уже идёт');
+    if (!this.startable()) throw new Error('не все готовы / мало игроков');
+    if (this.drawOrder) return false;    // уже крутится
+    this.drawOrder = this.seats.map((s) => s.id).sort(() => Math.random() - 0.5);
+    this.drawAt = Date.now();
+    this.logEvent('info', '— Жеребьёвка —');
+    return true;
   }
 
   // отнести прошедшее время тому, кого ждали (onClock), и сдвинуть точку отсчёта на now
@@ -80,7 +93,7 @@ export class Room {
   start() {
     if (!this.startable()) throw new Error('start: не все готовы / мало игроков');
     const players = this.seats.map((s) => ({ id: s.id, name: s.name }));
-    const order = players.map((p) => p.id).sort(() => Math.random() - 0.5); // жеребьёвка
+    const order = this.drawOrder ? this.drawOrder.slice() : players.map((p) => p.id).sort(() => Math.random() - 0.5); // порядок из жеребьёвки, иначе случайный (тест/инстант-старт)
     this.logEvent('info', '— Аукцион начался —');
     this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now, log: this.events });
     this.draft.start();
@@ -180,6 +193,7 @@ export class Room {
       spectators: [...this.spectators.values()],
       events: this.events.slice(-400), // живое окно: только недавнее (payload не растёт с размером лога); полный лог — в dc_drafts.events на финише
       chat: this.chat.slice(-100),     // последние сообщения чата (эфемерные, в памяти комнаты)
+      draw: (this.drawOrder && !this.draft) ? { order: this.drawOrder, at: this.drawAt } : null, // идёт жеребьёвка
     };
     if (!this.draft) return { started: false, isTest: !this.allowedUserIds, lobby, draft: null };
     const d = this.draft;
