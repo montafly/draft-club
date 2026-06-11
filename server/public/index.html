@@ -9,6 +9,7 @@
   header h1{font-size:15px;margin:0}.sp{flex:1}.mut{color:var(--mut)}
   .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}.pill.coin{background:#2a2410;color:var(--gold);font-weight:700}
   .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
+  .btn.flash{box-shadow:0 0 0 2px var(--gold),0 0 12px var(--gold);transition:box-shadow .05s}
   input,select{background:#0a0f14;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px}
   .stepper{display:flex;flex:none;align-items:stretch}
   .stepper input{width:46px;text-align:center;border-radius:0;border-left:0;border-right:0;-moz-appearance:textfield;flex:none}
@@ -1345,12 +1346,12 @@ function renderBottom(){
 function actionBox(d){
   if(d.phase!=='bidding'||d.actor!==me)return '';
   const o=d.actorOptions;
-  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='doBid(${v})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
+  const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='setBid(${v})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
   return `<div style="margin-top:8px">
     <div style="display:flex;gap:4px;align-items:stretch"><button class="btn r" style="flex:1;min-width:0" onclick='send({type:"pass"})'>FOLD</button><div class="stepper"><button class="btn step" onclick="stepBid(-1)" aria-label="меньше">−</button><input id="bidA" type="number" min="${o.minAmount}" max="${o.maxAmount}" value="${o.minAmount}" oninput="upRaise()"><button class="btn step" onclick="stepBid(1)" aria-label="больше">+</button></div><button id="raiseBtn" class="btn p" style="flex:1.4;min-width:0;white-space:nowrap" onclick='doBid(+document.getElementById("bidA").value)' ${o.canBid?'':'disabled'}>RAISE ($${o.minAmount})</button></div>
     <div style="margin-top:6px;display:flex;gap:4px;align-items:stretch">
       <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${quick}</div>
-      <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='doBid(${o.maxAmount})' ${o.canBid?'':'disabled'}>MAX<br>${o.maxAmount}</button>
+      <button class="btn qbid" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick='setBid(${o.maxAmount})' ${o.canBid?'':'disabled'}>MAX<br>${o.maxAmount}</button>
     </div></div>`;
 }
 // ва-банк: ставка во весь доступный максимум — предупреждаем (как при авто-заборе), кроме случая макс.бид=1 млн (#N2)
@@ -1362,6 +1363,8 @@ function doBid(amount){
 }
 function upRaise(){const i=document.getElementById('bidA'),b=document.getElementById('raiseBtn');if(!i||!b)return;const mn=+i.min,v=parseInt(i.value,10);b.textContent=(!i.value||isNaN(v)||v<mn)?`RAISE (мин ${mn})`:`RAISE ($${v})`;}
 function stepBid(dir){const i=document.getElementById('bidA');if(!i)return;const mn=+i.min,mx=+i.max;let v=parseInt(i.value,10);if(isNaN(v))v=mn;i.value=Math.min(mx,Math.max(mn,v+dir));upRaise();}
+// быстрая ставка не отправляется сразу: подставляем цену в поле, подтверждение — кнопкой RAISE
+function setBid(v){const i=document.getElementById('bidA');if(!i)return;const mn=+i.min,mx=+i.max;i.value=Math.min(mx,Math.max(mn,+v));upRaise();const b=document.getElementById('raiseBtn');if(b){b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),220);}}
 function nomPanel(d){
   const mine=d.actor===me;
   const who=id=>`<b style="color:var(--txt)">${d.managers.find(m=>m.id===id)?.name}</b>`;
