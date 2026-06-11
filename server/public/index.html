@@ -52,7 +52,7 @@
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
   .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.form .segs{flex:1;display:flex;gap:3px;min-width:0}.seg{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-size:9px;white-space:nowrap;border-radius:5px;padding:2px 1px;font-weight:600;text-align:center}.seg .segc{font-size:10px}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
-  .formn{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:5px;padding:2px 3px;background:#22303d;border:1px solid var(--line)}.formn .fl{font-size:8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}.formn .fv{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .formn{flex:0 0 auto;width:58px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:5px;padding:2px 3px;background:#22303d;border:1px solid var(--line)}.formn .fl{font-size:8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}.formn .fv{font-weight:800;font-size:11px;letter-spacing:-0.2px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#22303d}.seg.ok{background:#16351f;color:#7ee0a0}.needline{font-size:10px;color:var(--miss)}
   .rstat{display:flex;gap:8px;margin-top:10px}
   .rs{border-radius:8px;padding:8px 11px;border:1px solid var(--line);border-left:4px solid var(--line);background:var(--panel);font-size:12px;line-height:1.45;transition:background .2s,border-color .2s,opacity .2s}
@@ -1481,6 +1481,8 @@ function doBid(amount){
 }
 function upRaise(){const i=document.getElementById('bidA'),b=document.getElementById('raiseBtn');if(!i||!b)return;const mn=+i.min,v=parseInt(i.value,10);b.textContent=(!i.value||isNaN(v)||v<mn)?`RAISE (мин ${mn})`:`RAISE ($${v})`;}
 function stepBid(dir){const i=document.getElementById('bidA');if(!i)return;const mn=+i.min,mx=+i.max;let v=parseInt(i.value,10);if(isNaN(v))v=mn;i.value=Math.min(mx,Math.max(mn,v+dir));upRaise();}
+// степпер опенинг-бида при номинации (поле #open) — крупные -/+ вместо мелких нативных стрелок
+function stepOpen(dir){const i=document.getElementById('open');if(!i)return;const mn=+i.min,mx=+i.max;let v=parseInt(i.value,10);if(isNaN(v))v=mn;i.value=Math.min(mx,Math.max(mn,v+dir));if(typeof clrQuick==='function')clrQuick();}
 // быстрая ставка не отправляется сразу: подставляем цену в поле, подтверждение — кнопкой RAISE
 function setBid(v){const i=document.getElementById('bidA');if(!i)return;const mn=+i.min,mx=+i.max;i.value=Math.min(mx,Math.max(mn,+v));upRaise();const b=document.getElementById('raiseBtn');if(b){b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),220);}}
 function nomPanel(d){
@@ -1538,7 +1540,7 @@ function selectPlayer(id,mode){
   if(mode==='nominate'){
     const mx=S.draft.actorOptions.maxOpen;
     const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid qb" onclick="document.getElementById('open').value=${v};pickQuick(this)" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
-    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <input id="open" type="number" min="1" max="${mx}" value="1" oninput="clrQuick()" style="width:54px"> (макс ${mx})
+    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <span class="stepper" style="display:inline-flex;vertical-align:middle;margin:0 2px"><button class="btn step" onclick="stepOpen(-1)" aria-label="меньше">−</button><input id="open" type="number" min="1" max="${mx}" value="1" oninput="clrQuick()"><button class="btn step" onclick="stepOpen(1)" aria-label="больше">+</button></span> (макс ${mx})
       <div class="qrow" style="margin:6px 0;display:flex;gap:4px;align-items:stretch">
         <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${q}</div>
         <button class="btn qbid qb" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx};pickQuick(this)">MAX<br>${mx}</button>
