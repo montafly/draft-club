@@ -252,6 +252,7 @@
       <div class="card2">
         <h3>Камера и микрофон (проверка)</h3>
         <p class="mut" style="font-size:11px;margin:0 0 8px">Проверь, что браузер видит камеру и микрофон — это понадобится для видеосвязи в драфте. Сама видеосвязь между участниками подключается отдельно (WebRTC).</p>
+        <div id="mtHint" style="display:none;font-size:11.5px;line-height:1.45;margin:0 0 8px;padding:8px 10px;background:rgba(230,126,34,.12);border:1px solid #e67e22;border-radius:6px;color:#e9a35f"></div>
         <div class="row" style="gap:8px">
           <button class="btn p" id="mtStart" onclick="startMediaTest()">Включить</button>
           <button class="btn" id="mtCam" onclick="toggleCam()" disabled>Камера: —</button>
@@ -702,6 +703,17 @@ async function creditUser(id){
 }
 // --- самопроверка камеры/микрофона (изолированно от кокпита; обкатка getUserMedia + тумблеров) ---
 let mtStream=null,mtAudioCtx=null,mtRAF=null,mtSrcNode=null;
+// на iOS все браузеры на WebKit; доступ к камере/микрофону iOS даёт по системному разрешению приложения — Chrome iOS (CriOS) без него отклоняет getUserMedia мгновенно, без запроса
+function iosBrowserHint(){
+  const ua=navigator.userAgent||'';
+  const isIOS=/iPad|iPhone|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+  if(!isIOS)return '';
+  if(/CriOS/.test(ua))return 'Chrome на iPhone не пустит к камере/микрофону, пока не разрешишь в системе: Настройки iPhone → Приложения → Google Chrome → включи тумблеры «Камера» и «Микрофон», затем обнови страницу. Либо просто открой эту ссылку в Safari.';
+  if(/(FxiOS|EdgiOS|OPiOS|YaBrowser|GSA)/.test(ua))return 'В этом браузере на iPhone камера/микрофон часто недоступны. Открой ссылку в Safari, либо разреши доступ браузеру: Настройки iPhone → Приложения → твой браузер → «Камера» и «Микрофон».';
+  return ''; // Safari и встроенный браузер Telegram — работают штатно
+}
+function mtShowHint(){const h=iosBrowserHint(),el=document.getElementById('mtHint');if(el){if(h){el.textContent='Важно: '+h;el.style.display='';}else el.style.display='none';}}
+document.addEventListener('DOMContentLoaded',mtShowHint);if(document.readyState!=='loading')mtShowHint();
 function syncMediaBtns(){
   const v=mtStream&&mtStream.getVideoTracks()[0],a=mtStream&&mtStream.getAudioTracks()[0];
   document.getElementById('mtCam').textContent='Камера: '+(v&&v.enabled?'вкл':'выкл');
@@ -753,7 +765,7 @@ async function startMediaTest(){
     document.getElementById('mtCam').disabled=false;document.getElementById('mtMic').disabled=false;
     const hasVid=mtStream&&mtStream.getVideoTracks().length>0;
     msg.textContent=hasVid?'работает: видишь себя, полоска двигается при звуке. Можно выбрать другую камеру/микрофон и вкл/выкл их.':'камеры нет, но микрофон работает: полоска двигается при звуке. Для драфта камера не обязательна.';
-  }catch(e){msg.textContent='не удалось: '+(e.message||e)+' — проверь разрешения браузера на камеру/микрофон.';}
+  }catch(e){const hint=iosBrowserHint();msg.textContent=hint?('Камера/микрофон недоступны в этом браузере. '+hint):('не удалось: '+(e.message||e)+' — проверь разрешения браузера на камеру/микрофон.');}
 }
 async function changeMediaDevice(){ if(!mtStream)return; try{await mtAcquire();}catch(e){document.getElementById('mtMsg').textContent='не удалось переключить устройство: '+(e.message||e);} }
 function toggleCam(){const v=mtStream&&mtStream.getVideoTracks()[0];if(v){v.enabled=!v.enabled;syncMediaBtns();}}
