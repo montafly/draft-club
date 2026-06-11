@@ -161,6 +161,7 @@
       <a class="tab" data-sec="profile" href="?view=profile" onclick="navClick(event,'profile')">Профиль</a>
       <a class="tab admin" data-sec="admin" href="?view=admin" onclick="navClick(event,'admin')" style="display:none">Админка</a>
     </nav>
+    <button class="btn p" id="backToDraftBtn" onclick="backToDraft()" style="display:none">← Вернуться в драфт</button>
     <span class="sp"></span>
     <span class="pill" id="navClock" title="местное время · UTC+3"></span>
     <span class="pill coin" id="navCoin">0 DCC</span>
@@ -256,6 +257,11 @@
         </div>
         <div id="mtMsg" class="mut" style="font-size:12px;margin-top:6px"></div>
       </div>
+      <div class="card2">
+        <h3>Звуки (громкость по событиям)</h3>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">0–150%. Каждый настраивает под себя — сохраняется в этом браузере. ▶ — проба звука.</p>
+        <div id="soundVolPanel"></div>
+      </div>
     </div>
     <!-- АДМИНКА (только для админа) -->
     <div id="secAdmin" class="view">
@@ -263,11 +269,6 @@
         <label><input type="checkbox" id="autoToggle" onchange="toggleAutoplay()"> Разрешить авто-доигрывание драфта (для теста)</label>
         <span id="autoToggleMsg" class="mut" style="margin-left:8px"></span>
         <p class="mut" style="font-size:11px;margin:6px 0 0">В проде держать выключенным: при включении в кокпите появляется кнопка «⚡ Авто-доиграть», мгновенно завершающая аукцион. Нужно, чтобы соло прогнать драфт до итоговой картинки с очками.</p>
-      </div>
-      <div class="card2">
-        <h3>Звуки (громкость по событиям)</h3>
-        <p class="mut" style="font-size:11px;margin:0 0 8px">0–150%. Сохраняется в этом браузере. ▶ — проба звука.</p>
-        <div id="soundVolPanel"></div>
       </div>
       <div class="card2">
         <h2>Начисление DCC</h2>
@@ -322,7 +323,7 @@
 <div id="draft" style="display:none;flex:1;min-height:0;flex-direction:column">
   <header>
     <h1>Draft Club</h1>
-    <button class="btn" onclick="leaveDraft()">← Разделы</button>
+    <button class="btn" onclick="leaveDraft()">← Разделы</button><button class="btn" onclick="roomToProfile()">Профиль</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span><span id="timer" class="pill" style="display:none"></span>
     <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
@@ -375,7 +376,7 @@ ws.onmessage=e=>{const m=JSON.parse(e.data);
   else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
-  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);}};
+  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}};
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
 const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},audioEls:{},streams:{},camState:{},micState:{},localMute:{},camOn:false,micOn:true};
 const IC={
@@ -1124,6 +1125,9 @@ function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);
   document.getElementById('landing').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
   const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
 function leaveDraft(){location.href='/';}
+// профиль из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату
+function roomToProfile(){renderProfileUI();document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';showSection('profile');const b=document.getElementById('backToDraftBtn');if(b)b.style.display='inline-block';}
+function backToDraft(){document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
@@ -1132,7 +1136,7 @@ function showErr(t){const el=document.getElementById('err');el.textContent=t;set
 // Сэмплы: gavel.mp3 (freesound #173941, CC0) · team_celebration.ogg (Google Sound Library "Female Crowd Celebration", CC BY 4.0 — атрибуция на лендинге). ---
 const SND={ctx:null,master:null,bus:null,enabled:(localStorage.getItem('dcSound')!=='0'),buf:{}};
 // громкость по событиям (множители) + общая; сохраняется в localStorage. Дефолты — отправная точка, после тюна можно зашить как глобальные.
-const SVOL_DEF={master:0.6,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:0.9,teamDone:0.5,draftDone:0.5}; // дефолты по live-тюну Матвея 2026-06-10
+const SVOL_DEF={master:0.6,ambient:0.5,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:0.9,teamDone:0.5,draftDone:0.5}; // дефолты по live-тюну Матвея 2026-06-10
 let SVOL=(()=>{try{return Object.assign({},SVOL_DEF,JSON.parse(localStorage.getItem('dcSvol')||'{}'));}catch(e){return Object.assign({},SVOL_DEF);}})();
 function saveSvol(){try{localStorage.setItem('dcSvol',JSON.stringify(SVOL));}catch(e){}}
 function setSvol(name,v){SVOL[name]=+v;saveSvol();if(name==='master'&&SND.master)SND.master.gain.value=SVOL.master;}
@@ -1178,14 +1182,37 @@ function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(!f)return;const c
   const bus=c.createGain();bus.gain.value=(SVOL[name]==null?1:SVOL[name]);bus.connect(SND.master);
   const prev=SND.bus;SND.bus=bus;try{f();}catch(e){}SND.bus=prev;
   setTimeout(()=>{try{bus.disconnect();}catch(e){}},5000);}
-const SND_LABELS={master:'Общая',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён'};
+const SND_LABELS={master:'Общая',ambient:'Эмбиент (пока твой ход выставлять)',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён'};
 function onSvol(k,v){setSvol(k,v);const s=document.getElementById('svv_'+k);if(s)s.textContent=Math.round(v*100)+'%';}
 function buildSoundPanel(){const el=document.getElementById('soundVolPanel');if(!el)return;
-  el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="sndCtx();sndPreload();sfx('${k}')">▶</button>`;
+  el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="${k==='ambient'?'ambientPreview()':`sndCtx();sndPreload();sfx('${k}')`}">▶</button>`;
     return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:210px;font-size:12.5px">${SND_LABELS[k]}</span><input type="range" min="0" max="1.5" step="0.05" value="${cur}" oninput="onSvol('${k}',this.value)" style="width:180px"><span class="mut" id="svv_${k}" style="width:42px;font-size:12px">${Math.round(cur*100)}%</span>${test}</div>`;}).join('');}
 function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b)b.textContent='Звук: '+(SND.enabled?'вкл':'выкл');}
-function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sndPreload();sfx('turnBid');}}
+function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sndPreload();sfx('turnBid');}else ambientStop();if(typeof S!=='undefined'&&S)updateAmbient(S);}
 window.addEventListener('pointerdown',()=>{if(SND.enabled){sndCtx();sndPreload();}},{once:true}); // праймим контекст + предзагрузка сэмплов на первом клике (автоплей-политика)
+// --- эмбиент твоего хода выставления: непрерывный мягкий пад, играет пока твоя очередь номинировать (точечный сигнал можно пропустить, эмбиент — нет) ---
+function ambientStart(){
+  if(!SND.enabled)return;const c=sndCtx();if(!c||SND.amb)return;
+  const vol=(SVOL.ambient==null?0.5:SVOL.ambient);
+  const fade=c.createGain();fade.gain.value=0.0001;fade.connect(SND.master);
+  const tone=c.createGain();tone.gain.value=vol*0.6;tone.connect(fade);
+  const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=500;lp.Q.value=0.5;lp.connect(tone);
+  const oscs=[[110,'sawtooth',0.06],[164.81,'sawtooth',0.05],[220,'triangle',0.04]].map(([f,t,v])=>{const o=c.createOscillator();o.type=t;o.frequency.value=f;const og=c.createGain();og.gain.value=v;o.connect(og);og.connect(lp);o.start();return o;}); // A2+E3+A3 — мягкая открытая квинта
+  const lfo=c.createOscillator();lfo.type='sine';lfo.frequency.value=0.16;const lg=c.createGain();lg.gain.value=vol*0.18;lfo.connect(lg);lg.connect(tone.gain);lfo.start(); // медленное «дыхание» громкости
+  fade.gain.exponentialRampToValueAtTime(Math.max(0.0002,vol),c.currentTime+0.6);
+  SND.amb={fade,oscs,lfo};
+}
+function ambientStop(){
+  if(!SND.amb)return;const c=SND.ctx,a=SND.amb;SND.amb=null;
+  try{const t=c.currentTime;a.fade.gain.cancelScheduledValues(t);a.fade.gain.setValueAtTime(Math.max(0.0002,a.fade.gain.value),t);a.fade.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+    setTimeout(()=>{try{a.oscs.forEach(o=>o.stop());a.lfo.stop();a.fade.disconnect();}catch(e){}},480);}catch(e){}
+}
+function ambientPreview(){ambientStart();setTimeout(ambientStop,2600);} // проба из панели громкости
+// запускаем/глушим эмбиент по текущему стейту: только когда твоя очередь выставлять (фаза nominating, ты actor, лота ещё нет)
+function updateAmbient(next){
+  const on=SND.enabled&&next&&next.started&&next.draft&&next.draft.phase==='nominating'&&next.draft.actor===me&&!next.draft.lot;
+  if(on)ambientStart();else ambientStop();
+}
 // детект событий диффом прошлого и нового стейта
 function soundsFromState(prev,next){
   if(!next||!next.started||!next.draft)return;          // звуки только во время аукциона
