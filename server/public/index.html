@@ -1368,7 +1368,8 @@ function renderRoundStatus(){
   el.innerHTML=`<div class="rstat">${b1}${b2}</div>`;
 }
 // --- жеребьёвка: «колесо» с приземлением на серверный порядок, синхронно у всех по draw.at ---
-const DRAW_MS=28000; // длительность анимации (сервер стартует драфт через ~29.5с)
+const DRAW_SPIN_MS=6500; // длительность одного «выбивания» позиции (последний выбирается автоматом)
+const DRAW_REVEAL_MS=2000; // показ финального порядка перед стартом (синхронно с сервером)
 let drawAnim=null;
 function renderDraw(){
   const ov=document.getElementById('drawOverlay');if(!ov)return;
@@ -1386,18 +1387,18 @@ function drawTick(){
   if(!drawAnim)return;
   const seats=(S.lobby&&S.lobby.seats)||[];
   const order=drawAnim.order,n=order.length;if(!n)return;
-  const elapsed=Date.now()-drawAnim.at, slot=DRAW_MS/n;
-  let pick=Math.floor(elapsed/slot); if(pick>n)pick=n;
+  const spins=Math.max(0,n-1);                 // последний выбирается автоматом, без спина
+  const elapsed=Date.now()-drawAnim.at;
+  let pick=spins?Math.floor(elapsed/DRAW_SPIN_MS):0; if(pick>spins)pick=spins;
   const assigned={}; for(let i=0;i<Math.min(pick,n);i++)assigned[order[i]]=i+1; // id→позиция (заблокированы)
   let highId=null;
-  if(pick<n){
+  if(pick<spins){
     const active=seats.map(s=>s.id).filter(id=>!(id in assigned));
     const target=order[pick], tIdx=Math.max(0,active.indexOf(target));
-    const p=Math.min(1,(elapsed-pick*slot)/slot), SPINS=3;
+    const p=Math.min(1,(elapsed-pick*DRAW_SPIN_MS)/DRAW_SPIN_MS), SPINS=3;
     const idx=Math.floor((1-Math.pow(1-p,3))*(SPINS*active.length+tIdx))%active.length; // ease-out, приземление на target при p=1
     highId=active[((idx%active.length)+active.length)%active.length];
-    if(p>=1){assigned[target]=pick+1;highId=null;}
-  }
+  } else if(n>=1){ assigned[order[n-1]]=n; }   // все спины прошли → последний мгновенно
   const chips=seats.map(s=>{const pos=assigned[s.id],hot=s.id===highId;
     return `<div class="dwchip ${pos?'lock':''} ${hot?'hot':''} ${s.id===me?'me':''}">${pos?`<span class="dwpos">${pos}</span>`:''}<span class="dwnm">${s.name}</span></div>`;}).join('');
   const done=Object.keys(assigned).length>=n;
