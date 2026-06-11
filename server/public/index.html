@@ -50,7 +50,8 @@
   .ptimer.tick{color:var(--gold);border-color:var(--gold)}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
-  .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.seg{flex:1;display:flex;flex-direction:column;align-items:center;font-size:10px;white-space:nowrap;border-radius:5px;padding:2px 3px;font-weight:600;text-align:center}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
+  .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.form .segs{flex:1;display:flex;gap:3px;min-width:0}.seg{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-size:9px;white-space:nowrap;border-radius:5px;padding:2px 1px;font-weight:600;text-align:center}.seg .segc{font-size:10px}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
+  .formn{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:5px;padding:2px 3px;background:#22303d;border:1px solid var(--line)}.formn .fl{font-size:8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}.formn .fv{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#22303d}.seg.ok{background:#16351f;color:#7ee0a0}.needline{font-size:10px;color:var(--miss)}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
   .pcol table{table-layout:fixed}.pcol td:nth-child(3),.pcol th:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
@@ -106,7 +107,7 @@
   .lc-top{display:flex;align-items:center;gap:12px}
   .lc-pos{font-weight:800;font-size:14px;opacity:.8;min-width:36px;text-align:center}
   .lc-ph{width:50px;height:50px;border-radius:50%;background:#0d2a1c2e;display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
-  .lc-id{min-width:0;flex:1}.lc-nm{font-weight:800;font-size:21px;line-height:1.05}.lc-cl{font-size:14px;font-weight:700;opacity:.8;margin-top:2px}
+  .lc-id{min-width:0;flex:1}.lc-nm{font-weight:800;font-size:21px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lc-cl{font-size:14px;font-weight:700;opacity:.8;margin-top:2px}
   .lc-odds{display:flex;gap:8px;margin-top:9px;padding-top:7px;border-top:1px solid rgba(0,0,0,.18);font-size:12px}.lc-odds span{flex:1;text-align:center}.lc-odds b{display:block;font-size:16px;font-weight:800}
   .bid{font-size:22px;font-weight:800;color:var(--gold)}
   .bids{margin-top:8px}.bids .b{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #1d2935}
@@ -1193,8 +1194,9 @@ function soundsFromState(prev,next){
 }
 updateSoundBtn();buildSoundPanel();
 function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
-function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)} ${n}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
-  return `<div class="form">${seg}</div>`;}
+function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
+  const form=POSORD.map(k=>c[k]||0).join('-'); // формация ВРТ-ЗАЩ-ПЗ-НАП-ТРЕНЕР
+  return `<div class="form"><div class="segs">${seg}</div><div class="formn" title="Формация: вратарь-защита-полузащита-нападение-тренер"><span class="fl">Форм</span><span class="fv">${form}</span></div></div>`;}
 
 // раскладка зависит от фазы: в лобби блок «Лобби» + «Матчи тура» уезжают в левую колонку (под участников),
 // правая колонка прячется → камеры занимают всю ширину. В аукционе всё возвращается в правую колонку (стопкой).
@@ -1321,7 +1323,7 @@ function renderBottom(){
   if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
     const op=oppInfo(u.club);const oppTxt=op?(op.home?clubCode(op.opp).toUpperCase():clubCode(op.opp).toLowerCase()):'—';
     lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
-      <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
+      <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-id"><div class="lc-nm">${u.first?u.first[0]+'. ':''}${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
       <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
       ${actionBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
