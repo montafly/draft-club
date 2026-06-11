@@ -92,6 +92,7 @@ export class Room {
   // (нельзя отменить через чужой ход → накопительно откатываешь только свои последние действия)
   undo(seatId) {
     if (!this.draft) throw new Error('драфт не начат');
+    if (this.draft.phase === 'done') throw new Error('драфт завершён — отмена недоступна'); // завершённый драфт неизменяем: иначе откат последней замены после финиша
     const top = this.history[this.history.length - 1];
     if (!top || top.seatId !== seatId) throw new Error('нечего отменять (сверху не ваше действие)');
     restoreDraft(this.draft, top.snap);

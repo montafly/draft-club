@@ -1212,7 +1212,7 @@ function render(){
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
   renderRibbon();renderParts();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
-  const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.canUndoSeat===me)?'inline-block':'none';
+  const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
