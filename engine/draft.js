@@ -86,7 +86,7 @@ export class Draft {
     if (openingBid > maxBid(m, this.config)) throw new Error('nominate: ставка > макс. бида');
 
     this.lot = { unit, highBid: openingBid, highBidder: managerId, passed: new Set(),
-                 lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo,
+                 lastIdx: this.orderIdx.get(managerId), no: ++this.lotNo, nominatorId: managerId,
                  startAt: this.now(), bids: 1, bidsBy: { [managerId]: openingBid } };
     this.phase = 'bidding';
     { const code = unit.code || unit.club; const lbl = unit.position === 'COACH' ? `Coach (${code})` : `${unit.name} (${unit.position} / ${code})`; this.log.push({ t: this.now(), kind: 'nominate', text: `#${this.lot.no} ${m.name} выставил ${lbl} — старт $${openingBid}` }); }
@@ -172,7 +172,7 @@ export class Draft {
     const w = this.m(lot.highBidder);
     w.budget -= lot.highBid;
     w.roster.push({ ...lot.unit, price: lot.highBid });
-    this.picks.push({ no: lot.no, unitName: lot.unit.name, club: lot.unit.club, code: lot.unit.code,
+    this.picks.push({ no: lot.no, unitName: lot.unit.name, first: lot.unit.first, club: lot.unit.club, code: lot.unit.code,
                       position: lot.unit.position, price: lot.highBid,
                       winnerId: w.id, winnerName: w.name,
                       bids: lot.bids, durationMs: this.now() - lot.startAt });
@@ -215,7 +215,7 @@ export class Draft {
     m.substitute = { ...unit, price: 0 };
     this.taken.add(unit.id);
     this.clubCounts[unit.club] = (this.clubCounts[unit.club] || 0) + 1;
-    this.picks.push({ no: null, sub: true, unitName: unit.name, club: unit.club, code: unit.code,
+    this.picks.push({ no: null, sub: true, unitName: unit.name, first: unit.first, club: unit.club, code: unit.code,
                       position: unit.position, price: 0, winnerId: m.id, winnerName: m.name });
     { const code = unit.code || unit.club; const lbl = unit.position === 'COACH' ? `Coach (${code})` : `${unit.name} (${unit.position} / ${code})`; this.log.push({ t: this.now(), kind: 'sub', text: `${m.name} выбрал замену: ${lbl}` }); }
     this.subPtr++;

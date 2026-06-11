@@ -54,6 +54,19 @@
   .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.form .segs{flex:1;display:flex;gap:3px;min-width:0}.seg{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;font-size:9px;white-space:nowrap;border-radius:5px;padding:2px 1px;font-weight:600;text-align:center}.seg .segc{font-size:10px}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
   .formn{flex:0 0 auto;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:5px;padding:2px 3px;background:#22303d;border:1px solid var(--line)}.formn .fl{font-size:8px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}.formn .fv{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .seg.need{background:#5b1f1a;color:#ffdede}.seg.full{background:#22303d}.seg.ok{background:#16351f;color:#7ee0a0}.needline{font-size:10px;color:var(--miss)}
+  .rstat{display:flex;gap:8px;margin-top:10px}
+  .rs{border-radius:8px;padding:8px 11px;border:1px solid var(--line);border-left:4px solid var(--line);background:var(--panel);font-size:12px;line-height:1.45;transition:background .2s,border-color .2s,opacity .2s}
+  .rs1{flex:1;min-width:0}.rs2{flex:2;min-width:0}
+  .rs .rs-h{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+  .rs.wait{border-left-color:#e67e22;background:color-mix(in srgb,#e67e22 16%,var(--panel))}
+  .rs.gk{border-left-color:#f1c40f;background:color-mix(in srgb,#f1c40f 16%,var(--panel))}
+  .rs.def{border-left-color:#5dade2;background:color-mix(in srgb,#5dade2 16%,var(--panel))}
+  .rs.mid{border-left-color:#58d68d;background:color-mix(in srgb,#58d68d 16%,var(--panel))}
+  .rs.fwd{border-left-color:#ec7063;background:color-mix(in srgb,#ec7063 16%,var(--panel))}
+  .rs.coach{border-left-color:#bb8fce;background:color-mix(in srgb,#bb8fce 16%,var(--panel))}
+  .rs.buy{border-left-color:#1abc9c;background:color-mix(in srgb,#1abc9c 20%,var(--panel))}
+  .rs.buy.faded{border-left-color:var(--line);background:var(--panel);opacity:.62}
+  .rs.empty{opacity:.5}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:2px 4px;text-align:left}
   .pcol table{table-layout:fixed}.pcol td:nth-child(3),.pcol th:nth-child(3){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
   .pcol td:nth-child(1),.pcol th:nth-child(1),.pcol td:nth-child(2),.pcol th:nth-child(2),.pcol td:nth-child(4),.pcol th:nth-child(4),.pcol td:nth-child(5),.pcol th:nth-child(5){text-align:center}
@@ -323,6 +336,7 @@
       </div>
       <div class="center">
         <div class="cols" id="cols"></div>
+        <div id="roundStatus"></div>
         <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
@@ -1224,7 +1238,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderParts();renderCols();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
   const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -1287,6 +1301,31 @@ function renderCols(){
       ${Array.from({length:Math.max(0,12-m.roster.length)},(_,i)=>`<tr><td class="mut">${m.roster.length+i+1}</td><td></td><td class="mut">—</td><td></td><td></td></tr>`).join('')}
       ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.code||m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
     </div>`).join('');
+}
+// два блока статуса раунда: слева — последняя покупка, справа — текущий статус (ждём номинацию / идут торги)
+function renderRoundStatus(){
+  const el=document.getElementById('roundStatus');if(!el)return;
+  if(!S.started){el.innerHTML='';return;}
+  const d=S.draft;
+  const nm=id=>d.managers.find(m=>m.id===id)?.name||'—';
+  const ab=(first,name)=>`${first?first[0]+'. ':''}${name||''}`;
+  // блок 1 — последняя покупка
+  const buys=(d.picks||[]).filter(p=>!p.sub);
+  const last=buys[buys.length-1];
+  const bright=d.phase==='nominating'&&!d.lot; // ярко между покупкой и новой номинацией; при торгах гаснет
+  let b1;
+  if(last) b1=`<div class="rs rs1 buy ${bright?'':'faded'}"><div class="rs-h">Последняя покупка</div>R${last.no}: <b>${last.winnerName}</b> купил <b>${ab(last.first,last.unitName)}</b> за <b>$${last.price}</b></div>`;
+  else b1=`<div class="rs rs1 empty"><div class="rs-h">Последняя покупка</div><span class="mut">—</span></div>`;
+  // блок 2 — статус раунда
+  let b2;
+  if(d.phase==='bidding'&&d.lot){const u=d.lot.unit;
+    b2=`<div class="rs rs2 ${u.position.toLowerCase()}"><div class="rs-h">Round ${d.lot.no}</div><b>${nm(d.lot.nominator)}</b> выставил <b>${ab(u.first,u.name)}</b> (${posShort(u.position)} / ${u.code||u.club}). Текущая ставка: <b>$${d.lot.highBid}</b>. Очередь бида у <b>${nm(d.actor)}</b></div>`;}
+  else if(d.phase==='nominating'){const r=(d.lotNo||0)+1;
+    b2=`<div class="rs rs2 wait"><div class="rs-h">Round ${r}</div>Ждём номинацию · ходит <b>${nm(d.actor)}</b></div>`;}
+  else if(d.phase==='substitutes')
+    b2=`<div class="rs rs2 wait"><div class="rs-h">Фаза замен</div>Замену выбирает <b>${nm(d.actor)}</b></div>`;
+  else b2=`<div class="rs rs2"><div class="rs-h">Драфт</div>Завершён</div>`;
+  el.innerHTML=`<div class="rstat">${b1}${b2}</div>`;
 }
 let clubSortK='xg',clubSortDir=-1;
 function clubCode(club){const u=POOL.find(x=>x.club===club&&x.code);return u&&u.code?u.code:(club||'').slice(0,3).toUpperCase();}
