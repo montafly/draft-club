@@ -38,7 +38,10 @@
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
+  .phead{display:flex;align-items:center;gap:6px}
   .phead .nm{font-weight:800}
+  .ptimer{margin-left:auto;font-variant-numeric:tabular-nums;font-size:11px;color:var(--mut);background:#22303d;border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
+  .ptimer.tick{color:var(--gold);border-color:var(--gold)}
   .stats{display:flex;gap:6px;margin:6px 0}.sb{flex:1;background:#0f1822;border:1px solid var(--line);border-radius:8px;padding:4px 6px;text-align:center}.sb.hl{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .sb .lbl{font-size:9px;color:var(--mut);text-transform:uppercase}.sb .val{font-weight:800;font-size:15px}.sb .val.gold{color:var(--gold)}
   .form{display:flex;gap:4px;flex-wrap:nowrap;margin-bottom:6px}.seg{flex:1;display:flex;flex-direction:column;align-items:center;font-size:10px;white-space:nowrap;border-radius:5px;padding:2px 3px;font-weight:600;text-align:center}.seg .segr{font-size:9px;opacity:.6;font-weight:500;margin-top:1px}
@@ -1256,12 +1259,13 @@ function renderRibbon(){
 }
 function renderCols(){
   const el=document.getElementById('cols');
-  if(!S.started){el.innerHTML=(S.lobby.seats||[]).map(s=>`<div class="pcol ${s.id===me?'me':''}"><div class="cam" data-seat="${s.id}"></div><div class="phead"><span class="nm">${s.name}</span> · ${s.ready?'✓ готов':'…'}</div></div>`).join('')||'<div class="pcol mut">Ждём игроков…</div>';return;}
+  if(!S.started){PTIMER=null;el.innerHTML=(S.lobby.seats||[]).map(s=>`<div class="pcol ${s.id===me?'me':''}"><div class="cam" data-seat="${s.id}"></div><div class="phead"><span class="nm">${s.name}</span> · ${s.ready?'✓ готов':'…'}</div></div>`).join('')||'<div class="pcol mut">Ждём игроков…</div>';return;}
   const d=S.draft;
+  PTIMER={onClock:d.onClock,running:d.endAt==null,recvAt:Date.now(),base:{}};ordered().forEach(m=>{PTIMER.base[m.id]=m.activeMs||0;}); // пер-игроковые таймеры: база с сервера + живой тик у того, кто на часах
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
       <div class="cam" data-seat="${m.id}"></div>
-      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}</div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span></div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
         <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
@@ -1446,7 +1450,12 @@ function renderHist(){const b=document.getElementById('histBody');if(!S||!S.star
 document.getElementById('hist').addEventListener('click',e=>{if(e.target.id==='hist')toggleHist();});
 function toggleCollap(id){const b=document.getElementById(id);if(!b)return;const c=b.classList.toggle('collapsed');const h=b.querySelector('h3');if(h)h.textContent=h.textContent.replace(/^[▾▸]/,c?'▸':'▾');}
 function hhmmss(ms){const s=Math.max(0,Math.floor(ms/1000));return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(x=>String(x).padStart(2,'0')).join(':');}
-function draftStartMs(){const ev=(typeof S!=='undefined'&&S&&S.lobby&&S.lobby.events)||[];const n=ev.find(e=>e&&e.kind==='nominate');const f=n||ev[0];return f&&f.t?new Date(f.t).getTime():null;}
-setInterval(()=>{const el=document.getElementById('timer');if(!el)return;const st=(typeof S!=='undefined'&&S&&S.started)?draftStartMs():null;if(!st){el.style.display='none';return;}el.style.display='inline';el.textContent='⏱ '+hhmmss(Date.now()-st);},1000);
+let PTIMER=null; // пер-игроковые таймеры: {onClock, running, recvAt, base:{seatId:ms}}
+setInterval(()=>{
+  const el=document.getElementById('timer');
+  const d=(typeof S!=='undefined'&&S&&S.started&&S.draft)?S.draft:null;
+  if(el){ if(!d||d.startAt==null){el.style.display='none';} else {el.style.display='inline';const end=d.endAt!=null?d.endAt:Date.now();el.textContent='⏱ '+hhmmss(end-d.startAt);} } // таймер драфта: фикс. старт, замирает на финише (endAt)
+  if(PTIMER){const now=Date.now();for(const id in PTIMER.base){const cell=document.getElementById('ptimer-'+id);if(!cell)continue;let ms=PTIMER.base[id];if(PTIMER.running&&String(PTIMER.onClock)===String(id))ms+=now-PTIMER.recvAt;cell.textContent=mmss(ms);}}
+},1000);
 </script>
 </body></html>

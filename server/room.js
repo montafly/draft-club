@@ -27,6 +27,20 @@ export class Room {
     this.events = [];                    // единый лог комнаты (вход/выход + действия аукциона)
     this.chat = [];                      // эфемерный чат комнаты (в памяти процесса): {t,name,text}
     this.draft = null;
+    // --- хронометраж ---
+    this.draftStartAt = null;            // момент старта аукциона (таймер драфта; не плавает, в отличие от окна событий)
+    this.draftEndAt = null;              // момент финиша (последняя замена) — таймер замирает
+    this.seatMs = {};                    // «время на часах» по местам: сумма ≈ таймеру драфта
+    this.onClock = null;                 // чьё место сейчас «на часах» (ждём его ход)
+    this.clockSince = null;              // с какого момента тикает текущему onClock
+  }
+
+  // отнести прошедшее время тому, кого ждали (onClock), и сдвинуть точку отсчёта на now
+  _tickClock(now) {
+    if (this.onClock != null && this.clockSince != null) {
+      this.seatMs[this.onClock] = (this.seatMs[this.onClock] || 0) + (now - this.clockSince);
+    }
+    this.clockSince = now;
   }
 
   join(userId, name) {
@@ -70,10 +84,16 @@ export class Room {
     this.logEvent('info', '— Аукцион начался —');
     this.draft = new Draft(this.pool, players, order, this.config, { now: Date.now, log: this.events });
     this.draft.start();
+    const now = Date.now();
+    this.draftStartAt = now;             // полный хронометраж аукциона — от старта
+    this.onClock = this.draft.actor;     // первый номинатор «на часах»
+    this.clockSince = now;
   }
 
   action(seatId, msg) {
     if (!this.draft) throw new Error('драфт не начат');
+    const now = Date.now();
+    this._tickClock(now);                         // время ожидания → тому, кто сейчас ходит (его и ждали)
     const snap = snapDraft(this.draft);          // снимок ДО действия
     let res;
     switch (msg.type) {
@@ -85,6 +105,9 @@ export class Room {
     }
     this.history.push({ seatId, snap });          // действие прошло → фиксируем для отмены
     if (this.history.length > 50) this.history.shift();
+    this.onClock = this.draft.phase === 'done' ? null : this.draft.actor; // следующий на часах
+    this.clockSince = now;
+    if (this.draft.phase === 'done' && this.draftEndAt == null) this.draftEndAt = now; // таймер драфта замирает на последней замене
     return res;
   }
 
@@ -97,6 +120,10 @@ export class Room {
     if (!top || top.seatId !== seatId) throw new Error('нечего отменять (сверху не ваше действие)');
     restoreDraft(this.draft, top.snap);
     this.history.pop();
+    const now = Date.now();
+    this._tickClock(now);                         // зафиксировать набежавшее, дальше ждём вернувшегося ходящего
+    this.onClock = this.draft.actor;
+    this.clockSince = now;
     const s = this.seats.find((x) => x.id === seatId);
     this.logEvent('info', `${s ? s.name : 'игрок'} — отменил последнее действие`);
   }
@@ -108,6 +135,7 @@ export class Room {
       for (const s of this.seats) s.ready = true;
       this.start();
     }
+    if (this.draftStartAt == null) this.draftStartAt = Date.now();
     const d = this.draft; let guard = 0;
     while (d.phase !== 'done' && guard++ < 5000) {
       if (d.phase === 'nominating') {
@@ -123,6 +151,7 @@ export class Room {
       } else break;
     }
     this.history = []; // снапшоты отмены после автодоигрывания не нужны
+    if (this.draft.phase === 'done' && this.draftEndAt == null) this.draftEndAt = Date.now();
   }
 
   _actorOptions() {
@@ -161,6 +190,10 @@ export class Room {
       draft: {
         phase: d.phase,
         actor: d.actor,
+        startAt: this.draftStartAt,                 // хронометраж: фикс. старт/финиш + чьё место на часах
+        endAt: this.draftEndAt,
+        onClock: this.onClock,
+        asOf: Date.now(),
         canUndoSeat: this.history.length ? this.history[this.history.length - 1].seatId : null,
         order: d.order,
         lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed], bidsBy: d.lot.bidsBy },
@@ -172,6 +205,8 @@ export class Room {
         managers: [...d.managers.values()].map((m) => ({
           id: m.id, name: m.name, budget: m.budget, maxBid: d.managerMaxBid(m.id),
           finished: m.finished, finishOrder: m.finishOrder, size: m.roster.length,
+          activeMs: this.seatMs[m.id] || 0,
+
           counts: countPos(m.roster),
           roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, code: u.code, position: u.position, price: u.price })),
           substitute: m.substitute && { name: m.substitute.name, club: m.substitute.club, code: m.substitute.code, position: m.substitute.position },
