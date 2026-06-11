@@ -440,8 +440,11 @@ async function rtcStart(){
   if(RTC.on||myRtc==null)return;
   try{
     await rtcEnsureIce();
-    const constraints=(me==null)?{audio:true}:{video:true,audio:true}; // зритель — только микрофон, без камеры
-    RTC.stream=await navigator.mediaDevices.getUserMedia(constraints);
+    if(me==null){ RTC.stream=await navigator.mediaDevices.getUserMedia({audio:true}); } // зритель — только микрофон, без камеры
+    else{
+      try{ RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
+      catch(e){ RTC.stream=await navigator.mediaDevices.getUserMedia({audio:true}); } // нет камеры (NotFoundError) или занята → играем без видео, но со звуком: микрофон не должен зависеть от камеры
+    }
     RTC.on=true;RTC.micOn=true;RTC.camOn=false;
     if(me!=null){RTC.stream.getVideoTracks().forEach(t=>t.enabled=false); // камера по умолчанию выкл — можно играть без видео
       rtcTileVideo(myRtc).srcObject=new MediaStream(RTC.stream.getVideoTracks());} // своё превью — только видео, без аудио (иначе слышишь себя)
@@ -685,8 +688,13 @@ async function mtAcquire(){
   const video=(camSel&&camSel.value)?{deviceId:{exact:camSel.value}}:true;
   const audio=(micSel&&micSel.value)?{deviceId:{exact:micSel.value}}:true;
   if(mtStream)mtStream.getTracks().forEach(t=>t.stop());
-  try{ mtStream=await navigator.mediaDevices.getUserMedia({video,audio}); }
-  catch(e){ if(e&&e.name==='OverconstrainedError'){ mtStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); } else throw e; } // выбранное устройство не подошло → дефолтное
+  const gum=c=>navigator.mediaDevices.getUserMedia(c);
+  try{ mtStream=await gum({video,audio}); }
+  catch(e){
+    if(e&&e.name==='OverconstrainedError'){ mtStream=await gum({video:true,audio:true}); } // выбранное устройство не подошло → дефолтное
+    else if(e&&(e.name==='NotFoundError'||e.name==='DevicesNotFoundError')){ mtStream=await gum({audio}); } // нет камеры → проверяем хотя бы микрофон (камера не должна блокировать звук)
+    else throw e;
+  }
   document.getElementById('mtVideo').srcObject=mtStream;
   mtSetupMic();syncMediaBtns();
 }
@@ -697,7 +705,8 @@ async function startMediaTest(){
     await mtPopulateDevices();   // метки и список устройств доступны только после разрешения
     document.getElementById('mtStart').disabled=true;document.getElementById('mtStop').disabled=false;
     document.getElementById('mtCam').disabled=false;document.getElementById('mtMic').disabled=false;
-    msg.textContent='работает: видишь себя, полоска двигается при звуке. Можно выбрать другую камеру/микрофон и вкл/выкл их.';
+    const hasVid=mtStream&&mtStream.getVideoTracks().length>0;
+    msg.textContent=hasVid?'работает: видишь себя, полоска двигается при звуке. Можно выбрать другую камеру/микрофон и вкл/выкл их.':'камеры нет, но микрофон работает: полоска двигается при звуке. Для драфта камера не обязательна.';
   }catch(e){msg.textContent='не удалось: '+(e.message||e)+' — проверь разрешения браузера на камеру/микрофон.';}
 }
 async function changeMediaDevice(){ if(!mtStream)return; try{await mtAcquire();}catch(e){document.getElementById('mtMsg').textContent='не удалось переключить устройство: '+(e.message||e);} }
