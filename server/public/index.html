@@ -518,9 +518,9 @@ function updateRtcBtns(){
 // --- детект говорящего: AnalyserNode на свой и чужие аудио-потоки, подсветка ника/плитки ---
 const SEATCOL=['#f1c40f','#5dade2','#58d68d','#ec7063','#bb8fce','#f5a25d'];
 function seatColor(id){const n=SEATCOL.length;return SEATCOL[((id%n)+n)%n];}
-const SPK={ctx:null,nodes:{},spk:{},raf:0,TH:0.025,HANG:380};
+const SPK={ctx:null,sink:null,nodes:{},spk:{},raf:0,TH:0.025,HANG:380};
 function spkEnsureCtx(){
-  if(!SPK.ctx){try{SPK.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+  if(!SPK.ctx){try{SPK.ctx=new (window.AudioContext||window.webkitAudioContext)();SPK.sink=SPK.ctx.createGain();SPK.sink.gain.value=0;SPK.sink.connect(SPK.ctx.destination);}catch(e){return null;}} // sink: общий gain 0 в destination — на iOS анализатор тикает только если граф упирается в выход, gain 0 = без эха
   if(SPK.ctx.state==='suspended')SPK.ctx.resume();
   return SPK.ctx;
 }
@@ -531,7 +531,7 @@ function spkAttach(seat,stream){
   try{
     const src=ctx.createMediaStreamSource(stream);
     const an=ctx.createAnalyser();an.fftSize=512;an.smoothingTimeConstant=0.3;
-    src.connect(an); // только в анализатор, НЕ в destination — без эха
+    src.connect(an);an.connect(SPK.sink); // iOS Safari: тянем граф в destination через gain 0 sink (без эха), иначе анализатор не получает данные
     SPK.nodes[k]={src,an,buf:new Uint8Array(an.fftSize),last:0};
   }catch(e){return;}
   if(!SPK.raf)SPK.raf=requestAnimationFrame(spkLoop);
@@ -701,7 +701,7 @@ async function creditUser(id){
   }catch(e){msg.textContent='ошибка: '+e.message;}
 }
 // --- самопроверка камеры/микрофона (изолированно от кокпита; обкатка getUserMedia + тумблеров) ---
-let mtStream=null,mtAudioCtx=null,mtRAF=null;
+let mtStream=null,mtAudioCtx=null,mtRAF=null,mtSrcNode=null;
 function syncMediaBtns(){
   const v=mtStream&&mtStream.getVideoTracks()[0],a=mtStream&&mtStream.getAudioTracks()[0];
   document.getElementById('mtCam').textContent='Камера: '+(v&&v.enabled?'вкл':'выкл');
@@ -709,9 +709,12 @@ function syncMediaBtns(){
 }
 function mtSetupMic(){
   if(mtRAF){cancelAnimationFrame(mtRAF);mtRAF=null;}
-  if(mtAudioCtx){mtAudioCtx.close().catch(()=>{});mtAudioCtx=null;}
-  mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(!mtAudioCtx)mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)(); // переиспользуем один контекст (iOS лимитирует их число), не плодим новые
+  if(mtAudioCtx.state==='suspended')mtAudioCtx.resume().catch(()=>{});
+  if(mtSrcNode){try{mtSrcNode.disconnect();}catch(e){}}
   const srcNode=mtAudioCtx.createMediaStreamSource(mtStream),an=mtAudioCtx.createAnalyser();an.fftSize=256;srcNode.connect(an);
+  const sink=mtAudioCtx.createGain();sink.gain.value=0;an.connect(sink);sink.connect(mtAudioCtx.destination); // iOS Safari: анализатор тикает только если граф упирается в destination; gain 0 = без эха
+  mtSrcNode=srcNode;
   const buf=new Uint8Array(an.frequencyBinCount);
   const loop=()=>{an.getByteTimeDomainData(buf);let peak=0;for(const v of buf)peak=Math.max(peak,Math.abs(v-128));document.getElementById('mtMicBar').style.width=Math.min(100,Math.round(peak/128*200))+'%';mtRAF=requestAnimationFrame(loop);};loop();
 }
@@ -741,6 +744,9 @@ async function mtAcquire(){
 async function startMediaTest(){
   const msg=document.getElementById('mtMsg');msg.textContent='запрашиваю доступ к камере и микрофону…';
   try{
+    // создаём+будим аудиоконтекст здесь, в обработчике клика (до await) — иначе на iOS он останется suspended и полоска уровня не двинется
+    if(!mtAudioCtx)mtAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(mtAudioCtx.state==='suspended')mtAudioCtx.resume().catch(()=>{});
     await mtAcquire();
     await mtPopulateDevices();   // метки и список устройств доступны только после разрешения
     document.getElementById('mtStart').disabled=true;document.getElementById('mtStop').disabled=false;
@@ -754,6 +760,7 @@ function toggleCam(){const v=mtStream&&mtStream.getVideoTracks()[0];if(v){v.enab
 function toggleMic(){const a=mtStream&&mtStream.getAudioTracks()[0];if(a){a.enabled=!a.enabled;syncMediaBtns();}}
 function stopMediaTest(){
   if(mtRAF)cancelAnimationFrame(mtRAF);mtRAF=null;
+  if(mtSrcNode){try{mtSrcNode.disconnect();}catch(e){}mtSrcNode=null;}
   if(mtAudioCtx){mtAudioCtx.close().catch(()=>{});mtAudioCtx=null;}
   if(mtStream){mtStream.getTracks().forEach(t=>t.stop());mtStream=null;}
   const vid=document.getElementById('mtVideo');if(vid)vid.srcObject=null;
