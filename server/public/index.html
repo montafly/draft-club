@@ -79,6 +79,14 @@
   .rs.buy{border-left-color:#1abc9c;background:color-mix(in srgb,#1abc9c 20%,var(--panel))}
   .rs.buy.faded{border-left-color:var(--line);background:var(--panel);opacity:.62}
   .rs.empty{opacity:.5}
+  .rs .k{font-size:15px;font-weight:800;letter-spacing:.2px;color:#fff;-webkit-text-stroke:2px #000;paint-order:stroke fill}
+  .myctl{display:inline-flex;align-items:center;gap:2px;flex:none}
+  .myctl .btn{padding:3px;line-height:0;background:none;border:none;border-radius:6px;color:var(--mut);display:inline-flex;align-items:center;justify-content:center}
+  .myctl .btn:hover{background:#ffffff14}
+  .myctl .btn svg{width:15px;height:15px}
+  .myctl .btn.undo{color:var(--gold);background:rgba(232,195,114,.16);box-shadow:0 0 7px rgba(232,195,114,.6)}
+  .myctl .btn.undo:hover{background:rgba(232,195,114,.28)}
+  .phead .myctl{margin-left:6px}
   #drawOverlay{display:none;position:fixed;inset:0;background:rgba(8,12,16,.95);z-index:30;align-items:center;justify-content:center}
   .dwbox{text-align:center;max-width:920px;padding:24px}
   .dwhead{font-size:23px;font-weight:800;margin-bottom:20px;letter-spacing:.3px}
@@ -370,7 +378,7 @@
     <button class="btn" onclick="leaveDraft()" title="Выйти из комнаты">← Выйти</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><span id="specCtl" class="myctl"></span><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -385,8 +393,8 @@
         <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
-      <div class="rightcol right">
-        <div style="text-align:center;margin-bottom:4px"><span id="timer" class="pill" style="display:none;font-size:16px;padding:6px 16px;font-variant-numeric:tabular-nums"></span></div>
+      <div class="rightcol right" style="position:relative">
+        <span id="timer" class="pill" style="display:none;position:absolute;top:7px;left:6px;z-index:2;font-size:13px;padding:3px 10px;font-variant-numeric:tabular-nums"></span>
         <div id="bottom"></div>
         <div class="clubs mpanel" id="mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
@@ -433,7 +441,9 @@ const IC={
   spk:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>',
   spkOff:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>',
   micSm:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
-  micSmOff:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v3a3 3 0 0 0 5 2.2"/><path d="M15 11V5a3 3 0 0 0-5.5-1.7"/><path d="M5 10v1a7 7 0 0 0 11 5.5"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>'
+  micSmOff:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v3a3 3 0 0 0 5 2.2"/><path d="M15 11V5a3 3 0 0 0-5.5-1.7"/><path d="M5 10v1a7 7 0 0 0 11 5.5"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
+  // отмена последнего действия — круговая стрелка против часовой
+  undo:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
 };
 function rtcList(){return (S&&S.lobby&&S.lobby.rtc)||[];}                               // [{id,name,seat}] всех в комнате (игроки+зрители)
 function seatToRtc(seat){const p=rtcList().find(x=>x.seat===seat);return p?String(p.id):null;}
@@ -537,14 +547,23 @@ function toggleLocalMute(rid){ // заглушить участника «для
   const a=RTC.audioEls[rid];if(a)a.muted=!!RTC.localMute[rid];
   renderParts();
 }
+// п.8: контролы драфта (отмена/мик/камера) — в шапке моей колонки (.phead → #myCtlBox);
+// для зрителя без колонки запасной дом — #specCtl в тулбаре. Рендер заново на каждый вызов (контейнеры пересоздаются renderCols).
 function updateRtcBtns(){
-  const c=document.getElementById('rtcCamBtn'),mi=document.getElementById('rtcMicBtn');if(!c||!mi)return;
-  if(myRtc==null){c.style.display=mi.style.display='none';return;}
-  mi.style.display='inline-flex';                       // микрофон есть у всех в комнате (игроки и зрители)
-  c.style.display=(me!=null)?'inline-flex':'none';      // камера только у игроков; зритель без камеры
-  const micOn=RTC.on&&RTC.micOn,camOn=RTC.on&&RTC.camOn;
-  mi.innerHTML=micOn?IC.mic:IC.micOff;mi.style.color=micOn?'var(--acc)':'var(--mut)';mi.title=!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен');
-  c.innerHTML=camOn?IC.cam:IC.camOff;c.style.color=camOn?'var(--acc)':'var(--mut)';c.title=!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена');
+  const box=document.getElementById('myCtlBox')||document.getElementById('specCtl');if(!box)return;
+  if(box.id==='myCtlBox'){const sc=document.getElementById('specCtl');if(sc)sc.innerHTML='';} // активна колонка — чистим запасной контейнер, без дублей
+  let h='';
+  if(S&&S.started&&S.draft&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me&&me!=null) // отмена — только когда сервер разрешил откат этому игроку
+    h+=`<button class="btn undo" onclick='send({type:"undo"})' title="Отменить последнее действие">${IC.undo}</button>`;
+  if(myRtc!=null){                                       // микрофон — всем в комнате (игроки и зрители)
+    const micOn=RTC.on&&RTC.micOn;
+    h+=`<button class="btn" onclick="rtcMicClick()" style="color:${micOn?'var(--acc)':'var(--mut)'}" title="${!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен')}">${micOn?IC.mic:IC.micOff}</button>`;
+  }
+  if(me!=null&&myRtc!=null){                              // камера — только игрокам
+    const camOn=RTC.on&&RTC.camOn;
+    h+=`<button class="btn" onclick="rtcCamClick()" style="color:${camOn?'var(--acc)':'var(--mut)'}" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}</button>`;
+  }
+  box.innerHTML=h;
 }
 
 // --- детект говорящего: AnalyserNode на свой и чужие аудио-потоки, подсветка ника/плитки ---
@@ -623,8 +642,10 @@ async function initAuth(){
   sb.auth.onAuthStateChange((ev,s)=>{session=s; if(ev==='SIGNED_OUT'){authedOnce=false; showAuth();} else if(s && !authedOnce){onAuthed();}});
   if(session) onAuthed(); else showAuth();
 }
-function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('topbar').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
-function showApp(){document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
+// мобилка: внутри приложения форсим десктоп-раскладку 1200px (телефон масштабирует пальцами), как в просмотрщике итогов. device-width только на лендинге (форма входа).
+function setVp(wide){const v=document.getElementById('vp');if(v)v.setAttribute('content',wide?'width=1200':'width=device-width, initial-scale=1');}
+function showAuth(){setVp(false);document.getElementById('landing').style.display='flex';document.getElementById('topbar').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
+function showApp(){setVp(true);document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
 async function onAuthed(){
   authedOnce=true;
   myName=(session.user.email||'Player').split('@')[0];
@@ -916,7 +937,7 @@ const FTPOS={goalkeeper:['GK','gk'],defender:['DEF','def'],midfielder:['MID','mi
 function posClass(p){return FTPOS[p]?FTPOS[p][1]:(p||'').toLowerCase();}
 let viewerPoll=null,viewerUpdTick=null;
 function stopViewerPoll(){if(viewerPoll){clearInterval(viewerPoll);viewerPoll=null;}if(viewerUpdTick){clearInterval(viewerUpdTick);viewerUpdTick=null;}}
-function closeViewer(){document.getElementById('viewer').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('vp').setAttribute('content','width=device-width, initial-scale=1');stopViewerPoll();}
+function closeViewer(){document.getElementById('viewer').style.display='none';document.getElementById('app').style.display='flex';setVp(true);stopViewerPoll();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('viewer').style.display==='block')closeViewer();});
 // относительное время последнего пересчёта очков (#7: «обновлено X назад»)
 function relTime(ms){if(!ms)return '';const s=Math.round((Date.now()-ms)/1000);if(s<10)return 'только что';if(s<60)return s+' сек назад';const m=Math.round(s/60);if(m<60)return m+' мин назад';return Math.round(m/60)+' ч назад';}
@@ -927,7 +948,7 @@ async function openViewer(id){
   document.getElementById('vTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament}, тур ${d.round}`;
   document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';document.getElementById('topbar').style.display='flex'; // итоги — под общей шапкой сайта (п.10)
   document.getElementById('viewer').style.display='block';
-  document.getElementById('vp').setAttribute('content','width=1200');   // итоги на телефоне: десктоп 1:1, можно масштабировать пальцами
+  setVp(true);   // итоги на телефоне: десктоп 1:1, можно масштабировать пальцами
   document.getElementById('vRibbon').innerHTML='';document.getElementById('vLive').innerHTML='';document.getElementById('vUpd').textContent='';
   document.getElementById('vTeams').innerHTML='<div class="mut">загрузка…</div>';
   await loadViewer(id,true);
@@ -1241,13 +1262,13 @@ async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
-function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);
+function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);setVp(true);
   document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
   document.getElementById('backToDraftBtn').style.display='none'; // мы в драфте — «вернуться» не нужно
   const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
 function leaveDraft(){location.href='/';}
 // профиль/разделы из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату; навигация — через общую шапку (navClick)
-function backToDraft(){document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
+function backToDraft(){setVp(true);document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
@@ -1386,7 +1407,6 @@ function render(){
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
   renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
-  const ub=document.getElementById('undoBtn');if(ub)ub.style.display=(S.started&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me)?'inline-block':'none';
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
@@ -1436,7 +1456,7 @@ function renderCols(){
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
       <div class="cam" data-seat="${m.id}"></div>
-      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span></div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span>${m.id===me?'<span class="myctl" id="myCtlBox"></span>':''}</div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
         <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
@@ -1461,16 +1481,16 @@ function renderRoundStatus(){
   const last=buys[buys.length-1];
   const bright=d.phase==='nominating'&&!d.lot; // ярко между покупкой и новой номинацией; при торгах гаснет
   let b1;
-  if(last) b1=`<div class="rs rs1 buy ${bright?'':'faded'}"><div class="rs-h">Последняя покупка</div>R${last.no}: <b>${last.winnerName}</b> купил <b>${ab(last.first,last.unitName)}</b> за <b>$${last.price}</b></div>`;
+  if(last) b1=`<div class="rs rs1 buy ${bright?'':'faded'}"><div class="rs-h">Последняя покупка</div>R${last.no}: <span class="k">${last.winnerName}</span> купил <span class="k">${ab(last.first,last.unitName)}</span> за <b>$${last.price}</b></div>`;
   else b1=`<div class="rs rs1 empty"><div class="rs-h">Последняя покупка</div><span class="mut">—</span></div>`;
   // блок 2 — статус раунда
   let b2;
   if(d.phase==='bidding'&&d.lot){const u=d.lot.unit;
-    b2=`<div class="rs rs2 ${u.position.toLowerCase()}"><div class="rs-h">Round ${d.lot.no}</div><b>${nm(d.lot.nominator)}</b> выставил <b>${ab(u.first,u.name)}</b> (${posShort(u.position)} / ${u.code||u.club}). Текущая ставка: <b>$${d.lot.highBid}</b>. Очередь бида у <b>${nm(d.actor)}</b></div>`;}
+    b2=`<div class="rs rs2 ${u.position.toLowerCase()}"><div class="rs-h">Round ${d.lot.no}</div><span class="k">${nm(d.lot.nominator)}</span> выставил <span class="k">${ab(u.first,u.name)}</span> (${posShort(u.position)} / ${u.code||u.club}). Текущая ставка: <b>$${d.lot.highBid}</b>. Очередь бида у <span class="k">${nm(d.actor)}</span></div>`;}
   else if(d.phase==='nominating'){const r=(d.lotNo||0)+1;
-    b2=`<div class="rs rs2 wait"><div class="rs-h">Round ${r}</div>Ждём номинацию · ходит <b>${nm(d.actor)}</b></div>`;}
+    b2=`<div class="rs rs2 wait"><div class="rs-h">Round ${r}</div>Ждём номинацию · ходит <span class="k">${nm(d.actor)}</span></div>`;}
   else if(d.phase==='substitutes')
-    b2=`<div class="rs rs2 wait"><div class="rs-h">Фаза замен</div>Замену выбирает <b>${nm(d.actor)}</b></div>`;
+    b2=`<div class="rs rs2 wait"><div class="rs-h">Фаза замен</div>Замену выбирает <span class="k">${nm(d.actor)}</span></div>`;
   else b2=`<div class="rs rs2"><div class="rs-h">Драфт</div>Завершён</div>`;
   el.innerHTML=`<div class="rstat">${b1}${b2}</div>`;
 }
