@@ -87,6 +87,11 @@
   .myctl .btn.undo{color:var(--gold);background:rgba(232,195,114,.16);box-shadow:0 0 7px rgba(232,195,114,.6)}
   .myctl .btn.undo:hover{background:rgba(232,195,114,.28)}
   .phead .myctl{margin-left:6px}
+  .avbox{width:150px;height:142px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+  .avstage{position:relative;width:264px;height:248px;margin:0 auto;overflow:hidden;border-radius:8px;border:1px solid var(--line);background:#000;touch-action:none;cursor:grab}
+  .avstage:active{cursor:grabbing}
+  .avstage img{position:absolute;left:0;top:0;user-select:none;-webkit-user-drag:none}
+  .cam img.avtile{width:100%;height:100%;object-fit:cover;border-radius:7px;display:block}
   #drawOverlay{display:none;position:fixed;inset:0;background:rgba(8,12,16,.95);z-index:30;align-items:center;justify-content:center}
   .dwbox{text-align:center;max-width:920px;padding:24px}
   .dwhead{font-size:23px;font-weight:800;margin-bottom:20px;letter-spacing:.3px}
@@ -275,6 +280,19 @@
         </div>
       </div>
       <div class="card2">
+        <h3>Аватар</h3>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">Показывается как заглушка на твоей камере в драфте, когда камера выключена. Кадрируется под формат камеры.</p>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <div id="avPreview" class="avbox"><span class="mut" style="font-size:11px">нет аватара</span></div>
+          <div class="row" style="gap:8px">
+            <button class="btn p" onclick="document.getElementById('avFile').click()">Загрузить</button>
+            <button class="btn r" id="avDel" onclick="removeAvatar()" style="display:none">Удалить</button>
+            <input id="avFile" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="onAvatarFile(this)">
+          </div>
+        </div>
+        <div id="avMsg" class="mut" style="font-size:12px;margin-top:6px"></div>
+      </div>
+      <div class="card2">
         <h3>Баланс</h3>
         <div class="statline"><div class="stat"><span class="v gold" id="profCoin">0</span><span class="k">Draft Coins</span></div></div>
         <div id="profLedger" style="margin-top:12px"></div>
@@ -408,6 +426,16 @@
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
+<div id="avCrop" style="display:none;position:fixed;inset:0;background:rgba(8,12,16,.92);z-index:40;align-items:center;justify-content:center">
+  <div class="panel" style="max-width:340px;text-align:center">
+    <b>Кадрирование аватара</b>
+    <div class="mut" style="font-size:11px;margin:4px 0 10px">Перетащи фото и отрегулируй масштаб под рамку камеры.</div>
+    <div id="avStage" class="avstage" onpointerdown="AVA.start(event)"><img id="avImg" draggable="false"></div>
+    <div class="row" style="gap:8px;align-items:center;margin-top:10px"><span class="mut" style="font-size:11px">Масштаб</span><input id="avZoom" type="range" min="1" max="3" step="0.01" value="1" style="flex:1" oninput="AVA.zoom(this.value)"></div>
+    <div class="row" style="gap:8px;margin-top:10px;justify-content:flex-end"><button class="btn" onclick="AVA.cancel()">Отмена</button><button class="btn p" onclick="AVA.apply()">Применить</button></div>
+  </div>
+</div>
+
 <div id="viewer" style="display:none;flex:1;min-height:0;background:var(--bg);overflow:auto">
   <div style="max-width:1720px;margin:0 auto;padding:14px">
     <div class="row" style="margin-bottom:6px"><button class="btn" onclick="closeViewer()">← Назад</button><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><span id="vLive"></span><span id="vUpd" class="mut" style="font-size:11px"></span><button class="btn" onclick="refreshViewer(this)">Обновить</button><button class="btn" onclick="viewerHist()">История драфта</button></div>
@@ -464,7 +492,11 @@ function placeVideos(){ // показываем видео пира в плит�
     const seat=+cam.dataset.seat;const rid=seatToRtc(seat);const v=rid?RTC.videoEls[rid]:null;
     const off=(seat===me)?(RTC.on&&!RTC.camOn):(RTC.camState[rid]===false); // выкл камера → заглушка, не замороженный кадр
     if(v&&v.srcObject&&!off){ if(cam.firstElementChild!==v){cam.innerHTML='';cam.appendChild(v);} }
-    else { const vid=cam.querySelector('video'); if(vid)vid.remove(); if(cam.textContent!=='камера')cam.textContent='камера'; }
+    else { const vid=cam.querySelector('video'); if(vid)vid.remove();
+      // камера выкл/нет видео → аватар-заглушка: свой берём прямо из PROFILE (не зависит от серверного userId), чужой — из кэша AV по userId места; иначе текст «камера»
+      const av=(seat===me)?((PROFILE&&PROFILE.avatar_url)||null):(AV[seatUid(seat)]||null);
+      if(av){let img=cam.querySelector('img.avtile');if(!img){cam.innerHTML='';img=document.createElement('img');img.className='avtile';cam.appendChild(img);}if(img.getAttribute('src')!==av)img.src=av;}
+      else{const img=cam.querySelector('img.avtile');if(img)img.remove();if(cam.textContent!=='камера')cam.textContent='камера';} }
   });
 }
 function rtcSignal(peer,data){send({type:'rtc',to:+peer,data});}
@@ -652,6 +684,7 @@ async function onAuthed(){
   PROFILE={};
   try{const {data}=await sb.from('dc_profiles').select('*').eq('id',session.user.id).single(); if(data)PROFILE=data;}catch{}
   if(PROFILE.display_name)myName=PROFILE.display_name;
+  AV[session.user.id]=PROFILE.avatar_url||null; // свой аватар сразу в кэш заглушек
   initTzSelect();
   renderProfileUI();
   initAdminForm();
@@ -672,7 +705,68 @@ function renderProfileUI(){
   document.getElementById('stPod').textContent=PROFILE.podiums||0;
   const rb=document.getElementById('profRole');rb.textContent=isAdmin?'админ':'юзер';rb.className='badge'+(isAdmin?' admin':'');
   const tzSel=document.getElementById('profTz');if(tzSel)tzSel.value=PROFILE.timezone||'';
+  renderAvatarUI();
 }
+// --- Аватар: загрузка + кроп под формат камеры, хранение JPEG data-URL в dc_profiles.avatar_url ---
+const AV={}; // userId -> dataURL|null (кэш заглушек; null = аватара нет, повторно не фетчим)
+let avFetching=false;
+async function fetchSeatAvatars(){ // доливаем аватары участников по местам (userId из serialize)
+  if(!sb||avFetching)return;
+  const seats=(typeof S!=='undefined'&&S&&S.lobby&&S.lobby.seats)||[];
+  const need=[...new Set(seats.map(s=>s.userId).filter(u=>u&&!(u in AV)))];
+  if(!need.length)return;
+  avFetching=true;
+  try{const {data}=await sb.from('dc_profiles').select('id,avatar_url').in('id',need);
+    need.forEach(u=>{AV[u]=null;});(data||[]).forEach(p=>{AV[p.id]=p.avatar_url||null;});placeVideos();
+  }catch(e){}finally{avFetching=false;}
+}
+function seatUid(seat){const s=((typeof S!=='undefined'&&S&&S.lobby&&S.lobby.seats)||[]).find(x=>x.id===seat);return s?s.userId:null;}
+function renderAvatarUI(){
+  const box=document.getElementById('avPreview');if(!box)return;
+  if(PROFILE.avatar_url){box.innerHTML=`<img src="${PROFILE.avatar_url}" style="width:100%;height:100%;object-fit:cover">`;document.getElementById('avDel').style.display='';}
+  else{box.innerHTML='<span class="mut" style="font-size:11px">нет аватара</span>';document.getElementById('avDel').style.display='none';}
+}
+function onAvatarFile(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;const msg=document.getElementById('avMsg');
+  if(!/^image\/(png|jpeg|webp)$/.test(f.type)){msg.textContent='Только PNG, JPEG или WebP';inp.value='';return;}
+  if(f.size>8*1024*1024){msg.textContent='Файл больше 8 МБ — выбери поменьше';inp.value='';return;}
+  msg.textContent='';const img=new Image();
+  img.onload=()=>AVA.open(img);img.onerror=()=>{msg.textContent='Не удалось прочитать изображение';};
+  img.src=URL.createObjectURL(f);
+}
+async function saveAvatar(url){
+  const msg=document.getElementById('avMsg');msg.textContent='сохраняю…';
+  const {error}=await sb.from('dc_profiles').update({avatar_url:url}).eq('id',session.user.id);
+  if(error){msg.textContent='ошибка: '+error.message;return;}
+  PROFILE.avatar_url=url;AV[session.user.id]=url;renderAvatarUI();placeVideos();
+  msg.textContent='сохранено';setTimeout(()=>{if(msg.textContent==='сохранено')msg.textContent='';},2500);
+}
+async function removeAvatar(){
+  const msg=document.getElementById('avMsg');
+  const {error}=await sb.from('dc_profiles').update({avatar_url:null}).eq('id',session.user.id);
+  if(error){msg.textContent='ошибка: '+error.message;return;}
+  PROFILE.avatar_url=null;AV[session.user.id]=null;renderAvatarUI();placeVideos();
+  msg.textContent='аватар удалён';setTimeout(()=>{if(msg.textContent==='аватар удалён')msg.textContent='';},2500);
+}
+// кроп-модуль: рамка = формат камеры (.cam ~1.06:1); перетаскивание + зум; рендер в canvas → JPEG data-URL
+const AVA={img:null,fw:264,fh:248,ow:528,oh:496,fit:1,zoom:1,scale:1,ox:0,oy:0,drag:null};
+AVA.open=function(image){this.img=image;document.getElementById('avImg').src=image.src;
+  this.fit=Math.max(this.fw/image.naturalWidth,this.fh/image.naturalHeight);this.zoom=1;document.getElementById('avZoom').value=1;
+  this.scale=this.fit;this.center();this.render();document.getElementById('avCrop').style.display='flex';};
+AVA.center=function(){const dw=this.img.naturalWidth*this.scale,dh=this.img.naturalHeight*this.scale;this.ox=(this.fw-dw)/2;this.oy=(this.fh-dh)/2;this.clamp();};
+AVA.clamp=function(){const dw=this.img.naturalWidth*this.scale,dh=this.img.naturalHeight*this.scale;this.ox=Math.min(0,Math.max(this.fw-dw,this.ox));this.oy=Math.min(0,Math.max(this.fh-dh,this.oy));};
+AVA.render=function(){if(!this.img)return;const el=document.getElementById('avImg');el.style.width=(this.img.naturalWidth*this.scale)+'px';el.style.height=(this.img.naturalHeight*this.scale)+'px';el.style.left=this.ox+'px';el.style.top=this.oy+'px';};
+AVA.zoom=function(z){const cx=this.fw/2,cy=this.fh/2,ix=(cx-this.ox)/this.scale,iy=(cy-this.oy)/this.scale;
+  this.zoom=+z;this.scale=this.fit*this.zoom;this.ox=cx-ix*this.scale;this.oy=cy-iy*this.scale;this.clamp();this.render();};
+AVA.start=function(e){if(!AVA.img)return;AVA.drag={x:e.clientX,y:e.clientY,ox:AVA.ox,oy:AVA.oy};e.preventDefault();};
+AVA.move=function(e){if(!AVA.drag)return;AVA.ox=AVA.drag.ox+(e.clientX-AVA.drag.x);AVA.oy=AVA.drag.oy+(e.clientY-AVA.drag.y);AVA.clamp();AVA.render();};
+AVA.end=function(){AVA.drag=null;};
+AVA.cancel=function(){document.getElementById('avCrop').style.display='none';this.img=null;document.getElementById('avFile').value='';};
+AVA.apply=function(){if(!this.img)return;const c=document.createElement('canvas');c.width=this.ow;c.height=this.oh;const ctx=c.getContext('2d');const k=this.ow/this.fw;
+  ctx.drawImage(this.img,this.ox*k,this.oy*k,this.img.naturalWidth*this.scale*k,this.img.naturalHeight*this.scale*k);
+  const url=c.toDataURL('image/jpeg',0.82);document.getElementById('avCrop').style.display='none';document.getElementById('avFile').value='';saveAvatar(url);};
+document.addEventListener('pointermove',e=>AVA.move(e));
+document.addEventListener('pointerup',()=>AVA.end());
 function initTzSelect(){
   const sel=document.getElementById('profTz');if(!sel||sel.options.length)return;
   let zones;try{zones=Intl.supportedValuesOf('timeZone');}catch{zones=['Europe/Nicosia','Europe/Kyiv','Europe/Moscow','Asia/Yekaterinburg','Asia/Almaty','Europe/London','UTC'];}
@@ -1406,7 +1500,7 @@ function render(){
   document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
   const t=document.getElementById('turn');
   if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();if(RTC.on)connectPeers();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();updateRtcBtns();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }

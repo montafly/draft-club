@@ -187,7 +187,7 @@ export class Room {
 
   serialize() {
     const lobby = {
-      seats: this.seats.map((s) => ({ id: s.id, name: s.name, ready: s.ready, connected: s.connected })),
+      seats: this.seats.map((s) => ({ id: s.id, userId: s.userId, name: s.name, ready: s.ready, connected: s.connected })),
       startable: this.startable(),
       need: this.allowedUserIds ? this.allowedUserIds.size : null,
       spectators: [...this.spectators.values()],
