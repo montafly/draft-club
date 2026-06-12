@@ -493,7 +493,7 @@ function broadcast(code) {
   const state = e.room.serialize();
   if (state.lobby) state.lobby.rtc = [...e.clients]    // все в комнате для mesh: {id(rtcId), name, seat|null}
     .filter((c) => c.user && c.rtcId)
-    .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId, uid: c.user.id }));
+    .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId, uid: c.user.id, listen: c.voiceListen === true }));
   const msg = JSON.stringify({ type: 'state', state });
   for (const c of e.clients) if (c.readyState === 1) c.send(msg);
 }
@@ -574,6 +574,7 @@ wss.on('connection', (ws) => {
           if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.rtcId, data: msg.data }));
           return;
         }
+        if (msg.type === 'voiceListen') { ws.voiceListen = !!msg.on; broadcast(ws.roomCode); return; } // голосовой компаньон слушает у себя → ПК того же аккаунта приглушит свой звук
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
         else if (msg.type === 'start') { e.room.start(); refreshOdds(e).catch(() => {}); }
         else if (msg.type === 'draw') {
