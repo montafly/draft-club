@@ -122,7 +122,7 @@
   .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:5px;font-size:11px}
   .vteam tr.subr.counted td{background:#16351f}
   .vteam tr.plive td{background:rgba(47,129,247,.16)}                 /* игрок сейчас играет — лаконичная синяя подсветка строки (#11) */
-  .vteam tr.sdead td{background:rgba(125,141,160,.14);opacity:.6}     /* замена уже не может выйти в старт — серая (#12) */
+  .vteam tr.sdead td{background:rgba(125,141,160,.14);opacity:.6}     /* несыгравший стартер (dnp) или замена-мертвяк — серая мутная (#12) */
   .vteam tr.sdead.subr td{background:rgba(224,80,80,.14)}             /* + красный оттенок, если это именно замена-«мертвяк» */
   /* тесная раскладка (мобильный viewport=1200 или узкое окно): жмём имя+паддинги, чтобы колонка очков влезла в карточку */
   @media(max-width:1320px){.vteam td.nm,.vteam th.pl{max-width:60px;overflow:hidden;text-overflow:ellipsis}.vteam th,.vteam td{padding:2px 3px}}
@@ -942,7 +942,7 @@ function renderViewerTeams(){
     const starters=t.players.filter(p=>!p.isSub).slice().sort(pOrder==='draft'?byDraft:byPos);
     const sub=t.players.find(p=>p.isSub);
     let n=0;
-    let body=starters.map(p=>{n++;return `<tr class="${p.mstatus==='live'?'plive':''}"><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${fpts(p)}</td></tr>`;}).join('');
+    let body=starters.map(p=>{n++;return `<tr class="${p.mstatus==='live'?'plive':p.mstatus==='dnp'?'sdead':''}"><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${fpts(p)}</td></tr>`;}).join('');
     if(sub)body+=`<tr class="subr${sub.counted?' counted':''}${sub.mstatus==='dnp'?' sdead':''}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td>${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td>${sub.cost!=null?'$'+sub.cost:''}</td><td>${fpts(sub)}</td></tr>`;
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
