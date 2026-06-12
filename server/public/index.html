@@ -508,6 +508,7 @@ function rtcTileVideo(rid){ // видео-элемент для плитки .ca
 }
 function rtcAudioSink(rid,stream){ // скрытое воспроизведение аудио пира (своё аудио НЕ играем — иначе эхо)
   rid=String(rid);if(rid===String(myRtc))return;
+  if(VOICE)return; // голосовой компаньон = только микрофон: телефон НЕ проигрывает чужой звук (его слушаешь на ПК), иначе двойное эхо
   if(myUid){const p=rtcList().find(x=>String(x.id)===rid);if(p&&p.uid===myUid)return;} // своё второе устройство — не проигрываем (страховка от эха)
   let a=RTC.audioEls[rid];const sink=document.getElementById('rtcSink');
   if(!a){a=document.createElement('audio');a.autoplay=true;RTC.audioEls[rid]=a;if(sink)sink.appendChild(a);}
@@ -581,7 +582,7 @@ async function rtcStart(){
   if(RTC.on||myRtc==null)return;
   try{
     await rtcEnsureIce();
-    if(me==null){ RTC.stream=await navigator.mediaDevices.getUserMedia({audio:true}); } // зритель — только микрофон, без камеры
+    if(me==null){ RTC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); } // зритель/голос — только микрофон, с подавлением эха (телефон рядом с колонками ПК)
     else{
       try{ RTC.stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
       catch(e){ RTC.stream=await navigator.mediaDevices.getUserMedia({audio:true}); } // нет камеры (NotFoundError) или занята → играем без видео, но со звуком: микрофон не должен зависеть от камеры
