@@ -329,6 +329,21 @@ async function scoreDraft(draftId) {
   return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, hasRosters: rosters.length > 0 };
 }
 
+// Кэш результатов scoreDraft: один пересчёт на драфт раз в SCORE_TTL, всем клиентам — из кэша.
+// Снимает зависимость частоты запросов к FanTeam от числа открытых просмотрщиков (риск бана не растёт),
+// даёт «обновлено X назад» (updatedAt = время реального пересчёта) и делает кнопку «обновить» безопасной.
+const SCORE_TTL = 30000;
+const scoreCache = new Map(); // draftId -> { at, data }
+async function scoreDraftCached(draftId, force) {
+  const c = scoreCache.get(draftId);
+  const now = Date.now();
+  if (!force && c && (now - c.at) < SCORE_TTL) return { ...c.data, updatedAt: c.at };
+  const data = await scoreDraft(draftId);
+  const at = Date.now();
+  scoreCache.set(draftId, { at, data });
+  return { ...data, updatedAt: at };
+}
+
 const rooms = new Map(); // code -> { room, clients:Set<ws> }
 let autoplayEnabled = false; // тумблер авто-доигрывания (для теста), по умолчанию выкл — в проде остаётся off
 function makeCode() {
@@ -376,7 +391,7 @@ const server = http.createServer((req, res) => {
     const matchId = q.get('matchId');
     if (!matchId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен matchId' })); }
     ftDetail(matchId).then((det) => {
-      const names = {}; for (const m of det.realTeamMemberships || []) names[m.realPlayerId] = (m.realPlayer || {}).lastName || (m.realPlayer || {}).firstName || m.realPlayerId;
+      const names = {}; for (const m of det.realTeamMemberships || []) { const rp = m.realPlayer || {}; names[m.realPlayerId] = [rp.firstName, rp.lastName].filter(Boolean).join(' ') || m.realPlayerId; }  // полное имя+фамилия — снять разночтения у Lee/Kim (#14)
       const teams = {}; for (const t of det.realTeams || []) teams[t.id] = t.name || String(t.id);
       const rm = det.realMatch || {}; const tids = (rm.realTeamIds || []).slice(0, 2);
       const players = (det.realPlayerMatchStats || []).map((r) => ({ name: names[r.realPlayerId] || r.realPlayerId, club: teams[r.realTeamId] || r.realTeamId, position: r.position, lineup: r.lineup, minutes: r.minutesPlayed || 0, total: cp(r.stats || {}, r.position), stats: r.stats || {} }));
@@ -389,7 +404,7 @@ const server = http.createServer((req, res) => {
     const q = new URLSearchParams((req.url.split('?')[1] || ''));
     const draftId = q.get('draftId');
     if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
-    scoreDraft(draftId)
+    scoreDraftCached(draftId, q.get('force') === '1')
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
     return;
