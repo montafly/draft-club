@@ -6,6 +6,7 @@
   :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372;--miss:#ec7063}
   *{box-sizing:border-box} html,body{height:100%} body{margin:0;font:13px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--txt);display:flex;flex-direction:column}
   header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  #draftbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;background:#13202c;border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0}.sp{flex:1}.mut{color:var(--mut)}
   .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}.pill.coin{background:#2a2410;color:var(--gold);font-weight:700}
   .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
@@ -181,11 +182,12 @@
 </div>
 
 <!-- ОБОЛОЧКА ПРИЛОЖЕНИЯ: разделы -->
-<div id="app" style="display:none;flex:1;min-height:0;flex-direction:column">
-  <header>
+<!-- единая шапка сайта: видна везде, включая драфт (п.10) -->
+<header id="topbar" style="display:none">
     <h1>Draft Club</h1>
     <nav class="nav">
       <a class="tab" data-sec="lobby" href="?view=lobby" onclick="navClick(event,'lobby')">Лобби</a>
+      <a class="tab" data-sec="all" href="?view=all" onclick="navClick(event,'all')">Все драфты</a>
       <a class="tab" data-sec="mine" href="?view=mine" onclick="navClick(event,'mine')">Мои драфты</a>
       <a class="tab" data-sec="profile" href="?view=profile" onclick="navClick(event,'profile')">Профиль</a>
       <a class="tab admin" data-sec="admin" href="?view=admin" onclick="navClick(event,'admin')" style="display:none">Админка</a>
@@ -196,15 +198,11 @@
     <span class="pill coin" id="navCoin">0 DCC</span>
     <span class="pill" id="navName"></span>
     <a href="#" onclick="doLogout();return false" class="mut">выйти</a>
-  </header>
+</header>
+<div id="app" style="display:none;flex:1;min-height:0;flex-direction:column">
   <main>
     <!-- ЛОББИ -->
     <div id="secLobby" class="view active">
-      <div class="nav" style="margin-bottom:12px">
-        <button class="tab subtab active" data-sub="reg" onclick="showLobbyTab('reg')">Запись</button>
-        <button class="tab subtab" data-sub="all" onclick="showLobbyTab('all')">Все драфты</button>
-      </div>
-      <!-- подвкладка: запись -->
       <div id="lobReg">
         <div class="card2">
           <h3>Войти в драфт</h3>
@@ -221,12 +219,12 @@
           <div id="lobRegList"><div class="empty">загрузка…</div></div>
         </div>
       </div>
-      <!-- подвкладка: все драфты -->
-      <div id="lobAll" style="display:none">
-        <div class="card2">
-          <h3>Все драфты — идут и состоявшиеся</h3>
-          <div id="lobAllList"><div class="empty">загрузка…</div></div>
-        </div>
+    </div>
+    <!-- ВСЕ ДРАФТЫ (вынесено из Лобби в отдельный раздел, п.2) -->
+    <div id="secAll" class="view">
+      <div class="card2">
+        <h3>Все драфты — идут и состоявшиеся</h3>
+        <div id="lobAllList"><div class="empty">загрузка…</div></div>
       </div>
     </div>
     <!-- МОИ ДРАФТЫ -->
@@ -351,13 +349,13 @@
 
 <!-- КОКПИТ ДРАФТА -->
 <div id="draft" style="display:none;flex:1;min-height:0;flex-direction:column">
-  <header>
-    <h1>Draft Club</h1>
-    <button class="btn" onclick="leaveDraft()">← Разделы</button><button class="btn" onclick="roomToProfile()">Профиль</button>
+  <!-- тонкий тулбар драфта (под общей шапкой сайта), п.10 -->
+  <div id="draftbar">
+    <button class="btn" onclick="leaveDraft()" title="Выйти из комнаты">← Выйти</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
-    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span><span id="timer" class="pill" style="display:none"></span>
+    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
     <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="undoBtn" onclick='send({type:"undo"})' style="display:none">↶ Отменить</button><button class="btn" id="rtcMicBtn" onclick="rtcMicClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="rtcCamBtn" onclick="rtcCamClick()" style="display:none;padding:6px 9px"></button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
-  </header>
+  </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
     <div class="layout">
@@ -372,6 +370,7 @@
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
       <div class="rightcol right">
+        <div style="text-align:center;margin-bottom:4px"><span id="timer" class="pill" style="display:none;font-size:16px;padding:6px 16px;font-variant-numeric:tabular-nums"></span></div>
         <div id="bottom"></div>
         <div class="clubs mpanel" id="mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
@@ -385,7 +384,7 @@
 
 <div id="hist"><div class="panel" style="max-width:600px;margin:0 auto"><button class="btn" style="float:right" onclick="toggleHist()">Закрыть</button><b>История пиков</b><div id="histBody"></div></div></div>
 
-<div id="viewer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto">
+<div id="viewer" style="display:none;flex:1;min-height:0;background:var(--bg);overflow:auto">
   <div style="max-width:1720px;margin:0 auto;padding:14px">
     <div class="row" style="margin-bottom:6px"><button class="btn" onclick="closeViewer()">← Назад</button><h2 id="vTitle" style="flex:1;margin:0;font-size:16px"></h2><span id="vLive"></span><span id="vUpd" class="mut" style="font-size:11px"></span><button class="btn" onclick="refreshViewer(this)">Обновить</button><button class="btn" onclick="viewerHist()">История драфта</button></div>
     <div id="vRibbon" class="ribbon"></div>
@@ -608,8 +607,8 @@ async function initAuth(){
   sb.auth.onAuthStateChange((ev,s)=>{session=s; if(ev==='SIGNED_OUT'){authedOnce=false; showAuth();} else if(s && !authedOnce){onAuthed();}});
   if(session) onAuthed(); else showAuth();
 }
-function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
-function showApp(){document.getElementById('landing').style.display='none';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';}
+function showAuth(){document.getElementById('landing').style.display='flex';document.getElementById('topbar').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
+function showApp(){document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
 async function onAuthed(){
   authedOnce=true;
   myName=(session.user.email||'Player').split('@')[0];
@@ -621,7 +620,8 @@ async function onAuthed(){
   initAdminForm();
   showApp(); showSection(viewFromUrl()||'lobby');
   tick(); loadDrafts(); loadFlags();
-  const room=new URLSearchParams(location.search).get('room'); if(room) document.getElementById('lcode').value=room;
+  // п.1: при F5 в руме — восстанавливаем комнату (enterRoom→'room'→onRoom покажет драфт поверх). Мёртвая комната → мягкий фолбэк на лобби.
+  const room=new URLSearchParams(location.search).get('room'); if(room){document.getElementById('lcode').value=room; if(ws.readyState===1)enterRoom(room); else ws.addEventListener('open',()=>enterRoom(room),{once:true});} // ждём открытия сокета (F5 может опередить ws.onopen)
 }
 function renderProfileUI(){
   const isAdmin=PROFILE.role==='admin';
@@ -660,19 +660,24 @@ function maybeRefreshDrafts(){if(authedOnce&&!document.hidden&&document.getEleme
 setInterval(maybeRefreshDrafts,12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeRefreshDrafts();}); // вернулись на вкладку — сразу обновить (фоновые таймеры тормозят)
 window.addEventListener('focus',maybeRefreshDrafts);
-function viewFromUrl(){const v=new URLSearchParams(location.search).get('view');return ['lobby','mine','profile','admin'].includes(v)?v:null;}
+function viewFromUrl(){const v=new URLSearchParams(location.search).get('view');return ['lobby','all','mine','profile','admin'].includes(v)?v:null;}
 function navClick(e,sec){
   if(e.metaKey||e.ctrlKey||e.shiftKey||e.button){return;} // модификатор/средняя кнопка → нативное открытие в новой вкладке
-  e.preventDefault();showSection(sec);history.replaceState(null,'',location.pathname+'?view='+sec);
+  e.preventDefault();
+  if(document.getElementById('viewer').style.display!=='none')closeViewer(); // уходим из просмотрщика итогов чисто (стоп-поллинг, viewport)
+  document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex'; // навигация из драфта: уходим в раздел, драфт жив в фоне (п.10)
+  showSection(sec);
+  if(!myRoom)history.replaceState(null,'',location.pathname+'?view='+sec); // в руме URL держим на ?room — F5 вернёт в драфт (п.1)
 }
 function showSection(sec){
   document.querySelectorAll('#app .view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('#app .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
-  const map={lobby:'secLobby',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
+  document.querySelectorAll('#topbar .tab').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
+  const map={lobby:'secLobby',all:'secAll',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
   document.getElementById(map[sec]).classList.add('active');
+  const b=document.getElementById('backToDraftBtn');if(b)b.style.display=myRoom?'inline-block':'none'; // показываем «← Вернуться в драфт» только если в руме
   if(sec==='admin'){refreshAdminTime();renderAdminUsers();}
   if(sec==='profile')renderLedger();
-  if(sec==='lobby'||sec==='admin'||sec==='mine')loadDrafts();
+  if(sec==='lobby'||sec==='all'||sec==='admin'||sec==='mine')loadDrafts();
 }
 async function renderLedger(){
   const el=document.getElementById('profLedger');if(!el||!session)return;
@@ -796,12 +801,7 @@ function stopMediaTest(){
   document.getElementById('mtStart').disabled=false;['mtStop','mtCam','mtMic','mtCamSel','mtMicSel'].forEach(i=>document.getElementById(i).disabled=true);
   document.getElementById('mtMsg').textContent='выключено';
 }
-// --- Лобби: подвкладки Запись / Все драфты ---
-function showLobbyTab(t){
-  document.querySelectorAll('#secLobby .subtab').forEach(b=>b.classList.toggle('active',b.dataset.sub===t));
-  document.getElementById('lobReg').style.display=t==='reg'?'block':'none';
-  document.getElementById('lobAll').style.display=t==='all'?'block':'none';
-}
+// (showLobbyTab удалён — «Все драфты» теперь отдельный раздел secAll, п.2)
 // --- Админка: создание драфта ---
 const TOURNAMENTS=[{label:'EPL 2025/26',season:1900},{label:'World Cup 2026',season:1995}];
 const LEAGUES={BRONZE:{buyin:8,p1:28,p2:10},SILVER:{buyin:28,p1:90,p2:38},GOLDEN:{buyin:115,p1:350,p2:165}};
@@ -900,7 +900,7 @@ const FTPOS={goalkeeper:['GK','gk'],defender:['DEF','def'],midfielder:['MID','mi
 function posClass(p){return FTPOS[p]?FTPOS[p][1]:(p||'').toLowerCase();}
 let viewerPoll=null,viewerUpdTick=null;
 function stopViewerPoll(){if(viewerPoll){clearInterval(viewerPoll);viewerPoll=null;}if(viewerUpdTick){clearInterval(viewerUpdTick);viewerUpdTick=null;}}
-function closeViewer(){document.getElementById('viewer').style.display='none';document.getElementById('vp').setAttribute('content','width=device-width, initial-scale=1');stopViewerPoll();}
+function closeViewer(){document.getElementById('viewer').style.display='none';document.getElementById('app').style.display='flex';document.getElementById('vp').setAttribute('content','width=device-width, initial-scale=1');stopViewerPoll();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('viewer').style.display==='block')closeViewer();});
 // относительное время последнего пересчёта очков (#7: «обновлено X назад»)
 function relTime(ms){if(!ms)return '';const s=Math.round((Date.now()-ms)/1000);if(s<10)return 'только что';if(s<60)return s+' сек назад';const m=Math.round(s/60);if(m<60)return m+' мин назад';return Math.round(m/60)+' ч назад';}
@@ -909,6 +909,7 @@ async function openViewer(id){
   const d=DRAFTS.find(x=>x.id===id);if(!d)return;
   VIEW={draft:d,score:null,fixtures:[]};
   document.getElementById('vTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament}, тур ${d.round}`;
+  document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';document.getElementById('topbar').style.display='flex'; // итоги — под общей шапкой сайта (п.10)
   document.getElementById('viewer').style.display='block';
   document.getElementById('vp').setAttribute('content','width=1200');   // итоги на телефоне: десктоп 1:1, можно масштабировать пальцами
   document.getElementById('vRibbon').innerHTML='';document.getElementById('vLive').innerHTML='';document.getElementById('vUpd').textContent='';
@@ -1194,12 +1195,12 @@ async function authToken(){const {data}=await sb.auth.getSession(); return data.
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
 function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);
-  document.getElementById('landing').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
+  document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
+  document.getElementById('backToDraftBtn').style.display='none'; // мы в драфте — «вернуться» не нужно
   const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
 function leaveDraft(){location.href='/';}
-// профиль из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату
-function roomToProfile(){renderProfileUI();document.getElementById('draft').style.display='none';document.getElementById('app').style.display='flex';showSection('profile');const b=document.getElementById('backToDraftBtn');if(b)b.style.display='inline-block';}
-function backToDraft(){document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';}
+// профиль/разделы из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату; навигация — через общую шапку (navClick)
+function backToDraft(){document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
