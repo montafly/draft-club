@@ -35,6 +35,17 @@
   .applist div{padding:2px 0;border-bottom:1px solid #1d2935;font-size:12px}.applist div:last-child{border-bottom:none}
   .dcard{border-left:4px solid var(--line)}
   .dcard.st-recruiting{border-left-color:#5d7488}.dcard.st-finalized{border-left-color:#a569bd}.dcard.st-live{border-left-color:var(--acc)}.dcard.st-done{border-left-color:#3498db}.dcard.st-settled{border-left-color:var(--gold)}.dcard.st-cancelled{border-left-color:var(--miss)}
+  /* Блок B: компактный листинг драфтов */
+  .drow{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;flex-wrap:wrap}
+  .drow:hover{background:#15202b}
+  .dpill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+  .dmain{font-size:14px}.dmeta,.dtime{font-size:12px}.dtime{margin-left:auto;text-align:right}
+  .dchev{font-size:10px;color:var(--mut);width:12px;text-align:center;flex:0 0 auto}
+  .ddet{padding:2px 14px 14px;border-top:1px solid var(--line)}
+  .p-recruiting{background:#2c3a47;color:#9fb4c6}.p-finalized{background:#3a2c47;color:#cba6e0}.p-live{background:#1f3a2a;color:var(--acc)}.p-done{background:#1f2f42;color:#7fb8e8}.p-settled{background:#3a3320;color:var(--gold)}.p-cancelled{background:#3a2424;color:#e08a8a}
+  .dfilters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  .dfilters label{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:6px}
+  .dfilters select{font-size:12px;padding:4px 8px}
   .qbid{padding:2px 7px!important;font-size:11px!important;border-radius:6px!important}.qb.qsel{box-shadow:0 0 0 2px var(--acc);position:relative;z-index:1}
   .plist .pblockh{position:sticky;top:0;background:#1a2733;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-bottom:1px solid var(--line)}
   /* --- кокпит драфта (без изменений) --- */
@@ -224,6 +235,11 @@
     <div id="secAll" class="view">
       <div class="card2">
         <h3>Все драфты — идут и состоявшиеся</h3>
+        <div class="dfilters">
+          <label>Лига <select id="fLeague" onchange="renderLobbyAll()"><option value="">все</option></select></label>
+          <label>Турнир <select id="fTournament" onchange="renderLobbyAll()"><option value="">все</option></select></label>
+          <label>Статус <select id="fStatus" onchange="renderLobbyAll()"><option value="">все</option></select></label>
+        </div>
         <div id="lobAllList"><div class="empty">загрузка…</div></div>
       </div>
     </div>
@@ -879,7 +895,7 @@ async function loadDrafts(){
     const ids=[...new Set(APPS.map(a=>a.user_id))];
     if(ids.length){const {data:pf}=await sb.from('dc_profiles').select('id,display_name').in('id',ids);(pf||[]).forEach(p=>PROFNAMES[p.id]=p.display_name);}
   }catch(e){DRAFTS=[];APPS=[];}
-  renderLobbyReg();renderLobbyAll();renderAdminDrafts();renderMine();tick();
+  renderLobbyReg();populateAllFilters();renderLobbyAll();renderAdminDrafts();renderMine();tick();
 }
 function nameOf(uid){return PROFNAMES[uid]||uid.slice(0,8);}
 function applicantNames(id){return APPS.filter(a=>a.draft_id===id).map(a=>nameOf(a.user_id)+(a.status==='accepted'?' ✓':a.status==='rejected'?' ✗':''));}
@@ -1048,28 +1064,82 @@ function renderLobbyReg(){
       <button class="btn p" style="margin-top:8px" ${applied?'disabled':''} onclick="applyToDraft(${d.id})">${applied?'Заявка отправлена ✓':'Оставить заявку ('+d.buyin+' DCC)'}</button></div>`;
   }).join(''):'<div class="empty">Сейчас нет открытых на запись драфтов.</div>';
 }
+// --- Блок B: компактный листинг драфтов ---
+const EXPANDED=new Set();                                  // id раскрытых карточек
+const STATUS_SHORT={recruiting:'запись',finalized:'запланирован',live:'LIVE',done:'сыгран',settled:'завершён',cancelled:'отменён'};
+function toggleDraftRow(id){
+  if(EXPANDED.has(id))EXPANDED.delete(id);
+  else{EXPANDED.add(id);const d=DRAFTS.find(x=>x.id===id);if(d&&['done','settled'].includes(d.status))ensureScore(id);} // очки тянем лениво, только на раскрытие и только когда драфт в наборе очков
+  renderLobbyAll();renderMine();
+}
+function draftTiming(d){                                    // правая колонка строки: тайминг/итог по статусу
+  if(d.status==='recruiting'||d.status==='finalized')
+    return `старт ${fmtStart(d.starts_at)}`+(d.starts_at?` · <span class="countdown" data-start="${d.starts_at}"></span>`:'');
+  if(d.status==='live')return 'идёт';
+  if(d.status==='done')return 'идёт подсчёт очков';
+  if(d.status==='settled'){const sc=SCORES[d.id];const w=sc&&sc.standings&&sc.standings[0];return w?`🥇 ${w.name} ${f1(w.total)}`:'завершён';}
+  if(d.status==='cancelled')return 'отменён';
+  return '';
+}
+function scoreLines(d,sc){                                  // турнирная таблица в раскрытии; медали только при settled
+  if(!sc||sc.loading)return '<div class="mut" style="margin-top:6px">считаю очки…</div>';
+  if(sc.error)return '<div class="mut" style="margin-top:6px">не удалось посчитать очки</div>';
+  if(!sc.hasRosters)return '<div class="mut" style="margin-top:6px">состав не сохранён (сыгран до подключения скоринга)</div>';
+  const medals=d.status==='settled';
+  const rows=sc.standings.map((s,i)=>{const mk=medals?(['🥇','🥈'][i]||'• '):((i+1)+'. ');
+    return `<div>${mk}${s.name} — <b>${f1(s.total)}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`;}).join('');
+  return `<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">${rows}</div>`;
+}
+function draftRemaining(d,sc){                              // «осталось сыграть» — пока матчи не доиграны
+  if(!sc||!sc.matches||!sc.matches.length||d.status==='settled')return '';
+  const total=sc.matches.length,left=sc.matches.filter(m=>m.status!=='confirmed').length;
+  return left?`<div class="mut" style="margin-top:6px">осталось сыграть: ${left} из ${total} матчей</div>`:'';
+}
+function draftRow(d,ctx){                                   // одна карточка-строка (свёрнута/раскрыта) — общая для «Все» и «Мои»
+  ctx=ctx||{};const exp=EXPANDED.has(d.id);const n=(d.match_ids||[]).length;
+  let extra='';                                            // в «Мои» — статус заявки рядом со статусом драфта
+  if(ctx.app){const as=ctx.app.status;
+    if(as==='pending')extra='<span class="dpill" style="background:#3a3320;color:var(--gold)">заявка</span>';
+    else if(as==='rejected')extra='<span class="dpill" style="background:#3a2424;color:#e08a8a">не прошёл</span>';}
+  const row=`<div class="drow" onclick="toggleDraftRow(${d.id})">
+    <span class="dpill p-${d.status}">${STATUS_SHORT[d.status]||d.status}</span>${extra}
+    <span class="dmain"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round}</span>
+    <span class="dmeta mut">слотов ${d.slots} · матчей ${n}</span>
+    <span class="dtime mut">${draftTiming(d)}</span>
+    <span class="dchev">${exp?'▲':'▼'}</span></div>`;
+  if(!exp)return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}</div>`;
+  const scoring=['done','settled'].includes(d.status);          // набор очков → один список игроков с очками; иначе один список участников
+  const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id);
+  const isAcc=myA&&myA.status==='accepted';const live=d.status==='live';
+  const enter=(live&&isAcc)?`<button class="btn p" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
+  const spectate=(live&&!isAcc)?`<button class="btn" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`:'';
+  const watch=scoring?`<button class="btn" style="margin:8px 6px 0 0" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+  let detail;
+  if(scoring){const sc=SCORES[d.id];detail=scoreLines(d,sc)+draftRemaining(d,sc);}
+  else{const acc=acceptedNames(d.id);const an=applicantNames(d.id);                        // recruiting → заявки, finalized/live → утверждённый состав
+    detail=(d.status==='recruiting')
+      ?`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`
+      :`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`;}
+  return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}<div class="ddet">${detail}<br>${enter}${spectate}${watch}</div></div>`;
+}
+const STORDER=['recruiting','finalized','live','done','settled','cancelled'];
+function fillSel(id,opts){const s=document.getElementById(id);if(!s)return;const cur=s.value;
+  s.innerHTML='<option value="">все</option>'+opts.map(o=>`<option value="${o.v}"${o.v===cur?' selected':''}>${o.t}</option>`).join('');}
+function populateAllFilters(){                              // опции фильтров из реально присутствующих в DRAFTS значений, выбор сохраняется
+  fillSel('fLeague',[...new Set(DRAFTS.map(d=>d.league))].filter(Boolean).map(l=>({v:l,t:(LEAGUE_ICON[l]||'')+' '+l})));
+  fillSel('fTournament',[...new Set(DRAFTS.map(d=>d.tournament))].filter(Boolean).map(t=>({v:t,t})));
+  fillSel('fStatus',[...new Set(DRAFTS.map(d=>d.status))].filter(Boolean).sort((a,b)=>STORDER.indexOf(a)-STORDER.indexOf(b)).map(s=>({v:s,t:STATUS_SHORT[s]||s})));
+}
 function renderLobbyAll(){
   const el=document.getElementById('lobAllList');if(!el)return;
-  el.innerHTML=DRAFTS.length?DRAFTS.map(d=>{
-    const fin=d.status!=='recruiting';const acc=acceptedNames(d.id);const an=applicantNames(d.id);
-    const block=fin
-      ?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
-      :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
-    const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id);
-    const isAcc=myA&&myA.status==='accepted';const live=d.status==='live';
-    const enter=(live&&isAcc)?`<button class="btn p" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
-    const spectate=(live&&!isAcc)?`<button class="btn" style="margin:6px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`:'';
-    const watch=(d.status==='done'||d.status==='settled')?`<button class="btn" style="margin-top:6px" onclick="openViewer(${d.id})">Смотреть</button>`:'';
-    let scoreBlock='';
-    if(d.status==='done'||d.status==='settled'){const sc=SCORES[d.id];
-      if(!sc){ensureScore(d.id);scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';}
-      else if(sc.loading)scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';
-      else if(sc.error)scoreBlock='<div class="mut" style="margin-top:6px">не удалось посчитать очки</div>';
-      else if(!sc.hasRosters)scoreBlock='';
-      else scoreBlock=`<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">`+sc.standings.map((s,i)=>`<div>${['🥇','🥈'][i]||'• '}${s.name} — <b>${f1(s.total)}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`).join('')+'</div>';
-    }
-    return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · матчей ${(d.match_ids||[]).length}${block}${scoreBlock}<br>${enter}${spectate}${watch}</div>`;
-  }).join(''):'<div class="empty">Драфтов пока нет.</div>';
+  const v=id=>{const s=document.getElementById(id);return s?s.value:'';};
+  const fl=v('fLeague'),ft=v('fTournament'),fs=v('fStatus');
+  let list=DRAFTS;
+  if(fl)list=list.filter(d=>d.league===fl);
+  if(ft)list=list.filter(d=>d.tournament===ft);
+  if(fs)list=list.filter(d=>d.status===fs);
+  if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов пока нет.</div>';return;}
+  el.innerHTML=list.length?list.map(d=>draftRow(d)).join(''):'<div class="empty">Под фильтр ничего не подходит.</div>';
 }
 function renderAdminDrafts(){
   const el=document.getElementById('adminDraftsList');if(!el)return;
@@ -1106,30 +1176,7 @@ async function deleteDraft(id){
   if(error){if(m)m.textContent='не удалось удалить: '+error.message;return;}
   if(m)m.textContent='драфт удалён';delete SCORES[id];await loadDrafts();
 }
-function mineCard(a,d){
-  const cd=(d.starts_at&&d.status!=='live'&&d.status!=='done'&&d.status!=='settled')?` · до старта <span class="countdown" data-start="${d.starts_at}"></span>`:'';
-  const fin=(d.status!=='recruiting');const acc=acceptedNames(d.id),an=applicantNames(d.id);
-  const block=fin?`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`
-    :`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`;
-  let st,enter='';
-  if(a.status==='pending')st='<span class="badge">заявка на рассмотрении</span>';
-  else if(a.status==='rejected')st='<span class="badge">не прошёл в этот раз</span>';
-  else if(d.status==='live'){st='<span class="badge admin">LIVE — идёт</span>';enter=` <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button>`;}
-  else if(d.status==='finalized')st='<span class="badge admin">вы в составе ✓ — ждите старта</span>';
-  else if(d.status==='recruiting')st='<span class="badge admin">приняты, ждём финализации состава</span>';
-  else st='';
-  let scoreBlock='';
-  if(d.status==='done'||d.status==='settled'){const sc=SCORES[d.id];
-    if(!sc){ensureScore(d.id);scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';}
-    else if(sc.loading)scoreBlock='<div class="mut" style="margin-top:6px">считаю очки…</div>';
-    else if(sc.error)scoreBlock='<div class="mut" style="margin-top:6px">не удалось посчитать очки</div>';
-    else if(!sc.hasRosters)scoreBlock='<div class="mut" style="margin-top:6px">состав не сохранён (сыгран до подключения скоринга)</div>';
-    else scoreBlock=`<div class="mut" style="margin:6px 0 2px">очки${sc.allConfirmed?' (финал)':' (предварительно)'}:</div><div class="applist">`+sc.standings.map((s,i)=>`<div>${['🥇','🥈'][i]||'• '}${s.name} — <b>${f1(s.total)}</b>${s.subUsed?' <span class="mut">(зам)</span>':''}</div>`).join('')+'</div>';
-  }
-  const watch=(d.status==='live'||d.status==='done'||d.status==='settled')?` <button class="btn" onclick="openViewer(${d.id})">Смотреть</button>`:'';
-  return `<div class="card2 dcard st-${d.status}" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${STATUS_RU[d.status]||d.status}</span><br>старт: ${fmtStart(d.starts_at)}${cd} · бай-ин ${d.buyin} DCC${block}${scoreBlock}<br>${st}${enter}${watch}</div>`;
-}
-function renderMine(){
+function renderMine(){                                      // «Мои драфты» — те же компактные строки, с группировкой и статусом заявки
   const el=document.getElementById('mineList');if(!el)return;
   const dById={};DRAFTS.forEach(d=>dById[d.id]=d);
   const mine=APPS.filter(a=>a.user_id===session.user.id);
@@ -1139,7 +1186,7 @@ function renderMine(){
     if(d.status==='settled'||d.status==='cancelled')g.past.push([a,d]);
     else if(d.status==='live'||d.status==='done')g.live.push([a,d]);
     else g.planned.push([a,d]);}
-  const sec=(t,arr)=>arr.length?`<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase">${t}</h3>`+arr.map(([a,d])=>mineCard(a,d)).join(''):'';
+  const sec=(t,arr)=>arr.length?`<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase">${t}</h3>`+arr.map(([a,d])=>draftRow(d,{app:a})).join(''):'';
   el.innerHTML=(sec('LIVE',g.live)+sec('Запланированные',g.planned)+sec('Прошедшие',g.past))||'<div class="empty">—</div>';
 }
 async function loadFlags(){try{const r=await fetch('/api/flags');const j=await r.json();AUTOPLAY_ON=!!j.autoplay;const c=document.getElementById('autoToggle');if(c)c.checked=AUTOPLAY_ON;}catch{}}
