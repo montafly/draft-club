@@ -493,7 +493,7 @@ function broadcast(code) {
   const state = e.room.serialize();
   if (state.lobby) state.lobby.rtc = [...e.clients]    // все в комнате для mesh: {id(rtcId), name, seat|null}
     .filter((c) => c.user && c.rtcId)
-    .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId }));
+    .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId, uid: c.user.id }));
   const msg = JSON.stringify({ type: 'state', state });
   for (const c of e.clients) if (c.readyState === 1) c.send(msg);
 }
@@ -533,12 +533,20 @@ async function joinAuthed(ws, msg) {
   const prof = await getProfile(user.id);
   const name = (prof && prof.display_name) || (user.email || 'Player').split('@')[0];
   ws.user = user;
+  if (msg.voice) {                                     // голосовой компаньон: тот же аккаунт со второго устройства ТОЛЬКО для голоса
+    ws.voice = true;                                   // НЕ занимаем/не реюзаем место → seatId=null → действия запрещены, presence места на ПК не трогаем
+    ws.name = name + ' (голос)';                       // в mesh виден как отдельный голосовой пир
+    ws.seatId = null;
+    ws.send(JSON.stringify({ type: 'joined', you: null, name: ws.name, rtc: ws.rtcId, uid: user.id, voice: true }));
+    broadcast(ws.roomCode);
+    return;
+  }
   ws.name = name;                                      // имя для списка rtc-пиров в стейте
   const e = ws.roomCode ? rooms.get(ws.roomCode) : null;
   const id = e ? e.room.join(user.id, name) : null;
   ws.seatId = id;                                      // null = зритель (не принят / мест нет)
   if (id === null && e) e.room.addSpectator(user.id, name);
-  ws.send(JSON.stringify({ type: 'joined', you: id, name, rtc: ws.rtcId }));
+  ws.send(JSON.stringify({ type: 'joined', you: id, name, rtc: ws.rtcId, uid: user.id }));
   broadcast(ws.roomCode);
 }
 
@@ -601,7 +609,7 @@ wss.on('connection', (ws) => {
     if (!e) return;
     e.clients.delete(ws);
     if (ws.seatId) e.room.disconnect(ws.seatId);
-    else if (ws.user) e.room.removeSpectator(ws.user.id);
+    else if (ws.user && !ws.voice) e.room.removeSpectator(ws.user.id); // voice-компаньон зрителем не числится — присутствие места на ПК не трогаем
     broadcast(ws.roomCode);
   });
 });

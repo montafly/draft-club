@@ -189,6 +189,7 @@
   #hist{display:none;position:fixed;inset:0;background:#000a;padding:40px;overflow:auto;z-index:10}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -395,6 +396,7 @@
   <div id="draftbar">
     <button class="btn" onclick="leaveDraft()" title="Выйти из комнаты">← Выйти</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
+    <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
     <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><span id="specCtl" class="myctl"></span><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
@@ -421,6 +423,30 @@
 </div>
 
 <div id="rtcSink" style="display:none"></div>
+
+<style>
+#voiceMicBtn svg{width:48px;height:48px;stroke-width:2}
+#voiceMicBtn.on{border-color:var(--acc);color:var(--acc);box-shadow:0 0 30px -4px var(--acc)}
+</style>
+<div id="voicePane" style="display:none;position:fixed;inset:0;z-index:60;background:var(--bg);color:var(--txt);flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;text-align:center">
+  <div style="font-size:20px;font-weight:800">Голосовой режим</div>
+  <div style="color:var(--mut);max-width:320px;line-height:1.5">Вы подключены только голосом. Играете с другого устройства — здесь работает лишь микрофон.</div>
+  <button id="voiceMicBtn" onclick="voiceMicTap()" style="width:124px;height:124px;border-radius:50%;border:2px solid var(--line);background:var(--panel);color:var(--mut);display:flex;align-items:center;justify-content:center;cursor:pointer"></button>
+  <div id="voiceHint" style="font-size:15px;font-weight:600">Нажмите, чтобы говорить</div>
+  <div id="voiceErr" style="color:var(--miss);font-size:13px;max-width:340px;line-height:1.5"></div>
+  <div id="voiceRoom" style="color:var(--mut);font-size:12px"></div>
+  <div style="color:var(--mut);font-size:11px;max-width:320px;line-height:1.5">iOS: голос работает только в Safari или встроенном браузере Telegram (в Chrome для iOS микрофон недоступен).</div>
+</div>
+
+<div id="voiceInvite" style="display:none;position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:430px;width:100%;padding:20px;color:var(--txt)">
+    <div style="font-size:16px;font-weight:800;margin-bottom:8px">Подключить телефон голосом</div>
+    <div style="color:var(--mut);font-size:13px;line-height:1.5;margin-bottom:12px">Откройте ссылку на телефоне. Телефон подключится только для голоса и НЕ займёт ваше место — вы продолжаете играть здесь. На iOS откройте в Safari или встроенном браузере Telegram.</div>
+    <div style="display:flex;gap:8px;margin-bottom:6px"><input id="voiceLink" readonly style="flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--txt);font-size:12px"><button class="btn" onclick="copyVoiceLink()">Копировать</button></div>
+    <div id="voiceQr" style="display:flex;justify-content:center;margin:14px 0;background:#fff;border-radius:8px;padding:12px"></div>
+    <div style="text-align:right;margin-top:10px"><button class="btn" onclick="closeVoiceInvite()">Закрыть</button></div>
+  </div>
+</div>
 
 <div id="drawOverlay"><div class="dwbox" id="drawBody"></div></div>
 
@@ -450,11 +476,11 @@ const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
 const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-let me=null,myRtc=null,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
+let me=null,myRtc=null,myUid=null,VOICE=false,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
-  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:`${myName} · зритель`;}
+  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}};
@@ -482,6 +508,7 @@ function rtcTileVideo(rid){ // видео-элемент для плитки .ca
 }
 function rtcAudioSink(rid,stream){ // скрытое воспроизведение аудио пира (своё аудио НЕ играем — иначе эхо)
   rid=String(rid);if(rid===String(myRtc))return;
+  if(myUid){const p=rtcList().find(x=>String(x.id)===rid);if(p&&p.uid===myUid)return;} // своё второе устройство — не проигрываем (страховка от эха)
   let a=RTC.audioEls[rid];const sink=document.getElementById('rtcSink');
   if(!a){a=document.createElement('audio');a.autoplay=true;RTC.audioEls[rid]=a;if(sink)sink.appendChild(a);}
   if(a.srcObject!==stream)a.srcObject=stream;
@@ -545,7 +572,7 @@ function rtcClosePc(peer){const key=String(peer);
   delete RTC.streams[key];delete RTC.camState[key];delete RTC.micState[key];delete RTC.localMute[key];spkDetach(key);placeVideos();renderParts();}
 async function connectPeers(){ // полный mesh: все в комнате, кроме себя (игроки и зрители)
   if(!RTC.on||myRtc==null||!S||!S.lobby)return;
-  const peers=rtcList().map(p=>p.id).filter(id=>id!==myRtc);
+  const peers=rtcList().filter(p=>p.id!==myRtc&&p.uid!==myUid).map(p=>p.id); // своё второе устройство (тот же uid, напр. голосовой компаньон) в mesh не тянем → нет эха
   for(const peer of peers)if(!RTC.pcs[String(peer)])await rtcMakePc(peer);
   const keep=new Set(peers.map(String));
   for(const k of Object.keys(RTC.pcs))if(!keep.has(k))rtcClosePc(k);
@@ -567,7 +594,7 @@ async function rtcStart(){
     for(const k of Object.keys(RTC.pcs)){const st=RTC.pcs[k];if(!st.hasLocal){st.hasLocal=true;RTC.stream.getTracks().forEach(t=>st.pc.addTrack(t,RTC.stream));}} // дорожки в уже созданные (через входящий сигнал) пиры → negotiationneeded → оффер
     for(const k in RTC.pcs)rtcSignal(k,{cam:RTC.camOn,mic:RTC.micOn});
     placeVideos();updateRtcBtns();renderParts();
-  }catch(e){RTC.on=false;updateRtcBtns();showErr('Камера/микрофон: '+((e&&e.message)||e));}
+  }catch(e){RTC.on=false;RTC.lastErr=(e&&e.message)||String(e);updateRtcBtns();showErr('Камера/микрофон: '+RTC.lastErr);}
 }
 async function rtcMicClick(){ if(!RTC.on)await rtcStart(); else toggleCockpitMic(); }
 async function rtcCamClick(){ if(me==null)return; if(!RTC.on){await rtcStart();toggleCockpitCam();} else toggleCockpitCam(); }
@@ -691,7 +718,8 @@ async function onAuthed(){
   showApp(); showSection(viewFromUrl()||'lobby');
   tick(); loadDrafts(); loadFlags();
   // п.1: при F5 в руме — восстанавливаем комнату (enterRoom→'room'→onRoom покажет драфт поверх). Мёртвая комната → мягкий фолбэк на лобби.
-  const room=new URLSearchParams(location.search).get('room'); if(room){document.getElementById('lcode').value=room; if(ws.readyState===1)enterRoom(room); else ws.addEventListener('open',()=>enterRoom(room),{once:true});} // ждём открытия сокета (F5 может опередить ws.onopen)
+  const params=new URLSearchParams(location.search); const room=params.get('room'); const voice=params.get('voice')==='1';
+  if(room){document.getElementById('lcode').value=room; const go=()=>enterRoom(room,voice); if(ws.readyState===1)go(); else ws.addEventListener('open',go,{once:true});} // ждём открытия сокета (F5 может опередить ws.onopen)
 }
 function renderProfileUI(){
   const isAdmin=PROFILE.role==='admin';
@@ -1330,7 +1358,7 @@ async function launchDraftBtn(id){
     await loadDrafts();
   }catch(e){if(m)m.textContent='ошибка запуска: '+e.message;}
 }
-async function enterRoom(code){if(!code)return;const t=await authToken();if(!t){showAuth();return;}send({type:'joinRoom',code,token:t});}
+async function enterRoom(code,voice){if(!code)return;const t=await authToken();if(!t){showAuth();return;}VOICE=!!voice;send({type:'joinRoom',code,token:t,...(voice?{voice:true}:{})});}
 async function applyToDraft(id){
   const le=document.getElementById('lerr');
   const {error}=await sb.from('dc_applications').insert({draft_id:id,user_id:session.user.id});
@@ -1356,14 +1384,48 @@ async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
-function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code);setVp(true);
+function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code+(VOICE?'&voice=1':''));
+  if(VOICE){enterVoiceMode(code);return;}                                  // голосовой компаньон: показываем только панель мика, игровой UI скрыт
+  setVp(true);
   document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
   document.getElementById('backToDraftBtn').style.display='none'; // мы в драфте — «вернуться» не нужно
-  const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
+  const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';
+  document.getElementById('callPhoneBtn').style.display='inline-block';}
+function enterVoiceMode(code){setVp(false); // телефон-режим: device-width, простая панель вместо десктоп-кокпита
+  for(const id of ['landing','topbar','app','draft','viewer'])document.getElementById(id).style.display='none';
+  const vp=document.getElementById('voicePane');vp.style.display='flex';
+  document.getElementById('voiceRoom').textContent='Комната '+code;
+  renderVoicePane();}
+async function voiceMicTap(){ // первый тап → getUserMedia (нужен жест пользователя, особенно iOS), далее тумблер мика
+  const err=document.getElementById('voiceErr');if(err)err.textContent='';
+  if(!RTC.on){
+    if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ // мик доступен только на HTTPS (или localhost) — на http телефон не пустит
+      if(err)err.textContent='Микрофон доступен только по HTTPS. Откройте страницу по https-адресу (на проде так и есть); локальный http телефон к микрофону не пускает.';
+      return;
+    }
+    RTC.lastErr='';await rtcMicClick();
+    if(!RTC.on&&err){err.textContent='Не удалось включить микрофон: '+(RTC.lastErr||'нет доступа. Разрешите микрофон в настройках браузера.');}
+  } else { toggleCockpitMic(); }
+  renderVoicePane();}
+function renderVoicePane(){const b=document.getElementById('voiceMicBtn');if(!b)return;
+  const live=RTC.on,on=RTC.on&&RTC.micOn;
+  b.classList.toggle('on',on);
+  b.innerHTML=on?IC.mic:IC.micOff;
+  document.getElementById('voiceHint').textContent=!live?'Нажмите, чтобы говорить':(on?'Микрофон включён — вас слышно':'Микрофон выключен');}
 function leaveDraft(){location.href='/';}
 // профиль/разделы из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату; навигация — через общую шапку (navClick)
 function backToDraft(){setVp(true);document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
+function voiceInviteUrl(){return location.origin+'/?room='+myRoom+'&voice=1';}
+function openVoiceInvite(){if(!myRoom)return;const u=voiceInviteUrl();document.getElementById('voiceLink').value=u;renderVoiceQr(u);document.getElementById('voiceInvite').style.display='flex';}
+function renderVoiceQr(url){const box=document.getElementById('voiceQr');if(!box)return;
+  if(typeof qrcode!=='function'){box.style.display='none';return;} // библиотека не загрузилась — тихо прячем QR, ссылка остаётся
+  try{const qr=qrcode(0,'M');qr.addData(url);qr.make();box.innerHTML=qr.createSvgTag({cellSize:5,margin:0,scalable:true});
+    const svg=box.querySelector('svg');if(svg){svg.style.width='180px';svg.style.height='180px';svg.removeAttribute('width');svg.removeAttribute('height');}
+    box.style.display='flex';
+  }catch(e){box.style.display='none';}}
+function closeVoiceInvite(){document.getElementById('voiceInvite').style.display='none';}
+function copyVoiceLink(){const u=voiceInviteUrl();try{navigator.clipboard.writeText(u);showErr('ссылка скопирована');}catch{const el=document.getElementById('voiceLink');el.focus();el.select();}}
 initAuth();
 function send(o){ws.send(JSON.stringify(o));}
 function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
