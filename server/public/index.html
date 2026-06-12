@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" id="vp" content="width=device-width, initial-scale=1">
 <title>Draft Club</title>
 <style>
   :root{--bg:#0d1419;--panel:#16212c;--line:#243240;--txt:#e7edf3;--mut:#8aa0b2;--acc:#27ae60;--gold:#e8c372;--miss:#ec7063}
@@ -123,6 +123,8 @@
   .vteam tr.plive td{background:rgba(47,129,247,.16)}                 /* игрок сейчас играет — лаконичная синяя подсветка строки (#11) */
   .vteam tr.sdead td{background:rgba(125,141,160,.14);opacity:.6}     /* замена уже не может выйти в старт — серая (#12) */
   .vteam tr.sdead.subr td{background:rgba(224,80,80,.14)}             /* + красный оттенок, если это именно замена-«мертвяк» */
+  /* тесная раскладка (мобильный viewport=1200 или узкое окно): жмём имя+паддинги, чтобы колонка очков влезла в карточку */
+  @media(max-width:1320px){.vteam td.nm,.vteam th.pl{max-width:60px;overflow:hidden;text-overflow:ellipsis}.vteam th,.vteam td{padding:2px 3px}}
   /* легенда статусов — столбиком, в верх страницы (#11) */
   .vlegend{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mut);margin:0 0 10px;line-height:1.5}
   /* матчи — статистика игроков, блок под участниками с контуром (#6); контур по контенту, прижат влево, не во всю страницу (#14) */
@@ -898,7 +900,7 @@ const FTPOS={goalkeeper:['GK','gk'],defender:['DEF','def'],midfielder:['MID','mi
 function posClass(p){return FTPOS[p]?FTPOS[p][1]:(p||'').toLowerCase();}
 let viewerPoll=null,viewerUpdTick=null;
 function stopViewerPoll(){if(viewerPoll){clearInterval(viewerPoll);viewerPoll=null;}if(viewerUpdTick){clearInterval(viewerUpdTick);viewerUpdTick=null;}}
-function closeViewer(){document.getElementById('viewer').style.display='none';stopViewerPoll();}
+function closeViewer(){document.getElementById('viewer').style.display='none';document.getElementById('vp').setAttribute('content','width=device-width, initial-scale=1');stopViewerPoll();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('viewer').style.display==='block')closeViewer();});
 // относительное время последнего пересчёта очков (#7: «обновлено X назад»)
 function relTime(ms){if(!ms)return '';const s=Math.round((Date.now()-ms)/1000);if(s<10)return 'только что';if(s<60)return s+' сек назад';const m=Math.round(s/60);if(m<60)return m+' мин назад';return Math.round(m/60)+' ч назад';}
@@ -908,6 +910,7 @@ async function openViewer(id){
   VIEW={draft:d,score:null,fixtures:[]};
   document.getElementById('vTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league} · ${d.tournament}, тур ${d.round}`;
   document.getElementById('viewer').style.display='block';
+  document.getElementById('vp').setAttribute('content','width=1200');   // итоги на телефоне: десктоп 1:1, можно масштабировать пальцами
   document.getElementById('vRibbon').innerHTML='';document.getElementById('vLive').innerHTML='';document.getElementById('vUpd').textContent='';
   document.getElementById('vTeams').innerHTML='<div class="mut">загрузка…</div>';
   await loadViewer(id,true);
@@ -923,6 +926,7 @@ async function loadViewer(id,initial,force){
 }
 async function refreshViewer(b){if(!VIEW||!VIEW.draft)return;if(b){b.disabled=true;b.textContent='…';}await loadViewer(VIEW.draft.id,false,true);if(b){b.disabled=false;b.textContent='Обновить';}}
 const f1=v=>(v==null||v===''?'':Number(v).toFixed(1));
+const fpts=p=>p.mstatus==='pending'?'<span class="mut">–</span>':(p.counted?'<b>'+f1(p.points)+'</b>':f1(p.points));   // ещё не сыграл → прочерк, а не 0 (dnp/live остаются числом)
 const VSTAT={played:'<span class="vok">✓</span>',final:'<span class="vok">✓</span>',dnp:'<span class="vno">✗</span>',live:'<span class="vlive">●</span>',pending:'⏳'};
 function renderViewerTeams(){
   const el=document.getElementById('vTeams');const sc=VIEW.score;
@@ -937,8 +941,8 @@ function renderViewerTeams(){
     const starters=t.players.filter(p=>!p.isSub).slice().sort(pOrder==='draft'?byDraft:byPos);
     const sub=t.players.find(p=>p.isSub);
     let n=0;
-    let body=starters.map(p=>{n++;return `<tr class="${p.mstatus==='live'?'plive':''}"><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${p.counted?'<b>'+f1(p.points)+'</b>':f1(p.points)}</td></tr>`;}).join('');
-    if(sub)body+=`<tr class="subr${sub.counted?' counted':''}${sub.mstatus==='dnp'?' sdead':''}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td>${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td>${sub.cost!=null?'$'+sub.cost:''}</td><td>${sub.counted?'<b>'+f1(sub.points)+'</b>':f1(sub.points)}</td></tr>`;
+    let body=starters.map(p=>{n++;return `<tr class="${p.mstatus==='live'?'plive':''}"><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td>${fpts(p)}</td></tr>`;}).join('');
+    if(sub)body+=`<tr class="subr${sub.counted?' counted':''}${sub.mstatus==='dnp'?' sdead':''}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td>${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td>${sub.cost!=null?'$'+sub.cost:''}</td><td>${fpts(sub)}</td></tr>`;
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
