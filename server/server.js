@@ -344,6 +344,19 @@ async function scoreDraftCached(draftId, force) {
   return { ...data, updatedAt: at };
 }
 
+// Сводка тура для предпросмотра драфта в лобби (матчи + котировки клубов), кэш 60с — один запрос к FanTeam на драфт.
+const tourCache = new Map(); // draftId -> { t, data }
+async function tourForDraftCached(draftId) {
+  const c = tourCache.get(draftId), now = Date.now();
+  if (c && now - c.t < 60000) return c.data;
+  const rows = await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round,match_ids,league,tournament`); const d = rows[0];
+  if (!d) throw new Error('драфт не найден');
+  const { clubOdds, fixtures } = await tourInfo(d.season_id, d.round, d.match_ids);
+  const data = { league: d.league, tournament: d.tournament, round: d.round, clubOdds, fixtures };
+  tourCache.set(draftId, { t: now, data });
+  return data;
+}
+
 const rooms = new Map(); // code -> { room, clients:Set<ws> }
 let autoplayEnabled = false; // тумблер авто-доигрывания (для теста), по умолчанию выкл — в проде остаётся off
 function makeCode() {
@@ -405,6 +418,15 @@ const server = http.createServer((req, res) => {
     const draftId = q.get('draftId');
     if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
     scoreDraftCached(draftId, q.get('force') === '1')
+      .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
+      .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/draft/tour') {
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    const draftId = q.get('draftId');
+    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    tourForDraftCached(draftId)
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
     return;
