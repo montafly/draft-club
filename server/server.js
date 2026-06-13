@@ -357,6 +357,19 @@ async function tourForDraftCached(draftId) {
   return data;
 }
 
+// Пул игроков драфта для предпросмотра в лобби (как пул аукциона). Тяжёлый (per-match membership) → кэш 10 мин: предматчевые составы стабильны.
+const poolCache = new Map(); // draftId -> { t, data }
+async function poolForDraftCached(draftId) {
+  const c = poolCache.get(draftId), now = Date.now();
+  if (c && now - c.t < 600000) return c.data;
+  const rows = await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round,match_ids`); const d = rows[0];
+  if (!d) throw new Error('драфт не найден');
+  const { units, clubOdds, matches } = await buildDraftPool(d.season_id, d.round, d.match_ids);
+  const data = { units, clubOdds, matches };
+  poolCache.set(draftId, { t: now, data });
+  return data;
+}
+
 const rooms = new Map(); // code -> { room, clients:Set<ws> }
 let autoplayEnabled = false; // тумблер авто-доигрывания (для теста), по умолчанию выкл — в проде остаётся off
 function makeCode() {
@@ -427,6 +440,15 @@ const server = http.createServer((req, res) => {
     const draftId = q.get('draftId');
     if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
     tourForDraftCached(draftId)
+      .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
+      .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/draft/pool') {
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    const draftId = q.get('draftId');
+    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    poolForDraftCached(draftId)
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
     return;

@@ -428,6 +428,7 @@
 #voiceMicBtn svg{width:48px;height:48px;stroke-width:2}
 #voiceMicBtn.on{border-color:var(--acc);color:var(--acc);box-shadow:0 0 30px -4px var(--acc)}
 #voiceListenBtn.on{border-color:var(--acc);color:var(--acc)}
+#mplist{max-height:62vh}#mplist .pitem{cursor:default}#mplist .pitem:hover{background:#1d2935}
 </style>
 <div id="voicePane" style="display:none;position:fixed;inset:0;z-index:60;background:var(--bg);color:var(--txt);flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;text-align:center">
   <div style="font-size:20px;font-weight:800">Голосовой режим</div>
@@ -451,9 +452,12 @@
 </div>
 
 <div id="matchesModal" style="display:none;position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeDraftMatches()">
-  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow:auto;padding:20px;color:var(--txt)">
+  <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:1040px;width:100%;max-height:88vh;display:flex;flex-direction:column;padding:18px;color:var(--txt)">
     <div class="row" style="margin-bottom:10px"><h3 id="matchesTitle" style="flex:1;margin:0;font-size:15px"></h3><button class="btn" onclick="closeDraftMatches()">Закрыть</button></div>
-    <div id="matchesBody"></div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;overflow:auto;min-height:0;align-items:flex-start">
+      <div id="matchesBody" style="flex:1 1 320px;min-width:280px"></div>
+      <div id="matchesPool" style="flex:1 1 320px;min-width:280px"></div>
+    </div>
   </div>
 </div>
 
@@ -1118,6 +1122,7 @@ function renderViewerTeams(){
   document.getElementById('vRibbon').innerHTML=(sc.standings||[]).map((s,i)=>`<div class="chip ${final&&i===0?'me':''}"><b>${final?(i===0?'🥇 ':(i===1?'🥈 ':'')):''}${s.name}</b> · <span class="b">${f1(s.total)}</span></div>`).join('');
   const ptsPool=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(isPlayed(p)&&p.points!=null)ptsPool.push(p.points);})); // мин/макс по всем сыгравшим игрокам драфта (общий пул → цвета сравнимы между участниками)
   const ptsGrad=makeGrad(ptsPool);
+  const totGrad=makeGrad(sc.teams.map(t=>t.total)); // «Итого» — градиент по суммарным очкам участников (пул = тоталы команд)
   const cols=sc.teams.map((t)=>{
     const byDraft=(a,b)=>(a.draftOrder!=null?a.draftOrder:1e9)-(b.draftOrder!=null?b.draftOrder:1e9);
     const byPos=(a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position);
@@ -1131,7 +1136,7 @@ function renderViewerTeams(){
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
     return `<div class="vteam${lead}"><div class="vthead"><span class="vtn">${medal}${t.name}${fin}</span><span class="vtp">${f1(t.total)}</span></div>
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
-      <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td>${f1(t.total)}</td></tr></tfoot></table></div>`;
+      <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
   const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="position:static;width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт матч</span></div>`;
@@ -1235,11 +1240,46 @@ function renderLobbyReg(){
 async function openDraftMatches(id){
   const m=document.getElementById('matchesModal'),body=document.getElementById('matchesBody'),d=DRAFTS.find(x=>x.id===id)||{};
   document.getElementById('matchesTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league||''} · ${d.tournament||''}, тур ${d.round||''}`;
-  body.innerHTML='<div class="mut">Загрузка…</div>';m.style.display='flex';
+  body.innerHTML='<div class="mut">Загрузка…</div>';document.getElementById('matchesPool').innerHTML='';m.style.display='flex';
   try{const r=await fetch('/api/draft/tour?draftId='+id);const j=await r.json();if(j.error)throw new Error(j.error);renderDraftMatches(j);}
   catch(e){body.innerHTML='<div class="err">Не удалось загрузить матчи: '+((e&&e.message)||e)+'</div>';}
+  loadModalPool(id); // правая панель — браузер игроков (тяжёлый пул, грузим отдельно)
 }
 function closeDraftMatches(){document.getElementById('matchesModal').style.display='none';}
+// Браузер игроков в модалке (предпросмотр, read-only): список+фильтры как в драфте, но на пуле из /api/draft/pool. Своё состояние/ids, чтобы не пересекаться с боевым POOL.
+let MPOOL=[],mpFilt={q:'',t:'',p:''};
+async function loadModalPool(id){
+  const wrap=document.getElementById('matchesPool');if(!wrap)return;
+  wrap.innerHTML='<div class="mut">Загрузка игроков… (первый раз до ~5с)</div>';
+  try{const r=await fetch('/api/draft/pool?draftId='+id);const j=await r.json();if(j.error)throw new Error(j.error);
+    MPOOL=j.units||[];mpFilt={q:'',t:'',p:''};renderModalPoolUI();}
+  catch(e){wrap.innerHTML='<div class="err">Не удалось загрузить игроков: '+((e&&e.message)||e)+'</div>';}
+}
+function renderModalPoolUI(){
+  const wrap=document.getElementById('matchesPool');if(!wrap)return;
+  const teams=[...new Set(MPOOL.map(u=>u.club))].sort();
+  const poss=POSORD.filter(p=>MPOOL.some(u=>u.position===p));
+  wrap.innerHTML=`<div style="font-weight:700;color:var(--mut);font-size:12px;margin-bottom:6px">Игроки (${MPOOL.length}) — предпросмотр</div>
+    <div class="filters">
+      <input id="mpq" placeholder="поиск по фамилии…" value="${mpFilt.q||''}" oninput="renderModalPool()">
+      <select id="mpt" onchange="renderModalPool()"><option value="">все клубы</option>${teams.map(t=>`<option ${t===mpFilt.t?'selected':''}>${t}</option>`).join('')}</select>
+      <select id="mpp" onchange="renderModalPool()"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}" ${p===mpFilt.p?'selected':''}>${posShort(p)}</option>`).join('')}</select>
+    </div><div class="plist" id="mplist"></div>`;
+  renderModalPool();
+}
+function renderModalPool(){
+  const q=(document.getElementById('mpq')?.value||'').toLowerCase(),t=document.getElementById('mpt')?.value||'',p=document.getElementById('mpp')?.value||'';
+  mpFilt={q,t,p};
+  const list=MPOOL.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
+  const el=document.getElementById('mplist');if(!el)return;
+  let html='';
+  for(const pos of POSORD){
+    const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
+    if(!grp.length)continue;
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span></div>`).join('');
+  }
+  el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
+}
 function renderDraftMatches(j){
   const body=document.getElementById('matchesBody'),fx=j.fixtures||[],od=j.clubOdds||[];
   const fixTbl=fx.length?'<table style="font-size:12px;width:auto"><tbody>'+fx.map(m=>{
@@ -1247,7 +1287,7 @@ function renderDraftMatches(j){
     return `<tr><td style="text-align:right;padding:2px 6px">${m.home}</td><td style="padding:2px 6px;color:var(--mut)">—</td><td style="padding:2px 6px">${m.away}</td><td style="padding:2px 0 2px 12px">${st}</td></tr>`;
   }).join('')+'</tbody></table>':'<div class="mut">Матчи не найдены.</div>';
   const rows=od.slice().sort((a,b)=>{const x=(b.xg==null?-1:b.xg)-(a.xg==null?-1:a.xg);return x||String(a.club).localeCompare(String(b.club));});
-  const oddTbl=rows.length?'<table style="font-size:12px"><thead><tr><th>КЛУБ</th><th class="right">П%</th><th class="right">xG</th><th class="right">CS</th></tr></thead><tbody>'+
+  const oddTbl=rows.length?'<table style="font-size:12px;width:100%"><thead><tr><th>КЛУБ</th><th class="right">П%</th><th class="right">xG</th><th class="right">CS</th></tr></thead><tbody>'+
     rows.map(r=>`<tr><td title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg!=null?r.xg:'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>':'<div class="mut">Коэффициенты пока не опубликованы FanTeam.</div>';
   body.innerHTML=`<div style="font-weight:700;color:var(--mut);font-size:12px;margin-bottom:4px">Матчи (${fx.length})</div>${fixTbl}<div style="font-weight:700;color:var(--mut);font-size:12px;margin:14px 0 4px">Коэффициенты · П% · xG · CS</div>${oddTbl}`;
 }
