@@ -1047,6 +1047,7 @@ const LEAGUE_ICON={BRONZE:'🟤',SILVER:'⚪',GOLDEN:'🟡'};
 const STATUS_RU={recruiting:'идёт запись',finalized:'запланирован',live:'идёт',done:'сыгран · подсчёт очков',settled:'сыгран · очки подсчитаны',cancelled:'отменён'};
 let DRAFTS=[],APPS=[],MYAPPS=new Set(),PROFNAMES={},SCORES={},AUTOPLAY_ON=false;
 function fmtStart(iso){if(!iso)return 'время не задано';try{return new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(iso))+' ('+tzLabel()+')';}catch{return iso;}}
+function fmtPlayed(iso){if(!iso)return '';try{const dt=new Date(iso);const wd=new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,weekday:'short'}).format(dt);const md=new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(dt);return `${wd} ${md}`;}catch{return '';}} // короткий день недели + дата/время в выбранной TZ (для сыгранных драфтов)
 async function loadDrafts(){
   try{
     const {data:dr}=await sb.from('dc_drafts').select('*').order('created_at',{ascending:false});DRAFTS=dr||[];
@@ -1257,8 +1258,8 @@ function draftTiming(d){                                    // правая ко
   if(d.status==='recruiting'||d.status==='finalized')
     return `старт ${fmtStart(d.starts_at)}`+(d.starts_at?` · <span class="countdown" data-start="${d.starts_at}"></span>`:'');
   if(d.status==='live')return 'идёт';
-  if(d.status==='done')return 'идёт подсчёт очков';
-  if(d.status==='settled'){const sc=SCORES[d.id];const w=sc&&sc.standings&&sc.standings[0];return w?`🥇 ${w.name} ${f1(w.total)}`:'завершён';}
+  if(d.status==='done'){const p=fmtPlayed(d.starts_at);return (p?p+' · ':'')+'идёт подсчёт очков';}
+  if(d.status==='settled'){const sc=SCORES[d.id];const w=sc&&sc.standings&&sc.standings[0];const p=fmtPlayed(d.starts_at);const tail=w?`🥇 ${w.name} ${f1(w.total)}`:'завершён';return (p?p+' · ':'')+tail;}
   if(d.status==='cancelled')return 'отменён';
   return '';
 }
