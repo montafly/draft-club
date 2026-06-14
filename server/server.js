@@ -732,6 +732,9 @@ wss.on('connection', (ws) => {
           }
         }
         else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
+        else if (msg.type === 'delegateTurn') { if (!ws.seatId) throw new Error('вы зритель'); e.room.delegateTurn(ws.seatId, msg.toSeatId); }
+        else if (msg.type === 'reclaimTurn') { if (!ws.seatId) throw new Error('вы зритель'); e.room.reclaimTurn(ws.seatId); }
+        else if (msg.type === 'preFold') { if (!ws.seatId) throw new Error('вы зритель'); e.room.setPreFold(ws.seatId, msg.on !== false); }
         else if (msg.type === 'autoplay') {
           let ok = !e.room.allowedUserIds;                       // тестовая комната — всегда можно
           if (!ok && ws.user) { const prof = await getProfile(ws.user.id); ok = autoplayEnabled && prof && prof.role === 'admin'; }
@@ -739,7 +742,7 @@ wss.on('connection', (ws) => {
           e.room.autoplay();
         }
         else if (msg.type === 'chat') { if (!ws.user) throw new Error('войдите в комнату'); if (!e.room.addChat(ws.name, msg.text)) return; } // зрителям тоже можно; пустое — без рассылки
-        else { if (!ws.seatId) throw new Error('вы зритель'); e.room.action(ws.seatId, msg); }
+        else { if (!ws.seatId) throw new Error('вы зритель'); e.room.action(e.room.actingSeatFor(ws.seatId), msg); }   // делегат (#8) исполняет действие от имени владельца, чей сейчас ход
         broadcast(ws.roomCode);
         syncStatus(e);
       }

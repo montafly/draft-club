@@ -56,6 +56,7 @@
   .layout{display:flex;gap:10px;align-items:flex-start}.left{flex:1;min-width:0}.center{flex:1;min-width:0}.side{width:212px;flex:none}.side.lobby{width:240px}.side .clubs,.center .clubs{position:static}.rightcol{width:300px;flex:none;display:flex;flex-direction:column;gap:10px}.collap.collapsed .collap-body{display:none}
   .cols{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .pcol{flex:1 1 0;min-width:218px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .pcol.prelobby{flex:0 0 calc((100% - 32px)/5);max-width:calc((100% - 32px)/5)}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
   .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
@@ -155,6 +156,10 @@
   .vavimg{width:100%;height:100%;object-fit:cover}
   .vavini{font-weight:700;font-size:13px;color:#cfe0ee}
   .tippop{position:fixed;z-index:60;max-width:300px;background:#0d1b2a;border:1px solid #2c3e50;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;color:#e8eef4;box-shadow:0 6px 24px rgba(0,0,0,.5);pointer-events:none;display:none}
+  .delegbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:12px}
+  .delegbar.acc{border-color:var(--acc);color:var(--acc)}
+  .dgsel{background:#16202b;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:12px}
+  .badge.deleg{background:#3a2d10;color:#e0b65a;border:1px solid #6b541f}
   .ptH{font-weight:800;margin-bottom:2px}.ptS{margin-bottom:5px}
   .ptSec{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:5px 0 2px}
   .ptR{display:flex;justify-content:space-between;gap:14px;line-height:1.6}.ptR b{flex:0 0 auto}
@@ -1902,13 +1907,13 @@ function renderRibbon(){
 }
 function renderCols(){
   const el=document.getElementById('cols');
-  if(!S.started){PTIMER=null;el.innerHTML=(S.lobby.seats||[]).map(s=>`<div class="pcol ${s.id===me?'me':''}"><div class="cam" data-seat="${s.id}"></div><div class="phead"><span class="nm">${s.name}</span> · ${s.ready?'✓ готов':'…'}</div></div>`).join('')||'<div class="pcol mut">Ждём игроков…</div>';return;}
+  if(!S.started){PTIMER=null;el.innerHTML=(S.lobby.seats||[]).map(s=>`<div class="pcol prelobby ${s.id===me?'me':''}"><div class="cam" data-seat="${s.id}"></div><div class="phead"><span class="nm">${s.name}</span> · ${s.ready?'✓ готов':'…'}</div></div>`).join('')||'<div class="pcol mut">Ждём игроков…</div>';return;}
   const d=S.draft;
   PTIMER={onClock:d.onClock,running:d.endAt==null,recvAt:Date.now(),base:{}};ordered().forEach(m=>{PTIMER.base[m.id]=m.activeMs||0;}); // пер-игроковые таймеры: база с сервера + живой тик у того, кто на часах
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
       <div class="cam" data-seat="${m.id}"></div>
-      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span></div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}${(d.delegates&&d.delegates[m.id]!=null)?` <span class="badge deleg" title="Ходом этого участника управляет ${delegName(d.delegates[m.id])}">→ ${delegName(d.delegates[m.id])}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span></div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
         <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
@@ -2003,6 +2008,30 @@ function renderClubs(){
   el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
 
+// --- передача хода (#8) ---
+function delegOf(seat){return (S.draft&&S.draft.delegates)?S.draft.delegates[seat]:undefined;}
+function iActFor(seat){return seat===me||delegOf(seat)===me;}          // могу ли я действовать за это место
+function actMine(){const d=S.draft;return !!(d&&d.actor!=null&&iActFor(d.actor));}  // управляю текущим ходом (свой ход ИЛИ мне делегирован ходящий)
+function delegName(id){const m=(S.draft.managers||[]).find(x=>x.id===id);return m?m.name:('#'+id);}
+// панель передачи хода: кому я отдал / за кого играю / отдать другому
+function delegBar(d){
+  if(me==null)return '';                                                // зритель
+  const dl=d.delegates||{};
+  if(dl[me]!=null) return `<div class="delegbar"><span>Вы передали ход: <b>${delegName(dl[me])}</b> играет за вас.</span> <button class="btn" onclick='send({type:"reclaimTurn"})'>Вернуть ход</button></div>`;
+  const forMe=Object.keys(dl).filter(o=>String(dl[o])===String(me)).map(o=>delegName(+o));
+  const forMeTxt=forMe.length?`<div class="delegbar acc">Вы играете за: <b>${forMe.join(', ')}</b></div>`:'';
+  const others=(d.managers||[]).filter(m=>m.id!==me);
+  const sel=`<div class="delegbar"><select class="dgsel" onchange='if(this.value)send({type:"delegateTurn",toSeatId:+this.value});this.value="";'><option value="">Передать ход…</option>${others.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select> <span class="mut" style="font-size:11px">на случай проблем с соединением — вернёте кнопкой</span></div>`;
+  return forMeTxt+sel;
+}
+// заранее-пас (#10): для не-ходящего, ещё участвующего в лоте
+function preFoldBox(d){
+  if(d.phase!=='bidding'||!d.lot||me==null||actMine())return '';
+  const seat=(d.managers||[]).find(m=>m.id===me);if(!seat||seat.finished)return '';   // зритель/собран
+  if(d.lot.highBidder===me||(d.lot.passed||[]).includes(me))return '';                // уже лидер/выбыл
+  const on=(d.preFold||[]).includes(me);
+  return `<div style="margin-top:8px"><button class="btn ${on?'p':''}" style="width:100%" onclick='send({type:"preFold",on:${!on}})'>${on?'✓ Заранее пас — отменить':'Пас заранее (FOLD)'}</button><div class="mut" style="font-size:11px;margin-top:3px">${on?'Как дойдёт ход — пас применится автоматически.':'Применится автоматически, когда ход дойдёт до вас.'}</div></div>`;
+}
 function renderBottom(){
   const el=document.getElementById('bottom');const d=S.draft;
   if(!S.started){
@@ -2025,7 +2054,7 @@ function renderBottom(){
     lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
       <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-id"><div class="lc-nm">${u.first?u.first[0]+'. ':''}${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
       <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
-      ${actionBox(d)}
+      ${actionBox(d)}${preFoldBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
         if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
         else if((d.lot.passed||[]).includes(m.id)){s='выбыл';c='st-out';row='out';}
@@ -2036,15 +2065,15 @@ function renderBottom(){
   } else if(d.phase==='substitutes') lotH+='<span class="mut">Каждый участник по очереди (по порядку завершения) выбирает замену.</span>';
   else lotH+='<div class="mut">ожидается номинация</div>'+actionBox(d);
   lotH+='</div>';
-  const myPick=d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes');
+  const myPick=actMine()&&(d.phase==='nominating'||d.phase==='substitutes');
   const np=nomPanel(d);const nomH=np?`<div class="panel ${myPick?'pickactive':'pickro'}">`+np+'</div>':'';
-  el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar"></div>'+lotH+nomH+'</div>';
+  el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar"></div>'+delegBar(d)+lotH+nomH+'</div>';
   updateRtcBtns(); // бар пересоздаётся вместе с #bottom на каждый ререндер — заполняем заново
-  if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub',false);
+  if(actMine()&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub',false);
   else if(d.phase==='nominating'||d.phase==='substitutes'||d.phase==='bidding') renderNom('browse',true);
 }
 function actionBox(d){
-  if(d.phase!=='bidding'||d.actor!==me)return '';
+  if(d.phase!=='bidding'||!actMine())return '';
   const o=d.actorOptions;
   const quick=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn p qbid" onclick='setBid(${v})' ${(o.canBid&&v>=o.minAmount&&v<=o.maxAmount)?'':'disabled'}>${v}</button>`).join('');
   return `<div style="margin-top:8px">
@@ -2068,15 +2097,16 @@ function stepOpen(dir){const i=document.getElementById('open');if(!i)return;cons
 // быстрая ставка не отправляется сразу: подставляем цену в поле, подтверждение — кнопкой RAISE
 function setBid(v){const i=document.getElementById('bidA');if(!i)return;const mn=+i.min,mx=+i.max;i.value=Math.min(mx,Math.max(mn,+v));upRaise();const b=document.getElementById('raiseBtn');if(b){b.classList.add('flash');setTimeout(()=>b.classList.remove('flash'),220);}}
 function nomPanel(d){
-  const mine=d.actor===me;
+  const mine=actMine();
   const who=id=>`<b style="color:var(--txt)">${d.managers.find(m=>m.id===id)?.name}</b>`;
+  const goBadge=(d.actor!==me)?`<span class="badge go">ходите за ${who(d.actor)}</span>`:`<span class="badge go">ваш ход</span>`;  // делегат видит «ходите за X»
   if(d.phase==='nominating'){
     if(!mine)return `<h3>Выставление <span class="badge">просмотр</span></h3><span class="mut">Сейчас выставляет ${who(d.actor)}.</span>`+filterUI('browse',true);
-    return `<h3>Выставить игрока на торги</h3><div class="pickgo"><span class="badge go">ваш ход</span></div>`+filterUI('nominate',false);
+    return `<h3>Выставить игрока на торги</h3><div class="pickgo">${goBadge}</div>`+filterUI('nominate',false);
   }
   if(d.phase==='substitutes'){
     if(!mine)return `<h3>Замены <span class="badge">просмотр</span></h3><span class="mut">Замену выбирает ${who(d.actor)}.</span>`+filterUI('browse',true);
-    return `<h3>Выбрать замену</h3><div class="pickgo"><span class="badge go">ваш ход</span></div>`+filterUI('sub',false);
+    return `<h3>Выбрать замену</h3><div class="pickgo">${goBadge}</div>`+filterUI('sub',false);
   }
   if(d.phase==='bidding')return `<h3>Доступные игроки <span class="badge">просмотр</span></h3>`+filterUI('browse',true);
   return '';
@@ -2085,7 +2115,7 @@ function nomPanel(d){
 let browseMineOnly=true; // в режиме ожидания: показывать только тех, кого я реально могу купить (лимит позиции/клуба, бюджет)
 function availUnits(){
   const d=S.draft;
-  if(d.actor===me&&d.actorOptions&&d.actorOptions.units)return d.actorOptions.units;
+  if(actMine()&&d.actorOptions&&d.actorOptions.units)return d.actorOptions.units;
   const taken=new Set(d.taken||[]);
   let list=POOL.filter(u=>!taken.has(u.id));
   const mgr=(d.managers||[]).find(m=>m.id===me); // моё место; у зрителя нет → видит всю доску

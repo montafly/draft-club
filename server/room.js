@@ -35,6 +35,58 @@ export class Room {
     this.clockSince = null;              // с какого момента тикает текущему onClock
     this.drawOrder = null;               // жеребьёвка: предрассчитанный порядок выбора (до старта)
     this.drawAt = null;                  // момент запуска жеребьёвки (для синхронной анимации у всех)
+    this.delegate = {};                  // передача хода (#8): ownerSeatId -> delegateSeatId
+    this.preFold = { lotNo: null, seats: new Set() };   // заранее-пас по текущему лоту (#10)
+  }
+
+  // --- передача хода (#8): владелец места отдаёт управление другому месту, забирает обратно ---
+  delegateTurn(ownerSeatId, toSeatId) {
+    const owner = this.seats.find((s) => s.id === ownerSeatId);
+    const to = this.seats.find((s) => s.id === toSeatId);
+    if (!owner || !to) throw new Error('передача хода: нет такого места');
+    if (ownerSeatId === toSeatId) throw new Error('передача хода: нельзя себе');
+    this.delegate[ownerSeatId] = toSeatId;
+    this.logEvent('info', `${owner.name} передал управление своим ходом игроку ${to.name}`);
+  }
+  reclaimTurn(ownerSeatId) {
+    if (this.delegate[ownerSeatId] == null) return;
+    const owner = this.seats.find((s) => s.id === ownerSeatId);
+    delete this.delegate[ownerSeatId];
+    if (owner) this.logEvent('info', `${owner.name} вернул управление своим ходом`);
+  }
+  // кто может действовать за targetSeatId: сам владелец или тот, кому он делегировал
+  canActAs(senderSeatId, targetSeatId) {
+    return targetSeatId === senderSeatId || this.delegate[targetSeatId] === senderSeatId;
+  }
+  // место, ОТ ИМЕНИ которого исполнить действие отправителя: если сейчас ходит делегировавший — исполняем за владельца, движок ждёт именно его
+  actingSeatFor(senderSeatId) {
+    const actor = this.draft && this.draft.actor;
+    if (actor != null && this.canActAs(senderSeatId, actor)) return actor;
+    return senderSeatId;
+  }
+
+  // --- заранее-пас (#10): пометить пас на текущем лоте; авто-применится, когда дойдёт ход ---
+  _preFoldSeats() {
+    const lotNo = this.draft && this.draft.lot ? this.draft.lot.no : null;
+    if (this.preFold.lotNo !== lotNo) this.preFold = { lotNo, seats: new Set() };   // сменился лот → сброс
+    return this.preFold.seats;
+  }
+  setPreFold(seatId, on) {
+    if (!this.draft || this.draft.phase !== 'bidding' || !this.draft.lot) throw new Error('заранее-пас: не фаза торгов');
+    const s = this.seats.find((x) => x.id === seatId);
+    if (!s) throw new Error('заранее-пас: нет места');
+    const set = this._preFoldSeats();
+    if (on) { set.add(seatId); this.logEvent('info', `${s.name} — заранее пас`); }
+    else set.delete(seatId);
+  }
+  // авто-пас всех пред-фолдеров, до которых дошёл ход (вызывается после каждого действия в торгах)
+  _applyPreFold(now) {
+    const d = this.draft; let guard = 0;
+    while (d && d.phase === 'bidding' && d.lot && this._preFoldSeats().has(d.actor) && guard++ < this.maxSeats + 1) {
+      this._tickClock(now);
+      d.pass(d.actor);
+      this.clockSince = now;
+    }
   }
 
   // жеребьёвка: фиксируем порядок выбора заранее, клиент анимирует «колесо» к нему. true = только что запущена
@@ -116,6 +168,7 @@ export class Room {
       case 'pickSubstitute': res = this.draft.pickSubstitute(seatId, msg.unitId); break;
       default: throw new Error('неизвестное действие: ' + msg.type);
     }
+    this._applyPreFold(now);                       // пред-фолдеры, до которых дошёл ход — авто-пас (часть того же действия, один откат)
     this.history.push({ seatId, snap });          // действие прошло → фиксируем для отмены
     if (this.history.length > 50) this.history.shift();
     this.onClock = this.draft.phase === 'done' ? null : this.draft.actor; // следующий на часах
@@ -130,7 +183,7 @@ export class Room {
     if (!this.draft) throw new Error('драфт не начат');
     if (this.draft.phase === 'done') throw new Error('драфт завершён — отмена недоступна'); // завершённый драфт неизменяем: иначе откат последней замены после финиша
     const top = this.history[this.history.length - 1];
-    if (!top || top.seatId !== seatId) throw new Error('нечего отменять (сверху не ваше действие)');
+    if (!top || !this.canActAs(seatId, top.seatId)) throw new Error('нечего отменять (сверху не ваше действие)');   // делегат может отменить за владельца (#8)
     restoreDraft(this.draft, top.snap);
     this.history.pop();
     const now = Date.now();
@@ -210,6 +263,8 @@ export class Room {
         asOf: Date.now(),
         lotNo: d.lotNo,
         canUndoSeat: this.history.length ? this.history[this.history.length - 1].seatId : null,
+        delegates: { ...this.delegate },             // передача хода (#8): ownerSeatId -> delegateSeatId
+        preFold: [...this._preFoldSeats()],          // места с заранее-пасом на текущем лоте (#10)
         order: d.order,
         lot: d.lot && { unit: d.lot.unit, highBid: d.lot.highBid, highBidder: d.lot.highBidder, passed: [...d.lot.passed], bidsBy: d.lot.bidsBy, no: d.lot.no, nominator: d.lot.nominatorId },
         clubCounts: d.clubCounts,
