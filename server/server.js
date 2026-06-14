@@ -469,6 +469,26 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/draft/reconnect' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { draftId } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);
+        const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        let target = null;
+        for (const [, ent] of rooms) { if (ent.room && String(ent.room.draftId) === String(draftId)) { target = ent; break; } }
+        if (!target) throw new Error('живая комната не найдена (сначала «Воскресить комнату»)');
+        let n = 0; const m = JSON.stringify({ type: 'reconnect' });
+        for (const c of target.clients) { if (c.readyState === 1) { c.send(m); n++; } }
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ reconnected: n }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   if (url === '/api/admin/users') {
     (async () => {
       try {
@@ -619,6 +639,14 @@ wss.on('connection', (ws) => {
           return;
         }
         if (msg.type === 'voiceListen') { ws.voiceListen = !!msg.on; broadcast(ws.roomCode); return; } // голосовой компаньон слушает у себя → ПК того же аккаунта приглушит свой звук
+        if (msg.type === 'leaveRoom') { // явный выход: помечаем место отключённым / убираем зрителя, отвязываем сокет от комнаты (close его уже не тронет)
+          if (ws.seatId) e.room.disconnect(ws.seatId);
+          else if (ws.user && !ws.voice) e.room.removeSpectator(ws.user.id);
+          e.clients.delete(ws);
+          const code = ws.roomCode; ws.roomCode = null; ws.seatId = null;
+          broadcast(code);
+          return;
+        }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
         else if (msg.type === 'start') { e.room.start(); refreshOdds(e).catch(() => {}); }
         else if (msg.type === 'draw') {
@@ -653,8 +681,11 @@ wss.on('connection', (ws) => {
     const e = rooms.get(ws.roomCode);
     if (!e) return;
     e.clients.delete(ws);
-    if (ws.seatId) e.room.disconnect(ws.seatId);
-    else if (ws.user && !ws.voice) e.room.removeSpectator(ws.user.id); // voice-компаньон зрителем не числится — присутствие места на ПК не трогаем
+    // другой живой сокет того же аккаунта ещё в комнате (F5/реконнект гонкой, второе устройство) → присутствие НЕ гасим:
+    // иначе close старого сокета затирает connected, хотя человек уже сидит на новом (корень хаоса со статусами)
+    const dupLive = ws.user && [...e.clients].some((c) => c.user && c.user.id === ws.user.id && !c.voice);
+    if (ws.seatId) { if (!dupLive) e.room.disconnect(ws.seatId); }
+    else if (ws.user && !ws.voice && !dupLive) e.room.removeSpectator(ws.user.id); // voice-компаньон зрителем не числится — присутствие места на ПК не трогаем
     broadcast(ws.roomCode);
   });
 });

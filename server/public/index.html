@@ -397,6 +397,7 @@
     <button class="btn" onclick="leaveDraft()" title="Выйти из комнаты">← Выйти</button>
     <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
+    <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
     <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
     <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><span id="specCtl" class="myctl"></span><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
@@ -493,7 +494,9 @@ let me=null,myRtc=null,myUid=null,VOICE=false,voiceListenHere=false,S=null,POOL=
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
-  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
+  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);
+    if(me!=null&&!VOICE&&!RTC.on)setTimeout(()=>{if(!RTC.on)rtcStart();},400);} // мик по умолчанию включён при входе игрока (на iOS первый getUserMedia потребует тапа — поймаем в catch)
+  else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}};
@@ -1387,7 +1390,7 @@ function renderAdminDrafts(){
       : d.status==='finalized'
         ? `<span class="badge admin">состав зафиксирован</span> <button class="btn p" onclick="launchDraftBtn(${d.id})">Запустить live</button> <button class="btn" onclick="setDraftStatus(${d.id},'recruiting')">Вернуть в набор</button>`
         : d.status==='live'
-          ? `<span class="badge admin">LIVE · код ${d.room_code||'—'}</span> <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button> <button class="btn" onclick="launchDraftBtn(${d.id})" title="Воскресить комнату после перезапуска сервера">Перезапустить комнату</button>`
+          ? `<span class="badge admin">LIVE · код ${d.room_code||'—'}</span> <button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button> <button class="btn" onclick="reconnectAllBtn(${d.id})" title="Принудительно переподключить всех в комнате (все на пару секунд перезагрузятся и зайдут заново). Состояние драфта и заявки сохраняются">Переподключить всех</button> <button class="btn" onclick="launchDraftBtn(${d.id})" title="Воскресить комнату из БД после перезапуска сервера (если процесс перезапускали и комната пропала)">Воскресить комнату</button>`
           : `<span class="badge">${d.status}</span>`;
     return `<div class="card2" style="margin:0 0 10px">
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
@@ -1443,6 +1446,16 @@ async function launchDraftBtn(id){
   }catch(e){if(m)m.textContent='ошибка запуска: '+e.message;}
 }
 async function enterRoom(code,voice){if(!code)return;const t=await authToken();if(!t){showAuth();return;}VOICE=!!voice;send({type:'joinRoom',code,token:t,...(voice?{voice:true}:{})});}
+async function reconnectAllBtn(id){ // админ: переподключить всех в живой комнате (состояние/заявки сохраняются)
+  const m=document.getElementById('adminMsg');
+  if(!confirm('Переподключить всех в комнате? Все участники на пару секунд перезагрузятся и зайдут заново. Состояние драфта и заявки сохранятся. Не делай это во время активной номинации/ставки.'))return;
+  try{
+    const t=await authToken();
+    const r=await fetch('/api/draft/reconnect',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    if(m)m.textContent='переподключение отправлено — клиентов в комнате: '+j.reconnected;
+  }catch(e){if(m)m.textContent='ошибка переподключения: '+e.message;}
+}
 async function applyToDraft(id){
   const le=document.getElementById('lerr');
   const {error}=await sb.from('dc_applications').insert({draft_id:id,user_id:session.user.id});
@@ -1474,7 +1487,8 @@ function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code+(VO
   document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
   document.getElementById('backToDraftBtn').style.display='none'; // мы в драфте — «вернуться» не нужно
   const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';
-  document.getElementById('callPhoneBtn').style.display='inline-block';}
+  document.getElementById('callPhoneBtn').style.display='inline-block';
+  document.getElementById('leaveRoomBtn').style.display='inline-block';}
 function enterVoiceMode(code){setVp(false); // телефон-режим: device-width, простая панель вместо десктоп-кокпита
   voiceListenHere=false;                      // по умолчанию слух на ПК (телефон — только мик)
   for(const id of ['landing','topbar','app','draft','viewer'])document.getElementById(id).style.display='none';
@@ -1505,6 +1519,26 @@ function renderVoicePane(){const b=document.getElementById('voiceMicBtn');if(!b)
 function leaveDraft(){location.href='/';}
 // профиль/разделы из рума без выхода: WS глобальный (создан один раз), переключение display не рвёт комнату; навигация — через общую шапку (navClick)
 function backToDraft(){setVp(true);document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';document.getElementById('backToDraftBtn').style.display='none';}
+function rtcStopAll(){ // полная остановка локального медиа и всех пиров (при выходе из комнаты)
+  try{if(RTC.stream)RTC.stream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});}catch(e){}
+  for(const k of Object.keys(RTC.pcs))rtcClosePc(k);
+  RTC.on=false;RTC.stream=null;RTC.micOn=true;RTC.camOn=false;
+}
+function leaveRoom(){ // явный выход из комнаты: чистим ?room (F5 больше не вернёт), сообщаем серверу, гасим медиа
+  if(!myRoom){showSection('lobby');return;}
+  try{send({type:'leaveRoom'});}catch(e){}
+  rtcStopAll();
+  myRoom='';me=null;myRtc=null;
+  history.replaceState(null,'',location.pathname+'?view=lobby');
+  document.getElementById('draft').style.display='none';
+  document.getElementById('roomcode').style.display='none';
+  document.getElementById('callPhoneBtn').style.display='none';
+  document.getElementById('leaveRoomBtn').style.display='none';
+  document.getElementById('backToDraftBtn').style.display='none';
+  document.getElementById('app').style.display='flex';
+  showSection('lobby');
+  loadDrafts();
+}
 function copyLink(){if(!myRoom)return;try{navigator.clipboard.writeText(location.origin+'/?room='+myRoom);showErr('ссылка скопирована');}catch{showErr(location.origin+'/?room='+myRoom);}}
 function voiceInviteUrl(){return location.origin+'/?room='+myRoom+'&voice=1';}
 function openVoiceInvite(){if(!myRoom)return;const u=voiceInviteUrl();document.getElementById('voiceLink').value=u;renderVoiceQr(u);document.getElementById('voiceInvite').style.display='flex';}
@@ -1874,12 +1908,17 @@ function nomPanel(d){
   return '';
 }
 // юниты для панели пиков: ходящему — движковый eligible-список; остальным (read-only) — всё, что ещё на доске (#11)
+let browseMineOnly=true; // в режиме ожидания: показывать только тех, кого я реально могу купить (лимит позиции/клуба, бюджет)
 function availUnits(){
   const d=S.draft;
   if(d.actor===me&&d.actorOptions&&d.actorOptions.units)return d.actorOptions.units;
   const taken=new Set(d.taken||[]);
-  return POOL.filter(u=>!taken.has(u.id));
+  let list=POOL.filter(u=>!taken.has(u.id));
+  const mgr=(d.managers||[]).find(m=>m.id===me); // моё место; у зрителя нет → видит всю доску
+  if(browseMineOnly&&mgr)list=list.filter(u=>clientCanAdd(mgr,u,d.clubCounts||{}));
+  return list;
 }
+function toggleBrowseMine(v){browseMineOnly=v;renderBottom();}
 let nomFilt={q:'',t:'',p:''}; // сохраняем фильтр между ререндерами (#bottom перерисовывается на каждую ставку)
 function filterUI(mode,ro){
   const units=availUnits();
@@ -1889,7 +1928,7 @@ function filterUI(mode,ro){
     <input id="fq" placeholder="поиск по фамилии…" value="${nomFilt.q||''}" oninput="renderNom('${mode}',${!!ro})">
     <select id="ft" onchange="renderNom('${mode}',${!!ro})"><option value="">все клубы</option>${teams.map(t=>`<option ${t===nomFilt.t?'selected':''}>${t}</option>`).join('')}</select>
     <select id="fp" onchange="renderNom('${mode}',${!!ro})"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}" ${p===nomFilt.p?'selected':''}>${posShort(p)}</option>`).join('')}</select>
-  </div><div class="plist" id="plist"></div>`+(ro?'':`<div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`);
+  </div>${(ro&&me!=null)?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mut);margin:4px 0 2px;cursor:pointer" title="Скрыть тех, кого не можешь купить: занят лимит позиции/клуба или не хватает бюджета"><input type="checkbox" ${browseMineOnly?'checked':''} onchange="toggleBrowseMine(this.checked)"> только доступные мне</label>`:''}<div class="plist" id="plist"></div>`+(ro?'':`<div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`);
 }
 function renderNom(mode,ro){
   const units=availUnits();
