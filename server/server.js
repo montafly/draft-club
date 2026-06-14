@@ -59,15 +59,52 @@ async function ftDetail(matchId) {
   ftCache.set(matchId, { t: now, data: d });
   return d;
 }
-// очки игрока по позиционным весам FanTeam (порт collect.py compute_points — валидирован)
-function cp(s, pos) {
+// разбивка очков игрока на составляющие (ЕДИНЫЙ источник весов; cp = сумма). Веса FanTeam — валидированы, порт collect.py.
+// Возвращает строки {label, n (сырой счётчик), pts (вклад в очки)}; только ненулевой вклад.
+function cpBreak(s, pos) {
   const g = (k) => (+s[k] || 0);
-  let p = g('playtime1') + g('playtime60') + g('assist') * 3 + g('penaltyCaused') * -2 + g('penaltyMiss') * -2 + g('ownGoal') * -2 + g('yellowCard') * -1 + g('redCard') * -3 + g('impact') * 0.3;
-  if (pos === 'goalkeeper') p += g('goal') * 8 + g('cleanSheet') * 4 + g('shotOnTarget') * 1 + g('keeperSave') * 0.5 + g('penaltySave') * 5 + Math.floor(g('concededGoal') / 2) * -1;
-  else if (pos === 'defender') p += g('goal') * 6 + g('cleanSheet') * 4 + g('shotOnTarget') * 0.6 + Math.floor(g('concededGoal') / 2) * -1;
-  else if (pos === 'midfielder') p += g('goal') * 5 + g('cleanSheet') * 1 + g('fullGame') * 1 + g('shotOnTarget') * 0.4;
-  else if (pos === 'forward') p += g('goal') * 4 + g('fullGame') * 1 + g('shotOnTarget') * 0.4;
-  return Math.round(p * 100) / 100;
+  const out = [];
+  const add = (label, n, pts) => { if (pts) out.push({ label, n, pts }); };
+  add('Выход на поле', g('playtime1'), g('playtime1') * 1);
+  add('60+ минут', g('playtime60'), g('playtime60') * 1);
+  add('Пас (ассист)', g('assist'), g('assist') * 3);
+  add('Привёз пенальти/штрафной', g('penaltyCaused'), g('penaltyCaused') * -2);
+  add('Незабитый пенальти', g('penaltyMiss'), g('penaltyMiss') * -2);
+  add('Автогол', g('ownGoal'), g('ownGoal') * -2);
+  add('Жёлтая карточка', g('yellowCard'), g('yellowCard') * -1);
+  add('Красная карточка', g('redCard'), g('redCard') * -3);
+  add('Импакт', g('impact'), g('impact') * 0.3);
+  if (pos === 'goalkeeper') {
+    add('Гол', g('goal'), g('goal') * 8);
+    add('Сухой матч', g('cleanSheet'), g('cleanSheet') * 4);
+    add('Удары в створ', g('shotOnTarget'), g('shotOnTarget') * 1);
+    add('Сейвы', g('keeperSave'), g('keeperSave') * 0.5);
+    add('Сейв пенальти', g('penaltySave'), g('penaltySave') * 5);
+    add('Пропущенные голы', g('concededGoal'), Math.floor(g('concededGoal') / 2) * -1);
+  } else if (pos === 'defender') {
+    add('Гол', g('goal'), g('goal') * 6);
+    add('Сухой матч', g('cleanSheet'), g('cleanSheet') * 4);
+    add('Удары в створ', g('shotOnTarget'), g('shotOnTarget') * 0.6);
+    add('Пропущенные голы', g('concededGoal'), Math.floor(g('concededGoal') / 2) * -1);
+  } else if (pos === 'midfielder') {
+    add('Гол', g('goal'), g('goal') * 5);
+    add('Сухой матч', g('cleanSheet'), g('cleanSheet') * 1);
+    add('Полный матч', g('fullGame'), g('fullGame') * 1);
+    add('Удары в створ', g('shotOnTarget'), g('shotOnTarget') * 0.4);
+  } else if (pos === 'forward') {
+    add('Гол', g('goal'), g('goal') * 4);
+    add('Полный матч', g('fullGame'), g('fullGame') * 1);
+    add('Удары в створ', g('shotOnTarget'), g('shotOnTarget') * 0.4);
+  }
+  return out;
+}
+// очки игрока = сумма разбивки (округление как раньше — поведение totals неизменно)
+function cp(s, pos) { return Math.round(cpBreak(s, pos).reduce((a, b) => a + b.pts, 0) * 100) / 100; }
+// слить строки разбивки по нескольким матчам игрока (floor пропущенных считается per-match, потому суммируем готовые строки)
+function mergeBreak(lines) {
+  const m = new Map();
+  for (const l of lines) { const e = m.get(l.label); if (e) { e.n += l.n; e.pts += l.pts; } else m.set(l.label, { label: l.label, n: l.n, pts: l.pts }); }
+  return [...m.values()].map((e) => ({ label: e.label, n: e.n, pts: Math.round(e.pts * 100) / 100 }));
 }
 const POSMAP = { goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -225,18 +262,27 @@ async function payPrizes(draftId, standings, d) {
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
   const playerPts = {}, playerMin = {}, coachPts = {}, matchInfo = {}; let confirmed = 0;
+  const playerBreak = {}, playerEvents = {}, coachBreak = {}, nameOf = {};   // разбивка/события для тултипов просмотрщика (#5/#6)
   for (const mid of ids) {
     let det; try { det = await ftDetail(mid); } catch { continue; }
     const rm = det.realMatch || {};
     matchInfo[mid] = { status: rm.status || null, score: Array.isArray(rm.score) ? rm.score.slice(0, 2) : null };
     if (rm.status === 'confirmed') confirmed++;
+    for (const m of det.realTeamMemberships || []) { const rp = m.realPlayer || {}; nameOf[m.realPlayerId] = [rp.firstName, rp.lastName].filter(Boolean).join(' ') || String(m.realPlayerId); }
     for (const r of det.realPlayerMatchStats || []) {
-      const pid = r.realPlayerId, pos = r.position || '', pts = cp(r.stats || {}, pos), min = r.minutesPlayed || 0;
+      const pid = r.realPlayerId, pos = r.position || '', br = cpBreak(r.stats || {}, pos), pts = Math.round(br.reduce((a, b) => a + b.pts, 0) * 100) / 100, min = r.minutesPlayed || 0;
       playerPts[pid] = (playerPts[pid] || 0) + pts; playerMin[pid] = (playerMin[pid] || 0) + min;
-      if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; } // тренер = очки вышедших на замену
+      if (br.length) (playerBreak[pid] || (playerBreak[pid] = [])).push(...br);
+      if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; if (pts) (coachBreak[ck] || (coachBreak[ck] = [])).push({ label: nameOf[pid] || String(pid), n: 1, pts }); } // тренер = очки вышедших на замену
+    }
+    // таймлайн событий игрока (минута есть только здесь; удары в створ — счётчик без минуты, идут в разбивку)
+    for (const ev of det.realMatchEvents || []) {
+      const pid = ev.realPlayerId; if (pid == null) continue;
+      if (!['goal', 'assist', 'substitution', 'yellow_card', 'red_card'].includes(ev.mainType)) continue;
+      (playerEvents[pid] || (playerEvents[pid] = [])).push({ t: ev.mainType, minute: ev.minute != null ? ev.minute : null });
     }
   }
-  return { playerPts, playerMin, coachPts, matchInfo, allConfirmed: ids.length > 0 && confirmed === ids.length };
+  return { playerPts, playerMin, coachPts, matchInfo, allConfirmed: ids.length > 0 && confirmed === ids.length, playerBreak, playerEvents, coachBreak };
 }
 // standings драфта; статус settled когда все матчи confirmed
 async function scoreDraft(draftId) {
@@ -244,7 +290,9 @@ async function scoreDraft(draftId) {
   if (!d) throw new Error('нет драфта');
   const ids = d.match_ids || [];
   const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=*`);
-  const { playerPts, playerMin, coachPts, matchInfo, allConfirmed } = await draftPoints(ids);
+  const { playerPts, playerMin, coachPts, matchInfo, allConfirmed, playerBreak, playerEvents, coachBreak } = await draftPoints(ids);
+  const brk = (r) => r.position === 'COACH' ? (coachBreak[r.player_id] || []) : mergeBreak(playerBreak[r.player_id] || []);   // разбивка очков игрока/тренера для тултипа (#6)
+  const evs = (r) => r.position === 'COACH' ? [] : (playerEvents[r.player_id] || []).slice().sort((a, b) => (a.minute == null ? 1e9 : a.minute) - (b.minute == null ? 1e9 : b.minute));   // таймлайн (#5)
   let clubOdds = [], matches = [];
   try { const ti = await tourInfo(d.season_id, d.round, ids); clubOdds = ti.clubOdds; matches = ti.fixtures.map((f) => ({ ...f, score: (matchInfo[f.matchId] || {}).score || null, status: (matchInfo[f.matchId] || {}).status || f.status })); } catch (e) { console.error('tourInfo', e.message); }
   const clubStatus = {}, clubCode = {};
@@ -266,7 +314,7 @@ async function scoreDraft(draftId) {
     for (const r of starters) {
       const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
       total += pp;
-      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r) });
+      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r), breakdown: brk(r), events: evs(r) });
     }
     // Замена срабатывает, если есть несыгравший стартовый (матч завершён, 0 минут — pending/live НЕ считаем «не вышел», иначе замена
     // зелёная по умолчанию, #15), которого она может закрыть. Проверяем КАЖДОГО несыгравшего отдельно: замена позиции P может закрыть
@@ -290,7 +338,7 @@ async function scoreDraft(draftId) {
         }
       }
       const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
-      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub) });
+      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub), breakdown: brk(sub), events: evs(sub) });
     }
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });
@@ -418,11 +466,31 @@ const server = http.createServer((req, res) => {
     if (!matchId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен matchId' })); }
     ftDetail(matchId).then((det) => {
       const names = {}; for (const m of det.realTeamMemberships || []) { const rp = m.realPlayer || {}; names[m.realPlayerId] = [rp.firstName, rp.lastName].filter(Boolean).join(' ') || m.realPlayerId; }  // полное имя+фамилия — снять разночтения у Lee/Kim (#14)
-      const teams = {}; for (const t of det.realTeams || []) teams[t.id] = t.name || String(t.id);
+      const teams = {}, abbr = {}; for (const t of det.realTeams || []) { teams[t.id] = t.name || String(t.id); abbr[t.id] = t.abbr || String(t.name || '').slice(0, 3).toUpperCase(); }
       const rm = det.realMatch || {}; const tids = (rm.realTeamIds || []).slice(0, 2);
       const players = (det.realPlayerMatchStats || []).map((r) => ({ name: names[r.realPlayerId] || r.realPlayerId, club: teams[r.realTeamId] || r.realTeamId, position: r.position, lineup: r.lineup, minutes: r.minutesPlayed || 0, total: cp(r.stats || {}, r.position), stats: r.stats || {} }));
+      // лог событий матча (#5): timed из realMatchEvents (голы/ассисты/карточки/замены), untimed из счётчиков (удары/сухой/сейвы/пенальти/автогол). НЕ детализируем: минуты на поле, импакт, пропущенные.
+      const onePts = (key, pos, n) => Math.round(cpBreak({ [key]: n }, pos).reduce((a, b) => a + b.pts, 0) * 100) / 100;
+      // kind — для иконок/курсива на клиенте. Clean Sheet в лог НЕ кладём (по тз). Минуты на поле/импакт/пропущенные тоже не детализируем.
+      const TIMED = { goal: ['goal', 'Goal', 'goal'], assist: ['assist', 'Assist', 'assist'], yellow_card: ['yellowCard', 'Yellow Card', 'yc'], red_card: ['redCard', 'Red Card', 'rc'] };
+      const log = [];
+      for (const e of det.realMatchEvents || []) {
+        const pid = e.realPlayerId; if (pid == null) continue; const pos = e.position || '';
+        if (e.mainType === 'substitution') { const on = e.subType === 0; log.push({ minute: e.minute != null ? e.minute : null, name: names[pid] || String(pid), teamId: e.realTeamId, action: on ? 'Subbed ON' : 'Subbed OFF', kind: on ? 'sub_on' : 'sub_off', pts: null }); continue; }
+        const t = TIMED[e.mainType]; if (!t) continue;
+        log.push({ minute: e.minute != null ? e.minute : null, name: names[pid] || String(pid), teamId: e.realTeamId, action: t[1], kind: t[2], pts: onePts(t[0], pos, 1) });
+      }
+      const UNTIMED = [['shotOnTarget', 'Shot on Target', 'shot'], ['keeperSave', 'Save', 'save'], ['penaltySave', 'Penalty Save', 'pensave'], ['penaltyMiss', 'Penalty Miss', 'penmiss'], ['penaltyCaused', 'Blunder', 'blunder'], ['ownGoal', 'Own Goal', 'owngoal']];
+      for (const r of det.realPlayerMatchStats || []) {
+        const pos = r.position || '', s = r.stats || {}, pid = r.realPlayerId;
+        for (const [key, lbl, kind] of UNTIMED) {
+          const n = +s[key] || 0; if (!n) continue; const pts = onePts(key, pos, n); if (!pts) continue;   // 0 очков за категорию для этой позиции — пропускаем
+          log.push({ minute: null, name: names[pid] || String(pid), teamId: r.realTeamId, action: n > 1 ? lbl + ' ×' + n : lbl, kind, pts });
+        }
+      }
+      log.sort((a, b) => (a.minute == null ? 1e9 : a.minute) - (b.minute == null ? 1e9 : b.minute));
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ home: teams[tids[0]] || '', away: teams[tids[1]] || '', status: rm.status || null, players }));
+      res.end(JSON.stringify({ home: teams[tids[0]] || '', away: teams[tids[1]] || '', homeId: tids[0] || null, awayId: tids[1] || null, homeCode: abbr[tids[0]] || '', awayCode: abbr[tids[1]] || '', status: rm.status || null, players, log }));
     }).catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
     return;
   }

@@ -41,6 +41,8 @@
   .dpill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
   .dmain{font-size:14px}.dmeta,.dtime{font-size:12px}.dtime{margin-left:auto;text-align:right}
   .dchev{font-size:10px;color:var(--mut);width:12px;text-align:center;flex:0 0 auto}
+  .dwho{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-width:0}                                  /* чипы участников в строке драфта */
+  .dchip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;color:#fff;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
   .ddet{padding:2px 14px 14px;border-top:1px solid var(--line)}
   .p-recruiting{background:#2c3a47;color:#9fb4c6}.p-finalized{background:#3a2c47;color:#cba6e0}.p-live{background:#1f3a2a;color:var(--acc)}.p-done{background:#1f2f42;color:#7fb8e8}.p-settled{background:#3a3320;color:var(--gold)}.p-cancelled{background:#3a2424;color:#e08a8a}
   .dfilters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
@@ -87,6 +89,17 @@
   .myctl .btn.undo{color:var(--gold);background:rgba(232,195,114,.16);box-shadow:0 0 7px rgba(232,195,114,.6)}
   .myctl .btn.undo:hover{background:rgba(232,195,114,.28)}
   .phead .myctl{margin-left:6px}
+  /* бар контролов над лотом (#2): отмена/мик/камера крупно, равномерно, по высоте прямоугольника */
+  .rtcbar{display:flex;gap:8px;align-items:stretch}
+  .rtcbar .cbtn{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;border:2px solid var(--mut);background:#ffffff08;color:var(--mut);cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.02em}
+  .rtcbar .cbtn svg{width:19px;height:19px}
+  .rtcbar .cbtn:hover{background:#ffffff14}
+  .rtcbar .cbtn.on{border-color:#58d68d;color:#58d68d}      /* вкл — зелёный контур */
+  .rtcbar .cbtn.off{border-color:#ec7063;color:#ec7063}     /* выкл — красный контур */
+  .rtcbar .cbtn.undo{border-color:#7d8da0;color:#7d8da0}    /* отмена — серая по умолчанию */
+  .rtcbar .cbtn.undo.ready{border-color:var(--gold);color:var(--gold);box-shadow:0 0 7px rgba(232,195,114,.5)} /* доступна — жёлтая */
+  .rtcbar .cbtn:disabled{opacity:.55;cursor:default}
+  .rtcbar .cbtn:disabled:hover{background:#ffffff08}
   .avbox{width:150px;height:142px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
   .avstage{position:relative;width:264px;height:248px;margin:0 auto;overflow:hidden;border-radius:8px;border:1px solid var(--line);background:#000;touch-action:none;cursor:grab}
   .avstage:active{cursor:grabbing}
@@ -137,7 +150,33 @@
   .vteam{flex:1;min-width:250px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
   .vteam.lead{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
   .vteam.lead2{border-color:#9fb1c1;box-shadow:0 0 0 2px #9fb1c1 inset}
-  .vthead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.vthead .vtn{font-weight:800}.vthead .vtp{color:var(--gold);font-weight:800;font-size:15px}
+  .vthead{display:flex;justify-content:space-between;align-items:center;gap:8px}.vthead .vtn{font-weight:800;display:flex;align-items:center;gap:6px;min-width:0}.vthead .vtp{color:var(--gold);font-weight:800;font-size:15px;flex:0 0 auto}
+  .vava{width:28px;height:28px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;background:#1b3a52;flex:0 0 auto}
+  .vavimg{width:100%;height:100%;object-fit:cover}
+  .vavini{font-weight:700;font-size:13px;color:#cfe0ee}
+  .tippop{position:fixed;z-index:60;max-width:300px;background:#0d1b2a;border:1px solid #2c3e50;border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;color:#e8eef4;box-shadow:0 6px 24px rgba(0,0,0,.5);pointer-events:none;display:none}
+  .ptH{font-weight:800;margin-bottom:2px}.ptS{margin-bottom:5px}
+  .ptSec{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:5px 0 2px}
+  .ptR{display:flex;justify-content:space-between;gap:14px;line-height:1.6}.ptR b{flex:0 0 auto}
+  .mstatrow{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}.mstatcol{flex:1 1 460px;min-width:0}.evlogcol{flex:1 1 300px;min-width:240px}
+  .evlog{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .evlh{font-weight:700;margin-bottom:6px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .evrow{display:flex;align-items:center;gap:5px;font-size:12px;line-height:1.8;border-bottom:1px solid rgba(255,255,255,.05);padding:1px 0}
+  .evcode{font-weight:700;color:var(--mut);font-size:10px;flex:0 0 30px}
+  .evic{flex:0 0 20px;text-align:center}
+  .evtxt{flex:1 1 auto;min-width:0}
+  .evmin{min-width:26px;text-align:right;font-variant-numeric:tabular-nums;color:var(--mut);flex:0 0 auto}
+  .evnm{font-weight:600}.evdot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .evhome{background:#4aa3ff}.evaway{background:#ff9f43}.evpos{color:#3ccb78}.evneg{color:#e05050}
+  .evup{color:#3ccb78;font-weight:800}.evdn{color:#e05050;font-weight:800}
+  .evsep{border-top:2px solid #46617a;margin:5px 0 3px}
+  .matchwrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
+  .vstandcol{flex:0 1 220px;min-width:190px}
+  .vstand{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .stRow{display:flex;align-items:baseline;gap:6px;font-size:12px;line-height:1.9;border-bottom:1px solid rgba(255,255,255,.05)}
+  .stPl{color:var(--mut);min-width:18px;flex:0 0 auto}.stNm{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stPts{color:var(--gold);flex:0 0 48px;text-align:right;font-variant-numeric:tabular-nums}
+  .stCnt{flex:0 0 52px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
   .vteam table{width:100%;font-size:11px}
   .vteam th,.vteam td{text-align:center;padding:2px 5px}
   .vteam th.pl,.vteam td.nm{text-align:left;white-space:nowrap}
@@ -394,12 +433,9 @@
 <div id="draft" style="display:none;flex:1;min-height:0;flex-direction:column">
   <!-- тонкий тулбар драфта (под общей шапкой сайта), п.10 -->
   <div id="draftbar">
-    <button class="btn" onclick="leaveDraft()" title="Выйти из комнаты">← Выйти</button>
-    <span id="roomcode" class="pill" style="display:none;cursor:pointer" onclick="copyLink()"></span>
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
     <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
-    <span id="who" class="pill"></span><span id="phase" class="pill"></span><span id="turn" class="pill"></span>
-    <span class="sp"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><span id="specCtl" class="myctl"></span><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -414,8 +450,7 @@
         <div class="clubs collap" id="logBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('logBox')">▾ Лог драфта</h3><div class="collap-body"><div id="draftLog" style="max-height:280px;overflow-y:auto;font-size:11px;line-height:1.55"></div></div></div>
         <div class="clubs collap" id="chatBox" style="margin-top:10px"><h3 style="cursor:pointer" onclick="toggleCollap('chatBox')">▾ Чат</h3><div class="collap-body"><div id="chatLog" style="max-height:220px;overflow-y:auto;font-size:11px;line-height:1.5"></div><div style="display:flex;gap:5px;margin-top:6px"><input id="chatInput" maxlength="500" placeholder="Сообщение…" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()" style="flex:1;min-width:0;font-size:11px;padding:4px 7px"><button class="btn" style="padding:4px 10px" onclick="sendChat()">→</button></div></div></div>
       </div>
-      <div class="rightcol right" style="position:relative">
-        <span id="timer" class="pill" style="display:none;position:absolute;top:7px;left:6px;z-index:2;font-size:13px;padding:3px 10px;font-variant-numeric:tabular-nums"></span>
+      <div class="rightcol right">
         <div id="bottom"></div>
         <div class="clubs mpanel" id="mpanel" style="position:static"><h3>Матчи тура</h3><div id="matches"><span class="mut">—</span></div></div>
       </div>
@@ -494,7 +529,7 @@ let me=null,myRtc=null,myUid=null,VOICE=false,voiceListenHere=false,S=null,POOL=
 ws.onmessage=e=>{const m=JSON.parse(e.data);
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
-  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;document.getElementById('who').textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);
+  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;{const w=document.getElementById('who');if(w)w.textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
     if(me!=null&&!VOICE&&!RTC.on)setTimeout(()=>{if(!RTC.on)rtcStart();},400);} // мик по умолчанию включён при входе игрока (на iOS первый getUserMedia потребует тапа — поймаем в catch)
   else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
@@ -652,21 +687,22 @@ function toggleLocalMute(rid){ // заглушить участника «для
   const a=RTC.audioEls[rid];if(a)a.muted=!!RTC.localMute[rid];
   renderParts();
 }
-// п.8: контролы драфта (отмена/мик/камера) — в шапке моей колонки (.phead → #myCtlBox);
-// для зрителя без колонки запасной дом — #specCtl в тулбаре. Рендер заново на каждый вызов (контейнеры пересоздаются renderCols).
+// контролы драфта (отмена/мик/камера) — в баре #rtcCtlBar над блоком лота (#2: крупно, заметно, по высоте прямоугольника).
+// Бар пересоздаётся вместе с #bottom (renderBottom) → updateRtcBtns зовётся в конце renderBottom и на каждое RTC-событие.
 function updateRtcBtns(){
-  const box=document.getElementById('myCtlBox')||document.getElementById('specCtl');if(!box)return;
-  if(box.id==='myCtlBox'){const sc=document.getElementById('specCtl');if(sc)sc.innerHTML='';} // активна колонка — чистим запасной контейнер, без дублей
+  const box=document.getElementById('rtcCtlBar');if(!box)return; // бар над лотом (#2); существует только в кокпите драфта
   let h='';
-  if(S&&S.started&&S.draft&&S.draft.phase!=='done'&&S.draft.canUndoSeat===me&&me!=null) // отмена — только когда сервер разрешил откат этому игроку
-    h+=`<button class="btn undo" onclick='send({type:"undo"})' title="Отменить последнее действие">${IC.undo}</button>`;
+  if(me!=null&&S&&S.started&&S.draft&&S.draft.phase!=='done'){ // отмена — игроку всегда видна: серая по умолчанию, жёлтая и активная когда сервер разрешил откат
+    const ready=S.draft.canUndoSeat===me;
+    h+=`<button class="cbtn undo${ready?' ready':''}" ${ready?'':'disabled'} onclick='send({type:"undo"})' title="${ready?'Отменить последнее действие':'Отмена сейчас недоступна'}">${IC.undo}<span>Отмена</span></button>`;
+  }
   if(myRtc!=null){                                       // микрофон — всем в комнате (игроки и зрители)
     const micOn=RTC.on&&RTC.micOn;
-    h+=`<button class="btn" onclick="rtcMicClick()" style="color:${micOn?'var(--acc)':'var(--mut)'}" title="${!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен')}">${micOn?IC.mic:IC.micOff}</button>`;
+    h+=`<button class="cbtn ${micOn?'on':'off'}" onclick="rtcMicClick()" title="${!RTC.on?'Включить микрофон':(micOn?'Микрофон включён':'Микрофон выключен')}">${micOn?IC.mic:IC.micOff}<span>Микро</span></button>`;
   }
   if(me!=null&&myRtc!=null){                              // камера — только игрокам
     const camOn=RTC.on&&RTC.camOn;
-    h+=`<button class="btn" onclick="rtcCamClick()" style="color:${camOn?'var(--acc)':'var(--mut)'}" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}</button>`;
+    h+=`<button class="cbtn ${camOn?'on':'off'}" onclick="rtcCamClick()" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}<span>Камера</span></button>`;
   }
   box.innerHTML=h;
 }
@@ -1101,6 +1137,13 @@ function nameOf(uid){return PROFNAMES[uid]||uid.slice(0,8);}
 function applicantNames(id){return APPS.filter(a=>a.draft_id===id).map(a=>nameOf(a.user_id)+(a.status==='accepted'?' ✓':a.status==='rejected'?' ✗':''));}
 function acceptedNames(id){return APPS.filter(a=>a.draft_id===id&&a.status==='accepted').map(a=>nameOf(a.user_id));}
 function namesCol(arr){return arr.length?arr.map(n=>`<div>${n}</div>`).join(''):'<div class="mut">—</div>';}
+function nameColor(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360;return `hsl(${h},42%,30%)`;} // стабильный цвет чипа по имени участника
+function draftWhoChips(d){                                   // цветные блоки участников в строке (#: ориентир «кто где»; очки не показываем)
+  let names=acceptedNames(d.id);
+  if(!names.length){const sc=SCORES[d.id];if(sc&&sc.standings)names=sc.standings.map(s=>s.name);}
+  if(!names.length)return '';
+  return `<span class="dwho">${names.map(n=>`<span class="dchip" style="background:${nameColor(n)}" title="${n}">${n}</span>`).join('')}</span>`;
+}
 async function ensureScore(id){
   if(SCORES[id])return; SCORES[id]={loading:true};
   try{const r=await fetch('/api/draft/score?draftId='+id);const j=await r.json();SCORES[id]=r.ok?j:{error:true};
@@ -1140,6 +1183,12 @@ async function loadViewer(id,initial,force){
   try{const r=await fetch('/api/draft/score?draftId='+id+(force?'&force=1':''));VIEW.score=await r.json();}catch{VIEW.score={error:true};}
   VIEW.fixtures=(VIEW.score&&VIEW.score.matches)||[];
   renderViewerTeams();renderUpd();
+  if(VIEW.openMatch!=null&&!initial)refreshOpenMatch();   // на поллинге тихо обновляем статы/лог открытого матча (live), без мигания
+}
+// тихое обновление открытого матча (без «загрузка…»): данные в VIEW.matchData, перерисовка тела матча с сохранением фильтра
+async function refreshOpenMatch(){
+  const mid=VIEW.openMatch;if(mid==null)return;
+  try{const r=await fetch('/api/ft/matchstats?matchId='+mid);const j=await r.json();if(r.ok&&VIEW.openMatch===mid){VIEW.matchData=j;const b=document.getElementById('vMatchBody');if(b)b.innerHTML=renderMatchStats(j);}}catch(e){}
 }
 async function refreshViewer(b){if(!VIEW||!VIEW.draft)return;if(b){b.disabled=true;b.textContent='…';}await loadViewer(VIEW.draft.id,false,true);if(b){b.disabled=false;b.textContent='Обновить';}}
 const f1=v=>(v==null||v===''?'':Number(v).toFixed(1));
@@ -1158,25 +1207,30 @@ function renderViewerTeams(){
   const ptsPool=[];sc.teams.forEach(t=>t.players.forEach(p=>{if(isPlayed(p)&&p.points!=null)ptsPool.push(p.points);})); // мин/макс по всем сыгравшим игрокам драфта (общий пул → цвета сравнимы между участниками)
   const ptsGrad=makeGrad(ptsPool);
   const totGrad=makeGrad(sc.teams.map(t=>t.total)); // «Итого» — градиент по суммарным очкам участников (пул = тоталы команд)
+  // заголовки таблицы состава с пояснениями (#7): нативный title + tap-попап
+  const HDR=[['#','Порядок игрока в составе'],['POS','Позиция: GK вратарь · DEF защитник · MID полузащитник · FWD нападающий'],['','Статус матча игрока: ✓ сыграл · ✗ не вышел (матч прошёл) · ● идёт · ⏳ ждёт матч'],['PLAYER','Игрок. Тренер = сумма очков вышедших на замену игроков его клуба. Наведи/нажми на строку — разбивка очков и события'],['TEAM','Клуб игрока'],['COST','Цена покупки на аукционе'],['PTS','Очки за тур. Наведи/нажми на строку игрока — из чего сложились']];
+  const VHEAD='<thead><tr>'+HDR.map(h=>`<th${h[0]==='PLAYER'?' class="pl"':''} data-tip="${escAttr(h[1])}" style="cursor:help">${h[0]}</th>`).join('')+'</tr></thead>';
   const cols=sc.teams.map((t)=>{
     const byDraft=(a,b)=>(a.draftOrder!=null?a.draftOrder:1e9)-(b.draftOrder!=null?b.draftOrder:1e9);
     const byPos=(a,b)=>POSORD.indexOf(a.position)-POSORD.indexOf(b.position);
     const starters=t.players.filter(p=>!p.isSub).slice().sort(pOrder==='draft'?byDraft:byPos);
     const sub=t.players.find(p=>p.isSub);
     let n=0;
-    let body=starters.map(p=>{n++;return `<tr class="${p.mstatus==='live'?'plive':p.mstatus==='dnp'?'sdead':''}"><td class="mut">${n}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+(p.code||p.club):p.name}</td><td>${p.code||p.club}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td style="${isPlayed(p)?ptsGrad(p.points):''}">${fpts(p)}</td></tr>`;}).join('');
-    if(sub)body+=`<tr class="subr${sub.counted?' counted':''}${sub.mstatus==='dnp'?' sdead':''}"><td class="mut">S</td><td class="${posClass(sub.position)}">${posShort(sub.position)}</td><td>${VSTAT[sub.mstatus]||''}</td><td class="nm">${sub.name}</td><td>${sub.code||sub.club}</td><td>${sub.cost!=null?'$'+sub.cost:''}</td><td style="${isPlayed(sub)?ptsGrad(sub.points):''}">${fpts(sub)}</td></tr>`;
+    const prow=(p,first,cls)=>{const tid=regTip(playerTipHtml(p));return `<tr class="${cls}" data-tip-id="${tid}" style="cursor:help"><td class="mut">${first}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+esc(p.code||p.club):esc(p.name)}</td><td>${esc(p.code||p.club)}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td style="${isPlayed(p)?ptsGrad(p.points):''}">${fpts(p)}</td></tr>`;};
+    let body=starters.map(p=>{n++;return prow(p,n,p.mstatus==='live'?'plive':p.mstatus==='dnp'?'sdead':'');}).join('');
+    if(sub)body+=prow(sub,'S','subr'+(sub.counted?' counted':'')+(sub.mstatus==='dnp'?' sdead':''));
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
-    return `<div class="vteam${lead}"><div class="vthead"><span class="vtn">${medal}${t.name}${fin}</span><span class="vtp">${f1(t.total)}</span></div>
+    return `<div class="vteam${lead}"><div class="vthead"><span class="vtn"><span class="vava" data-uid="${escAttr(t.user_id||'')}">${avaHtml(t.user_id,t.name)}</span>${medal}${esc(t.name)}${fin}</span><span class="vtp">${f1(t.total)}</span></div>
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
-      <table><thead><tr><th>#</th><th>POS</th><th></th><th class="pl">PLAYER</th><th>TEAM</th><th>COST</th><th>PTS</th></tr></thead><tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
+      <table>${VHEAD}<tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
   const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="position:static;width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт матч</span></div>`;
   const pbar=`<div class="row" style="margin-bottom:8px;justify-content:flex-end"><button class="btn" onclick="togglePOrder()">Состав: <b>${pOrder==='draft'?'как драфтили':'по позициям'}</b></button></div>`;
-  el.innerHTML=legend+pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div id="vMatches"></div></div><div class="right">${right}</div></div>`;
+  el.innerHTML=legend+pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 auto;min-width:0"></div><div class="vstandcol">${standTable()}</div></div></div><div class="right">${right}</div></div>`;
+  fetchViewerAvatars();   // дотянуть аватары участников из профилей и проставить в шапки колонок (#4)
   renderViewerMatchesList();   // блок матчей — сразу под участниками, в левой колонке (#14); выбранный матч восстанавливаем из кэша
 }
 function renderViewerSchedule(){
@@ -1219,20 +1273,30 @@ function viewerHist(){
   b.innerHTML=parts.length?parts.join(''):'<p class="mut">Нет данных.</p>';
   el.style.zIndex='30';el.style.display='block';
 }
+// таблица текущей очередности участников (#доп): «1. name 34.8 (сыграло/всего)»; played = стартовые с начавшимся матчем
+function standTable(){
+  const sc=VIEW.score;if(!sc||!sc.standings||!sc.standings.length)return '';
+  const teamByU={};(sc.teams||[]).forEach(t=>teamByU[t.user_id]=t);
+  const rows=sc.standings.map(s=>{const t=teamByU[s.user_id];const pl=t?t.players.filter(p=>!p.isSub):[];const played=pl.filter(p=>p.mstatus&&p.mstatus!=='pending').length;return `<div class="stRow"><span class="stPl">${s.place}.</span><span class="stNm">${esc(s.name)}</span><b class="stPts">${f1(s.total)}</b><span class="stCnt mut">(${played}/${pl.length})</span></div>`;});
+  return `<div class="vstand"><div class="evlh">Очередность</div>${rows.join('')}</div>`;
+}
 function renderViewerMatchesList(){
   const el=document.getElementById('vMatches');if(!el)return;const fx=VIEW.fixtures;const ids=VIEW.draft.match_ids||[];
   const list=fx.length?fx:ids.map(id=>({matchId:id,home:'матч',away:id}));
-  const cached=VIEW.openMatch!=null&&VIEW.matchBody;
-  el.innerHTML=`<div class="vmpanel"><h3>Матчи — статистика игроков</h3><div style="display:flex;gap:14px;align-items:flex-start"><div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">${list.map(m=>`<button class="btn${m.matchId===VIEW.openMatch?' p':''}" data-mid="${m.matchId}" style="text-align:left;white-space:nowrap" onclick="openMatch(${m.matchId},this)">${m.home} — ${m.away}</button>`).join('')}</div><div id="vMatchBody" style="flex:1;min-width:0">${cached?VIEW.matchBody:'<span class="mut">Выбери матч, чтобы увидеть статистику игроков.</span>'}</div></div></div>`;
+  // рендерим тело из VIEW.matchData (живой объект) → фильтр команды (VIEW.logTeam) переживает автообновление, не сбрасывается (баг с «остаётся одна команда»)
+  const body=(VIEW.openMatch!=null&&VIEW.matchData)?renderMatchStats(VIEW.matchData):'<span class="mut">Выбери матч, чтобы увидеть статистику игроков.</span>';
+  el.innerHTML=`<div class="vmpanel"><h3>Матчи — статистика игроков</h3><div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto">${list.map(m=>`<button class="btn${m.matchId===VIEW.openMatch?' p':''}" data-mid="${m.matchId}" style="text-align:left;white-space:nowrap" onclick="openMatch(${m.matchId},this)">${m.home} — ${m.away}</button>`).join('')}</div><div id="vMatchBody" style="flex:1 1 460px;min-width:0">${body}</div></div></div>`;
 }
 async function openMatch(mid,btn){
   VIEW.openMatch=mid;   // запомнить выбор — переживает авто-рефреш (#14)
   document.querySelectorAll('#vMatches .btn').forEach(b=>b.classList.toggle('p',b.dataset.mid==mid));
   const b=document.getElementById('vMatchBody');b.innerHTML='<span class="mut">загрузка…</span>';
-  try{const r=await fetch('/api/ft/matchstats?matchId='+mid);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);const h=renderMatchStats(j);VIEW.matchBody=h;b.innerHTML=h;}catch(e){VIEW.matchBody='';b.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
+  try{const r=await fetch('/api/ft/matchstats?matchId='+mid);const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);VIEW.matchData=j;if(!VIEW.logTeam)VIEW.logTeam='both';const h=renderMatchStats(j);VIEW.matchBody=h;b.innerHTML=h;}catch(e){VIEW.matchBody='';b.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
 }
 function renderMatchStats(j){
   const COLS=[['G','goal'],['AST','assist'],['CS','cleanSheet'],['CG','concededGoal'],['SoT','shotOnTarget'],['S','keeperSave'],['PS','penaltySave'],['BLD','penaltyCaused'],['PM','penaltyMiss'],['OG','ownGoal'],['YC','yellowCard'],['RC','redCard'],['IMP','impact']];
+  // пояснения к столбцам таблицы статов (#7 в разделе «Матчи»)
+  const MDESC={G:'Goal — гол. GK +8 · DEF +6 · MID +5 · FWD +4',AST:'Assist — голевой пас. +3',CS:'Clean Sheet — сухой матч (60+ мин). GK/DEF +4 · MID +1',CG:'Conceded Goals — пропущенные. GK/DEF: −1 за каждые 2',SoT:'Shot on Target — удар в створ. GK +1 · DEF +0.6 · MID/FWD +0.4',S:'Saves — сейвы вратаря. +0.5 за каждый',PS:'Penalty Save — отражённый пенальти. +5',BLD:'Blunder — привезённый пенальти/штрафной. −2',PM:'Penalty Miss — незабитый пенальти. −2',OG:'Own Goal — автогол. −2',YC:'Yellow Card — жёлтая карточка. −1',RC:'Red Card — красная карточка. −3',IMP:'Impact — влияние на игру. ±0.3',MP:'Minutes Played — сыграно минут',POS:'Позиция: GK вратарь · DEF защитник · MID полузащитник · FWD нападающий',SUM:'Сумма очков игрока за матч'};
   const FTORD={goalkeeper:0,defender:1,midfielder:2,forward:3};
   const prank=p=>(p.position in FTORD?FTORD[p.position]:9);
   const byClub={};j.players.forEach(p=>{if((p.minutes||0)>0)(byClub[p.club]||(byClub[p.club]=[])).push(p);});
@@ -1248,7 +1312,8 @@ function renderMatchStats(j){
   const rowHtml=p=>{const fp=FTPOS[p.position]||[p.position,''];return `<tr><td class="${fp[1]}" style="white-space:nowrap">${p.name}</td><td class="${fp[1]}">${fp[0]}</td><td class="right">${p.minutes}</td>`+COLS.map(c=>{const v=p.stats[c[1]]||0;return v?`<td class="right" style="${cellBg(c[1],v)}">${v}</td>`:`<td class="right mut">0</td>`;}).join('')+`<td class="right" style="${grad(p.total)}">${f1(p.total)}</td></tr>`;};
   const ncol=COLS.length+4; // Игрок,POS,MP + COLS + Σ
   // один общий стол на обе команды → колонки выровнены (auto-layout), имена не режутся; команда = строка-заголовок colspan
-  html+=`<div style="overflow-x:auto"><table class="mstat" style="font-size:11px"><thead><tr><th style="text-align:left">Игрок</th><th>POS</th><th class="right">MP</th>`+COLS.map(c=>`<th class="right">${c[0]}</th>`).join('')+`<th class="right">Σ</th></tr></thead><tbody>`;
+  const mth=(lbl,k,cls)=>`<th${cls?' '+cls:''} data-tip="${escAttr(MDESC[k]||'')}" style="cursor:help">${lbl}</th>`;
+  html+=`<div style="overflow-x:auto"><table class="mstat" style="font-size:11px"><thead><tr><th style="text-align:left">Игрок</th>${mth('POS','POS')}${mth('MP','MP','class="right"')}`+COLS.map(c=>mth(c[0],c[0],'class="right"')).join('')+`${mth('Σ','SUM','class="right"')}</tr></thead><tbody>`;
   for(const club of Object.keys(byClub)){
     const start=byClub[club].filter(p=>p.lineup!=='bench').sort((a,b)=>prank(a)-prank(b));
     const subs=byClub[club].filter(p=>p.lineup==='bench').sort((a,b)=>prank(a)-prank(b));
@@ -1257,8 +1322,43 @@ function renderMatchStats(j){
       +(subs.length?`<tr><td colspan="${ncol}" style="border-top:2px dashed #34495e;padding-top:6px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Вышли на замену</td></tr>`+subs.map(rowHtml).join(''):'');
   }
   html+=`</tbody></table></div>`;
+  // лог событий матча справа (#5): фильтр обе/дом/гости; данные j.log (с сервера)
+  const log=`<div class="evlog"><div class="evlh">Лог событий матча</div><div id="evLogHead" class="row" style="gap:4px;margin-bottom:6px;flex-wrap:wrap">`
+    +`<button class="btn p" data-f="both" onclick="setLogTeam('both')">${esc(j.homeCode||j.home)} + ${esc(j.awayCode||j.away)}</button>`
+    +`<button class="btn" data-f="home" onclick="setLogTeam('home')">${esc(j.homeCode||j.home)}</button>`
+    +`<button class="btn" data-f="away" onclick="setLogTeam('away')">${esc(j.awayCode||j.away)}</button>`
+    +`</div><div id="evLogBody">${evLogRows()}</div></div>`;
+  return `<div class="mstatrow"><div class="mstatcol">${html}</div><div class="evlogcol">${log}</div></div>`;
+}
+// иконки/курсив событий лога (#5). Замены: красная стрелка вниз / зелёная вверх; гол ⚽; ассист 🥾; карточки 🟨/🟥; сейвы 🧤; бландер/автогол 🚫
+const EVICON={goal:'⚽',assist:'🥾',yc:'🟨',rc:'🟥',save:'🧤',pensave:'🧤',blunder:'🚫',owngoal:'🚫',penmiss:'🚫',sub_on:'<span class="evup">↑</span>',sub_off:'<span class="evdn">↓</span>',shot:''};
+const EVITAL=new Set(['sub_on','sub_off','save','pensave','shot']);   // курсивом: замены, сейвы, удары в створ
+// строки лога событий матча с учётом фильтра команды (#5)
+function evLogRows(){
+  const j=VIEW.matchData;if(!j||!j.log)return '<div class="mut">—</div>';
+  const f=VIEW.logTeam||'both';
+  const rows=j.log.filter(e=>f==='both'||(f==='home'&&e.teamId===j.homeId)||(f==='away'&&e.teamId===j.awayId));
+  if(!rows.length)return '<div class="mut">Нет событий, начисливших очки.</div>';
+  const rowHtml=e=>{
+    const code=e.teamId===j.homeId?(j.homeCode||j.home):(j.awayCode||j.away);
+    const min=e.minute!=null?`<span class="evmin">${e.minute}'</span>`:`<span class="evmin mut">·</span>`;
+    const pts=e.pts==null?'':` <b class="${e.pts>=0?'evpos':'evneg'}">(${e.pts>0?'+':''}${f1(e.pts)})</b>`;
+    const dot=e.teamId===j.homeId?'evhome':'evaway';
+    const ic=EVICON[e.kind]||'';
+    const act=EVITAL.has(e.kind)?`<i>${esc(e.action)}</i>`:esc(e.action);
+    return `<div class="evrow"><span class="evdot ${dot}"></span><span class="evcode">${esc(code)}</span><span class="evic">${ic}</span>${min}<span class="evtxt"><span class="evnm">${esc(e.name)}</span>: ${act}${pts}</span></div>`;
+  };
+  // жирная линия между ивентами с минутами и без (удары в створ/сейвы и пр.)
+  let html='',hadTimed=false,sep=false;
+  for(const e of rows){
+    if(e.minute==null&&hadTimed&&!sep){html+='<div class="evsep"></div>';sep=true;}
+    if(e.minute!=null)hadTimed=true;
+    html+=rowHtml(e);
+  }
   return html;
 }
+function renderEvLog(){const b=document.getElementById('evLogBody');if(b)b.innerHTML=evLogRows();document.querySelectorAll('#evLogHead .btn').forEach(x=>x.classList.toggle('p',x.dataset.f===(VIEW.logTeam||'both')));}
+function setLogTeam(v){VIEW.logTeam=v;renderEvLog();}
 function renderLobbyReg(){
   const el=document.getElementById('lobRegList');if(!el)return;
   const rec=DRAFTS.filter(d=>d.status==='recruiting');
@@ -1338,7 +1438,7 @@ function draftTiming(d){                                    // правая ко
   if(d.status==='recruiting'||d.status==='finalized')
     return `старт ${fmtStart(d.starts_at)}`+(d.starts_at?` · <span class="countdown" data-start="${d.starts_at}"></span>`:'');
   if(d.status==='live')return 'идёт';
-  if(d.status==='done'){const p=fmtPlayed(d.starts_at);return (p?p+' · ':'')+'идёт подсчёт очков';}
+  if(d.status==='done'){const p=fmtPlayed(d.starts_at);return (p?p+' · ':'')+'подсчёт очков';}
   if(d.status==='settled'){const sc=SCORES[d.id];const w=sc&&sc.standings&&sc.standings[0];const p=fmtPlayed(d.starts_at);const tail=w?`🥇 ${w.name} ${f1(w.total)}`:'завершён';return (p?p+' · ':'')+tail;}
   if(d.status==='cancelled')return 'отменён';
   return '';
@@ -1367,6 +1467,7 @@ function draftRow(d,ctx){                                   // одна карт
     <span class="dpill p-${d.status}">${STATUS_SHORT[d.status]||d.status}</span>${extra}
     <span class="dmain"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round}</span>
     <span class="dmeta mut">слотов ${d.slots} · матчей ${n}</span>
+    ${draftWhoChips(d)}
     <span class="dtime mut">${draftTiming(d)}</span>
     <span class="dchev">${exp?'▲':'▼'}</span></div>`;
   if(!exp)return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}</div>`;
@@ -1518,7 +1619,7 @@ function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code+(VO
   setVp(true);
   document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
   document.getElementById('backToDraftBtn').style.display='none'; // мы в драфте — «вернуться» не нужно
-  const rc=document.getElementById('roomcode');rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';
+  const rc=document.getElementById('roomcode');if(rc){rc.textContent='Комната '+code+' · копировать ссылку';rc.style.display='inline';}
   document.getElementById('callPhoneBtn').style.display='inline-block';
   document.getElementById('leaveRoomBtn').style.display='inline-block';}
 function enterVoiceMode(code){setVp(false); // телефон-режим: device-width, простая панель вместо десктоп-кокпита
@@ -1563,7 +1664,7 @@ function leaveRoom(){ // явный выход из комнаты: чистим
   myRoom='';me=null;myRtc=null;
   history.replaceState(null,'',location.pathname+'?view=lobby');
   document.getElementById('draft').style.display='none';
-  document.getElementById('roomcode').style.display='none';
+  {const rc=document.getElementById('roomcode');if(rc)rc.style.display='none';}
   document.getElementById('callPhoneBtn').style.display='none';
   document.getElementById('leaveRoomBtn').style.display='none';
   document.getElementById('backToDraftBtn').style.display='none';
@@ -1715,9 +1816,9 @@ function applyLayoutMode(){
 function render(){
   const d=S.draft;
   applyLayoutMode();
-  document.getElementById('phase').textContent=S.started?'фаза: '+d.phase:'лобби';
+  {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
-  if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';
+  if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
   renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
@@ -1740,6 +1841,43 @@ function renderLog(){
   el.scrollTop=0;
 }
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// экранирование под атрибут (data-tip — простой текст с переносами)
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'&#10;');}
+// --- Тултипы итогов (#5/#6/#7): форматированный попап, по наведению (ПК) и по тапу (телефон) ---
+// data-tip = простой текст (заголовки столбцов), data-tip-id = ключ в реестре с HTML (тултип игрока)
+let TIPREG={},tipSeq=0;
+function regTip(html){const id='pt'+(++tipSeq);TIPREG[id]=html;return id;}
+function getTipPop(){let el=document.getElementById('tipPop');if(!el){el=document.createElement('div');el.id='tipPop';el.className='tippop';document.body.appendChild(el);}return el;}
+function tipHtmlFor(el){const id=el.getAttribute('data-tip-id');if(id&&TIPREG[id])return TIPREG[id];const t=el.getAttribute('data-tip');return t?esc(t).replace(/\n/g,'<br>'):'';}
+function showTip(el,x,y){const html=tipHtmlFor(el);if(!html){hideTip();return;}const p=getTipPop();p.innerHTML=html;p.style.display='block';const w=p.offsetWidth,h=p.offsetHeight;let L=x+14,T=y+16;if(L+w>innerWidth-8)L=Math.max(8,innerWidth-w-8);if(T+h>innerHeight-8)T=Math.max(8,y-h-16);if(T<8)T=8;p.style.left=L+'px';p.style.top=T+'px';}
+function hideTip(){const el=document.getElementById('tipPop');if(el)el.style.display='none';}
+document.addEventListener('mouseover',e=>{const t=e.target.closest('[data-tip],[data-tip-id]');if(t)showTip(t,e.clientX,e.clientY);});
+document.addEventListener('mouseout',e=>{const t=e.target.closest('[data-tip],[data-tip-id]');if(!t)return;const to=e.relatedTarget;if(to&&t.contains(to))return;hideTip();});
+document.addEventListener('click',e=>{const t=e.target.closest('[data-tip],[data-tip-id]');if(t){e.stopPropagation();showTip(t,e.clientX,e.clientY);}else hideTip();});
+// форматированный тултип игрока (#6): разбивка очков (категория ×n = вклад) + таймлайн событий с минутой
+const EVLBL={goal:'гол',assist:'пас',substitution:'замена',yellow_card:'жёлтая карточка',red_card:'красная карточка'};
+function playerTipHtml(p){
+  const head=p.position==='COACH'?'Тренер '+esc(p.code||p.club):esc(p.name)+(p.code||p.club?' · '+esc(p.code||p.club):'');
+  if(p.mstatus==='pending')return `<div class="ptH">${head}</div><div class="mut">ждёт матч</div>`;
+  let h=`<div class="ptH">${head}</div>`;
+  if(p.points!=null)h+=`<div class="ptS">Очки: <b class="${p.points>=0?'evpos':'evneg'}">${f1(p.points)}</b>${p.minutes?` <span class="mut">· ${p.minutes} мин</span>`:''}</div>`;
+  const br=p.breakdown||[];
+  if(br.length)h+=`<div class="ptSec">${p.position==='COACH'?'вышедшие на замену':'разбивка'}</div>`+br.map(b=>`<div class="ptR"><span>${esc(b.label)}${b.n>1?' <span class="mut">×'+b.n+'</span>':''}</span><b class="${b.pts>=0?'evpos':'evneg'}">${b.pts>0?'+':''}${f1(b.pts)}</b></div>`).join('');
+  const ev=p.events||[];
+  if(ev.length)h+=`<div class="ptSec">события</div>`+ev.map(e=>`<div class="ptR"><span><span class="mut">${e.minute!=null?e.minute+"'":''}</span> ${esc(EVLBL[e.t]||e.t)}</span></div>`).join('');
+  if(!br.length&&!ev.length)h+=`<div class="mut">${p.mstatus==='dnp'?'не вышел на поле':'нет начисленных очков'}</div>`;
+  return h;
+}
+// аватар участника в шапке колонки итогов (#4): из dc_profiles.avatar_url (кэш AV), иначе заглушка-инициал
+function avaHtml(uid,name){const url=uid?AV[uid]:null;const init=String(name||'?').trim().charAt(0).toUpperCase();return url?`<img src="${escAttr(url)}" class="vavimg" alt="">`:`<span class="vavini">${esc(init)}</span>`;}
+async function fetchViewerAvatars(){
+  if(!sb||!VIEW||!VIEW.score||!VIEW.score.teams)return;
+  const need=[...new Set(VIEW.score.teams.map(t=>t.user_id).filter(u=>u&&!(u in AV)))];
+  if(!need.length){renderVAvatars();return;}
+  try{const {data}=await sb.from('dc_profiles').select('id,avatar_url').in('id',need);need.forEach(u=>{AV[u]=null;});(data||[]).forEach(p=>{AV[p.id]=p.avatar_url||null;});}catch(e){}
+  renderVAvatars();
+}
+function renderVAvatars(){const ts=(VIEW&&VIEW.score&&VIEW.score.teams)||[];document.querySelectorAll('#vTeams .vava').forEach(el=>{const uid=el.dataset.uid;const t=ts.find(x=>String(x.user_id)===uid);el.innerHTML=avaHtml(uid,t&&t.name);});}
 function renderChat(){
   const el=document.getElementById('chatLog');if(!el)return;
   const ch=(S&&S.lobby&&S.lobby.chat)||[];
@@ -1768,7 +1906,7 @@ function renderCols(){
   el.innerHTML=ordered().map(m=>`
     <div class="pcol ${m.id===d.actor?'act':''} ${m.id===me?'me':''} ${m.finished?'done':''}">
       <div class="cam" data-seat="${m.id}"></div>
-      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span>${m.id===me?'<span class="myctl" id="myCtlBox"></span>':''}</div>
+      <div class="phead"><span class="nm">${m.name}${m.id===d.actor?' · ход':''}</span>${m.finished?` <span class="badge admin">СОБРАН #${m.finishOrder}</span>`:''}<span class="ptimer ${m.id===d.onClock?'tick':''}" id="ptimer-${m.id}" title="Время на часах у игрока">${mmss(m.activeMs||0)}</span></div>
       <div class="stats">
         <div class="sb"><div class="lbl">Бюджет</div><div class="val gold">$${m.budget}</div></div>
         <div class="sb hl"><div class="lbl">Макс.бид</div><div class="val">$${m.maxBid}</div></div>
@@ -1869,11 +2007,12 @@ function renderBottom(){
     const ms=S.lobby.seats.find(s=>s.id===me);
     const seats=S.lobby.seats||[];const rdy=seats.filter(s=>s.ready).length;const need=S.lobby.need;
     const wait=need?`<p class="mut">В комнате ${seats.length}/${need}, готовы ${rdy}/${seats.length}.${seats.length<need?' Ждём остальных участников.':(rdy<seats.length?' Ждём готовности всех.':'')}</p>`:'';
-    el.innerHTML=`<div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
+    el.innerHTML=`<div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
       (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
       <button class="btn p" onclick='send({type:"draw"})' ${S.lobby.startable?'':'disabled'}>Жеребьёвка</button>`+
       (S.isTest?` <button class="btn" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт (тест)</button>`:'')
       :'<span class="mut">Ты зритель</span>')+`</div>`;
+    updateRtcBtns(); // контролы мик/камера доступны и в предруме (#: лобби)
     return;
   }
   if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div>';return;}
@@ -1897,7 +2036,8 @@ function renderBottom(){
   lotH+='</div>';
   const myPick=d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes');
   const np=nomPanel(d);const nomH=np?`<div class="panel ${myPick?'pickactive':'pickro'}">`+np+'</div>':'';
-  el.innerHTML='<div class="bottom">'+lotH+nomH+'</div>';
+  el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar"></div>'+lotH+nomH+'</div>';
+  updateRtcBtns(); // бар пересоздаётся вместе с #bottom на каждый ререндер — заполняем заново
   if(d.actor===me&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub',false);
   else if(d.phase==='nominating'||d.phase==='substitutes'||d.phase==='bidding') renderNom('browse',true);
 }
@@ -1947,7 +2087,8 @@ function availUnits(){
   const taken=new Set(d.taken||[]);
   let list=POOL.filter(u=>!taken.has(u.id));
   const mgr=(d.managers||[]).find(m=>m.id===me); // моё место; у зрителя нет → видит всю доску
-  if(browseMineOnly&&mgr)list=list.filter(u=>clientCanAdd(mgr,u,d.clubCounts||{}));
+  // фильтр «только доступные мне» осмыслен лишь в аукционе (бюджет/лимиты при ожидании); на фазе замен ростеры полны → clientCanAdd отбраковал бы всех, поэтому пропускаем (#3)
+  if(browseMineOnly&&mgr&&d.phase!=='substitutes')list=list.filter(u=>clientCanAdd(mgr,u,d.clubCounts||{}));
   return list;
 }
 function toggleBrowseMine(v){browseMineOnly=v;renderBottom();}
@@ -1960,7 +2101,7 @@ function filterUI(mode,ro){
     <input id="fq" placeholder="поиск по фамилии…" value="${nomFilt.q||''}" oninput="renderNom('${mode}',${!!ro})">
     <select id="ft" onchange="renderNom('${mode}',${!!ro})"><option value="">все клубы</option>${teams.map(t=>`<option ${t===nomFilt.t?'selected':''}>${t}</option>`).join('')}</select>
     <select id="fp" onchange="renderNom('${mode}',${!!ro})"><option value="">все позиции</option>${poss.map(p=>`<option value="${p}" ${p===nomFilt.p?'selected':''}>${posShort(p)}</option>`).join('')}</select>
-  </div>${(ro&&me!=null)?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mut);margin:4px 0 2px;cursor:pointer" title="Скрыть тех, кого не можешь купить: занят лимит позиции/клуба или не хватает бюджета"><input type="checkbox" ${browseMineOnly?'checked':''} onchange="toggleBrowseMine(this.checked)"> только доступные мне</label>`:''}<div class="plist" id="plist"></div>`+(ro?'':`<div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`);
+  </div>${(ro&&me!=null&&S.draft.phase!=='substitutes')?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--mut);margin:4px 0 2px;cursor:pointer" title="Скрыть тех, кого не можешь купить: занят лимит позиции/клуба или не хватает бюджета"><input type="checkbox" ${browseMineOnly?'checked':''} onchange="toggleBrowseMine(this.checked)"> только доступные мне</label>`:''}<div class="plist" id="plist"></div>`+(ro?'':`<div class="sel" id="sel" data-mode="${mode}"><span class="mut">Выбери игрока из списка — затем подтвердишь.</span></div>`);
 }
 function renderNom(mode,ro){
   const units=availUnits();
