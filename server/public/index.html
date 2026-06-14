@@ -171,12 +171,14 @@
   .evup{color:#3ccb78;font-weight:800}.evdn{color:#e05050;font-weight:800}
   .evsep{border-top:2px solid #46617a;margin:5px 0 3px}
   .matchwrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-top:10px}
-  .vstandcol{flex:0 1 220px;min-width:190px}
-  .vstand{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-  .stRow{display:flex;align-items:baseline;gap:6px;font-size:12px;line-height:1.9;border-bottom:1px solid rgba(255,255,255,.05)}
-  .stPl{color:var(--mut);min-width:18px;flex:0 0 auto}.stNm{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .stPts{color:var(--gold);flex:0 0 48px;text-align:right;font-variant-numeric:tabular-nums}
-  .stCnt{flex:0 0 52px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
+  .vstandcol{flex:0 0 auto}
+  .vstand{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:max-content;max-width:100%}
+  .sttbl{border-collapse:collapse}
+  .sttbl td{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.05);white-space:nowrap;font-size:12px;line-height:1.9}
+  .stPl{color:var(--mut);text-align:right;padding-right:8px}
+  .stNm{font-weight:600;padding-right:16px}
+  .stPts{color:var(--gold);text-align:right;font-variant-numeric:tabular-nums;padding-right:10px}
+  .stCnt{text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
   .vteam table{width:100%;font-size:11px}
   .vteam th,.vteam td{text-align:center;padding:2px 5px}
   .vteam th.pl,.vteam td.nm{text-align:left;white-space:nowrap}
@@ -1277,8 +1279,8 @@ function viewerHist(){
 function standTable(){
   const sc=VIEW.score;if(!sc||!sc.standings||!sc.standings.length)return '';
   const teamByU={};(sc.teams||[]).forEach(t=>teamByU[t.user_id]=t);
-  const rows=sc.standings.map(s=>{const t=teamByU[s.user_id];const pl=t?t.players.filter(p=>!p.isSub):[];const played=pl.filter(p=>p.mstatus&&p.mstatus!=='pending').length;return `<div class="stRow"><span class="stPl">${s.place}.</span><span class="stNm">${esc(s.name)}</span><b class="stPts">${f1(s.total)}</b><span class="stCnt mut">(${played}/${pl.length})</span></div>`;});
-  return `<div class="vstand"><div class="evlh">Очередность</div>${rows.join('')}</div>`;
+  const rows=sc.standings.map(s=>{const t=teamByU[s.user_id];const pl=t?t.players.filter(p=>!p.isSub):[];const played=pl.filter(p=>p.mstatus&&p.mstatus!=='pending').length;return `<tr><td class="stPl">${s.place}.</td><td class="stNm">${esc(s.name)}</td><td class="stPts">${f1(s.total)}</td><td class="stCnt mut">(${played}/${pl.length})</td></tr>`;});
+  return `<div class="vstand"><div class="evlh">Очередность</div><table class="sttbl">${rows.join('')}</table></div>`;
 }
 function renderViewerMatchesList(){
   const el=document.getElementById('vMatches');if(!el)return;const fx=VIEW.fixtures;const ids=VIEW.draft.match_ids||[];
