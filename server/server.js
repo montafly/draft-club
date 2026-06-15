@@ -618,6 +618,17 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 let rtcSeq = 0;                                          // уникальный id соединения для WebRTC-mesh (игроки и зрители)
 
+// WS keepalive: пингуем клиентов; мёртвый (half-open) сокет не ответит pong → terminate → честный 'close' → presence чистится (dupLive прикрывает гонку реконнекта)
+const WS_PING_MS = 30000;
+const wsHeartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  }
+}, WS_PING_MS);
+wss.on('close', () => clearInterval(wsHeartbeat));
+
 const DRAW_SPIN_MS = 6500, DRAW_REVEAL_MS = 2000; // жеребьёвка: (n-1) спинов + показ финального порядка; последний выбирается автоматом (синхронно с клиентом)
 function broadcast(code) {
   const e = rooms.get(code);
@@ -684,10 +695,12 @@ async function joinAuthed(ws, msg) {
 
 wss.on('connection', (ws) => {
   ws.roomCode = null; ws.seatId = null; ws.user = null; ws.rtcId = ++rtcSeq; ws.name = null;
+  ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; });   // ответ на протокольный ping heartbeat'а
   ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     try {
+      if (msg.type === 'ping') { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'pong' })); return; }   // app-watchdog клиента: эхо-pong
       if (msg.type === 'createRoom') {
         const code = makeCode();
         rooms.set(code, { room: new Room(), clients: new Set() });

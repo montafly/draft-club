@@ -531,9 +531,10 @@ const LIM={GK:[1,1],DEF:[3,5],MID:[2,5],FWD:[1,3],COACH:[1,1]};
 const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
-const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+let ws=null,wsBackoff=0,wsPingTimer=null,wsPongTimer=null,wsReconnTimer=null,wsManualClose=false;
 let me=null,myRtc=null,myUid=null,VOICE=false,voiceListenHere=false,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
-ws.onmessage=e=>{const m=JSON.parse(e.data);
+function onWsMessage(e){const m=JSON.parse(e.data);
+  if(m.type==='pong'){clearTimeout(wsPongTimer);wsPongTimer=null;return;} // ответ на keepalive-пинг клиента
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
   else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;{const w=document.getElementById('who');if(w)w.textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
@@ -541,7 +542,33 @@ ws.onmessage=e=>{const m=JSON.parse(e.data);
   else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
-  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}};
+  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}}
+// WS keepalive + авто-reconnect: раньше сокет создавался один раз и не переподключался (упал → клиент мёртв до ручного F5). Теперь watchdog рвёт мёртвый half-open сокет, reconnect с backoff поднимает заново и пере-входит в комнату. RTC (медиа) идёт P2P и переживает флап — восстанавливается только сигнальный канал (по нему же ходит сигналинг RTC).
+function wsStartPing(){ // app-watchdog: шлём ping, ждём pong; нет ответа за 8с → сокет мёртв → close → reconnect (ловит half-open, который onclose сам не покажет)
+  wsStopPing();
+  wsPingTimer=setInterval(()=>{
+    if(!ws||ws.readyState!==1)return;
+    try{ws.send(JSON.stringify({type:'ping'}));}catch(e){}
+    clearTimeout(wsPongTimer);
+    wsPongTimer=setTimeout(()=>{try{ws.close();}catch(e){}},8000);
+  },20000);
+}
+function wsStopPing(){clearInterval(wsPingTimer);wsPingTimer=null;clearTimeout(wsPongTimer);wsPongTimer=null;}
+function wsScheduleReconnect(){
+  clearTimeout(wsReconnTimer);
+  const delay=Math.min(20000,1000*Math.pow(2,wsBackoff))+Math.floor(Math.random()*1000); // экспонента + джиттер (против шторма реконнектов)
+  wsBackoff++;
+  wsReconnTimer=setTimeout(wsConnect,delay);
+}
+function wsConnect(){
+  wsManualClose=false;
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws.onmessage=onWsMessage;
+  ws.onopen=()=>{wsBackoff=0;wsStartPing();if(myRoom)enterRoom(myRoom,VOICE);}; // переоткрытие → пере-вход в комнату (свежий стейт прилетит сам), на первой загрузке myRoom пуст — вход делает onAuthed
+  ws.onclose=()=>{wsStopPing();if(!wsManualClose)wsScheduleReconnect();};
+  ws.onerror=()=>{try{ws.close();}catch(e){}}; // ошибка → close → reconnect
+}
+wsConnect();
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
 const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},audioEls:{},streams:{},camState:{},micState:{},localMute:{},camOn:false,micOn:true};
 const IC={
@@ -1691,7 +1718,7 @@ function renderVoiceQr(url){const box=document.getElementById('voiceQr');if(!box
 function closeVoiceInvite(){document.getElementById('voiceInvite').style.display='none';}
 function copyVoiceLink(){const u=voiceInviteUrl();try{navigator.clipboard.writeText(u);showErr('ссылка скопирована');}catch{const el=document.getElementById('voiceLink');el.focus();el.select();}}
 initAuth();
-function send(o){ws.send(JSON.stringify(o));}
+function send(o){try{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}catch(e){}} // во время реконнект-гэпа сокет закрыт — молча пропускаем (ICE-кандидаты до-восстановятся на ре-негоциации)
 function showErr(t){const el=document.getElementById('err');el.textContent=t;setTimeout(()=>{if(el.textContent===t)el.textContent='';},4000);}
 // --- Звуки событий аукциона (WebAudio): синтез + 2 коротких сэмпла. Набор согласован с Матвеем.
 // Сэмплы: gavel.mp3 (freesound #173941, CC0) · team_celebration.ogg (Google Sound Library "Female Crowd Celebration", CC BY 4.0 — атрибуция на лендинге). ---
