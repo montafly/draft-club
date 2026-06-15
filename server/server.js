@@ -537,6 +537,23 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/draft/unapply' && req.method === 'POST') {           // участник сам отзывает свою заявку (только пока идёт набор)
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { draftId } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);
+        const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=status`); const d = drows[0];
+        if (!d) throw new Error('драфт не найден');
+        if (d.status !== 'recruiting') throw new Error('заявку можно отозвать только пока идёт набор');
+        await svcDelete(`dc_applications?draft_id=eq.${draftId}&user_id=eq.${user.id}`);   // только свою (по user_id из токена)
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   if (url === '/api/draft/reconnect' && req.method === 'POST') {
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });

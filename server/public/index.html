@@ -1417,7 +1417,9 @@ function renderLobbyReg(){
     return `<div class="card2" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · матчей ${(d.match_ids||[]).length}<br>
       старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · бай-ин ${d.buyin} DCC · призы ${d.prize1}/${d.prize2}
       <div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>
-      <button class="btn p" style="margin-top:8px" ${applied?'disabled':''} onclick="applyToDraft(${d.id})">${applied?'Заявка отправлена ✓':'Оставить заявку ('+d.buyin+' DCC)'}</button>
+      ${applied
+        ? `<span class="mut" style="font-size:12px;margin-top:8px;display:inline-block">Заявка отправлена ✓</span> <button class="btn" style="margin-top:8px" onclick="unapplyFromDraft(${d.id})">Отменить заявку</button>`
+        : `<button class="btn p" style="margin-top:8px" onclick="applyToDraft(${d.id})">Оставить заявку (${d.buyin} DCC)</button>`}
       <button class="btn" style="margin:8px 0 0 6px" onclick="openDraftMatches(${d.id})">Матчи</button></div>`;
   }).join(''):'<div class="empty">Сейчас нет открытых на запись драфтов.</div>';
 }
@@ -1645,6 +1647,15 @@ async function applyToDraft(id){
   if(error){if(le)le.textContent='не удалось подать заявку: '+error.message;return;}
   if(le)le.textContent='';
   await loadDrafts();
+}
+async function unapplyFromDraft(id){
+  const le=document.getElementById('lerr');
+  if(!confirm('Отменить свою заявку на этот драфт?'))return;
+  try{const t=await authToken();const r=await fetch('/api/draft/unapply',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    if(le)le.textContent='';
+    await loadDrafts();
+  }catch(e){if(le)le.textContent='не удалось отменить заявку: '+e.message;}
 }
 async function saveNick(){
   const nn=document.getElementById('profNick').value.trim();
