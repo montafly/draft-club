@@ -818,6 +818,7 @@ function renderParts(){
 // --- Supabase авторизация ---
 let recovering=false; // режим восстановления пароля (переход по ссылке из письма) — чтобы не провалиться в Лобби до смены
 async function initAuth(){
+  recovering=location.hash.includes('type=recovery'); // захватываем ДО createClient: detectSessionInUrl асинхронно вычищает хэш, иначе на уже залогиненном устройстве проверка ниже не срабатывала и onAuthed уводил в Лобби (форма мелькала → авто-логин)
   try{const cfg=await (await fetch('/config.json')).json(); sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);}
   catch(e){const a=document.getElementById('amsg'); if(a)a.textContent='не удалось получить конфиг сервера'; return;}
   const {data}=await sb.auth.getSession(); session=data.session;
@@ -828,7 +829,7 @@ async function initAuth(){
     if(ev==='SIGNED_OUT'){authedOnce=false; showAuth(); return;}
     if(recovering) return;                                               // в режиме восстановления в Лобби не проваливаемся
     if(s && !authedOnce) onAuthed();});
-  if(location.hash.includes('type=recovery')){showPwReset(); return;}    // ссылку восстановления Supabase мог обработать синхронно — не дать onAuthed() увести в Лобби до смены пароля
+  if(recovering){showPwReset(); return;}                                  // флаг захвачен в начале (до вычистки хэша) — показываем форму нового пароля, не уводим в Лобби даже при активной сессии
   if(session) onAuthed(); else showAuth();
 }
 function showPwReset(){recovering=true; showAuth(); const b=document.getElementById('pwSet'); if(b)b.style.display='block'; const a=document.getElementById('amsg'); if(a)a.textContent='Задай новый пароль и сохрани.'; const n=document.getElementById('npass'); if(n)setTimeout(()=>n.focus(),50);}
