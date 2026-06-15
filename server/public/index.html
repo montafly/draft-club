@@ -247,6 +247,12 @@
     <input id="apass" type="password" placeholder="пароль" style="width:100%;margin:4px 0 8px" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}">
     <button class="btn p" onclick="doLogin()">Войти</button>
     <button class="btn" onclick="doRegister()">Регистрация</button>
+    <div style="margin-top:8px"><a href="#" onclick="doReset();return false;" style="font-size:12px;color:#7fb3d5;text-decoration:underline">Забыли пароль?</a></div>
+    <div id="pwSet" style="display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px">
+      <div style="font-size:13px;margin-bottom:6px">Новый пароль</div>
+      <input id="npass" type="password" placeholder="новый пароль (мин. 6 символов)" style="width:100%;margin:4px 0 8px" onkeydown="if(event.key==='Enter'){event.preventDefault();doSetNewPassword();}">
+      <button class="btn p" onclick="doSetNewPassword()">Сохранить новый пароль</button>
+    </div>
     <div id="amsg" class="mut" style="margin-top:8px;font-size:12px"></div>
     <div class="mut" style="margin-top:14px;font-size:10px;line-height:1.4;opacity:.7">Звуки: <a href="https://developers.google.com/assistant/tools/sound-library" target="_blank" rel="noopener" style="color:inherit">Google Sound Library</a> (CC BY 4.0) · <a href="https://freesound.org" target="_blank" rel="noopener" style="color:inherit">freesound.org</a> (CC0)</div>
   </div>
@@ -810,15 +816,22 @@ function renderParts(){
 }
 
 // --- Supabase авторизация ---
+let recovering=false; // режим восстановления пароля (переход по ссылке из письма) — чтобы не провалиться в Лобби до смены
 async function initAuth(){
   try{const cfg=await (await fetch('/config.json')).json(); sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);}
   catch(e){const a=document.getElementById('amsg'); if(a)a.textContent='не удалось получить конфиг сервера'; return;}
   const {data}=await sb.auth.getSession(); session=data.session;
   // важно: onAuthed() сбрасывает вид на Лобби. Зовём его ТОЛЬКО при первом входе,
   // иначе обновление токена/возврат фокуса (Supabase шлёт событие) выкидывает из live-комнаты.
-  sb.auth.onAuthStateChange((ev,s)=>{session=s; if(ev==='SIGNED_OUT'){authedOnce=false; showAuth();} else if(s && !authedOnce){onAuthed();}});
+  sb.auth.onAuthStateChange((ev,s)=>{session=s;
+    if(ev==='PASSWORD_RECOVERY'){showPwReset(); return;}                 // переход по ссылке из письма «забыли пароль» → форма нового пароля
+    if(ev==='SIGNED_OUT'){authedOnce=false; showAuth(); return;}
+    if(recovering) return;                                               // в режиме восстановления в Лобби не проваливаемся
+    if(s && !authedOnce) onAuthed();});
+  if(location.hash.includes('type=recovery')){showPwReset(); return;}    // ссылку восстановления Supabase мог обработать синхронно — не дать onAuthed() увести в Лобби до смены пароля
   if(session) onAuthed(); else showAuth();
 }
+function showPwReset(){recovering=true; showAuth(); const b=document.getElementById('pwSet'); if(b)b.style.display='block'; const a=document.getElementById('amsg'); if(a)a.textContent='Задай новый пароль и сохрани.'; const n=document.getElementById('npass'); if(n)setTimeout(()=>n.focus(),50);}
 // мобилка: внутри приложения форсим десктоп-раскладку 1200px (телефон масштабирует пальцами), как в просмотрщике итогов. device-width только на лендинге (форма входа).
 function setVp(wide){const v=document.getElementById('vp');if(v)v.setAttribute('content',wide?'width=1200':'width=device-width, initial-scale=1');}
 function showAuth(){setVp(false);document.getElementById('landing').style.display='flex';document.getElementById('topbar').style.display='none';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='none';}
@@ -1646,6 +1659,18 @@ async function doRegister(){const email=document.getElementById('aemail').value.
   const {error}=await sb.auth.signUp({email,password:pass,options:{emailRedirectTo:location.origin+'/'}}); document.getElementById('amsg').textContent=error?error.message:'Регистрация создана. Проверь почту, подтверди — затем войди.';}
 async function doLogin(){const email=document.getElementById('aemail').value.trim(),pass=document.getElementById('apass').value;
   const {error}=await sb.auth.signInWithPassword({email,password:pass}); if(error) document.getElementById('amsg').textContent=error.message;}
+async function doReset(){const email=document.getElementById('aemail').value.trim(),amsg=document.getElementById('amsg');
+  if(!email){amsg.textContent='введи email в поле выше — на него придёт ссылка для сброса';document.getElementById('aemail').focus();return;}
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/'});
+  amsg.textContent=error?error.message:('Письмо отправлено на '+email+'. Перейди по ссылке из письма — откроется форма нового пароля.');}
+async function doSetNewPassword(){const np=document.getElementById('npass').value,amsg=document.getElementById('amsg');
+  if(!np||np.length<6){amsg.textContent='пароль минимум 6 символов';return;}
+  const {error}=await sb.auth.updateUser({password:np});
+  if(error){amsg.textContent=error.message;return;}
+  recovering=false; document.getElementById('pwSet').style.display='none'; document.getElementById('npass').value='';
+  history.replaceState(null,'',location.pathname+location.search); // убрать recovery-хэш из URL
+  amsg.textContent='пароль обновлён — входим...';
+  if(!authedOnce)onAuthed();}
 async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
