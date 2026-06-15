@@ -2044,10 +2044,16 @@ function drawTick(){
   let highId=null;
   if(pick<spins){
     const active=seats.map(s=>s.id).filter(id=>!(id in assigned));
-    const target=order[pick], tIdx=Math.max(0,active.indexOf(target));
-    const p=Math.min(1,(elapsed-pick*DRAW_SPIN_MS)/DRAW_SPIN_MS), SPINS=3;
-    const idx=Math.floor((1-Math.pow(1-p,3))*(SPINS*active.length+tIdx))%active.length; // ease-out, приземление на target при p=1
-    highId=active[((idx%active.length)+active.length)%active.length];
+    const target=order[pick];
+    const intoSpin=elapsed-pick*DRAW_SPIN_MS;                  // 0..DRAW_SPIN_MS внутри текущего спина
+    const LAND=700;                                            // последние 700мс — фиксация на выпавшем перед его lock (без долгого «зависания» заранее)
+    if(active.length<=1||intoSpin>=DRAW_SPIN_MS-LAND){ highId=target; }
+    else{
+      // огонёк хаотично прыгает по оставшимся; интервал прыжка плавно растёт 70→260мс (к концу реже), но НЕ приземляется на выпавшего заранее
+      let t=0,gap=70,hop=0; while(t<intoSpin){ t+=gap; gap=Math.min(260,gap*1.12); hop++; }
+      const seed=(pick*92821+hop*53)%10007;                   // псевдослучай по номеру прыжка (стабилен в пределах одного прыжка, одинаков у всех)
+      highId=active[seed%active.length];
+    }
   } else if(n>=1){ assigned[order[n-1]]=n; }   // все спины прошли → последний мгновенно
   const chips=seats.map(s=>{const pos=assigned[s.id],hot=s.id===highId;
     return `<div class="dwchip ${pos?'lock':''} ${hot?'hot':''} ${s.id===me?'me':''}">${pos?`<span class="dwpos">${pos}</span>`:''}<span class="dwnm">${s.name}</span></div>`;}).join('');
