@@ -1583,6 +1583,7 @@ function renderAdminDrafts(){
     return `<div class="card2" style="margin:0 0 10px">
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
       принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}
+      <div class="row" style="gap:6px;align-items:center;margin:8px 0"><span class="mut" style="font-size:12px">Старт (${tzLabel()}):</span><input id="dwhen-${d.id}" type="datetime-local" value="${d.starts_at?tzWallString(new Date(d.starts_at)):''}" style="font-size:12px"><button class="btn" onclick="saveDraftTime(${d.id})">Сохранить время</button></div>
       <div style="margin:8px 0">${rows}</div>
       ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
       <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
@@ -1626,6 +1627,14 @@ async function toggleAutoplay(){
 }
 async function setApp(appId,status){await sb.from('dc_applications').update({status}).eq('id',appId);await loadDrafts();}
 async function setDraftStatus(id,status){await sb.from('dc_drafts').update({status}).eq('id',id);await loadDrafts();}
+async function saveDraftTime(id){
+  const inp=document.getElementById('dwhen-'+id),m=document.getElementById('adminMsg');
+  const utc=tzWallToUTC(inp&&inp.value||null);
+  const {error}=await sb.from('dc_drafts').update({starts_at:utc?utc.toISOString():null}).eq('id',id);
+  if(error){if(m)m.textContent='не удалось изменить время: '+error.message;return;}
+  if(m)m.textContent='время старта обновлено';
+  await loadDrafts();
+}
 async function launchDraftBtn(id){
   const m=document.getElementById('adminMsg');
   try{
