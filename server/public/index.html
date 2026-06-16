@@ -992,15 +992,15 @@ async function renderAdminUsers(){
     const t=await authToken();const r=await fetch('/api/admin/users',{headers:{authorization:'Bearer '+t}});const j=await r.json();
     if(!r.ok)throw new Error(j.error||r.status);
     ADMIN_USERS=j.users||[];
-    el.innerHTML='<input id="userFilter" placeholder="поиск по нику…" oninput="drawAdminUsers()" style="margin-bottom:8px;width:240px"><div style="max-height:360px;overflow-y:auto"><table style="font-size:13px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th class="right">Баланс</th><th style="width:230px"></th></tr></thead><tbody id="userRows"></tbody></table></div><div id="creditMsg" class="mut" style="font-size:12px;margin-top:6px"></div>';
+    el.innerHTML='<input id="userFilter" placeholder="поиск по нику/email…" oninput="drawAdminUsers()" style="margin-bottom:8px;width:240px"><div style="max-height:360px;overflow-y:auto"><table style="font-size:13px;width:100%"><thead><tr><th style="text-align:left">Игрок</th><th class="right">Баланс</th><th style="width:230px"></th></tr></thead><tbody id="userRows"></tbody></table></div><div id="creditMsg" class="mut" style="font-size:12px;margin-top:6px"></div>';
     drawAdminUsers();
   }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
 }
 function drawAdminUsers(){
   const tb=document.getElementById('userRows');if(!tb)return;
   const q=((document.getElementById('userFilter')||{}).value||'').toLowerCase();
-  const rows=ADMIN_USERS.filter(u=>!q||(u.display_name||'').toLowerCase().includes(q));
-  tb.innerHTML=rows.length?rows.map(u=>`<tr><td>${u.display_name||u.id.slice(0,8)}${u.role==='admin'?' <span class="badge admin">admin</span>':''}</td><td class="right" style="font-weight:700;color:var(--gold)" id="bal-${u.id}">${u.dcc_balance||0}</td><td><div class="row" style="gap:4px;justify-content:flex-end"><input id="cr-${u.id}" type="number" placeholder="±DCC" style="width:90px"><button class="btn p qbid" onclick="creditUser('${u.id}')">Начислить</button></div></td></tr>`).join(''):'<tr><td colspan="3" class="mut">никого не найдено</td></tr>';
+  const rows=ADMIN_USERS.filter(u=>!q||(u.display_name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+  tb.innerHTML=rows.length?rows.map(u=>`<tr><td>${u.display_name||u.id.slice(0,8)}${u.role==='admin'?' <span class="badge admin">admin</span>':''}${u.email?`<div class="mut" style="font-size:11px">${esc(u.email)}</div>`:''}</td><td class="right" style="font-weight:700;color:var(--gold)" id="bal-${u.id}">${u.dcc_balance||0}</td><td><div class="row" style="gap:4px;justify-content:flex-end"><input id="cr-${u.id}" type="number" placeholder="±DCC" style="width:90px"><button class="btn p qbid" onclick="creditUser('${u.id}')">Начислить</button></div></td></tr>`).join(''):'<tr><td colspan="3" class="mut">никого не найдено</td></tr>';
 }
 async function creditUser(id){
   const inp=document.getElementById('cr-'+id);const amt=Math.round(Number(inp.value));if(!amt)return;

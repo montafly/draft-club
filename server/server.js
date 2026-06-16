@@ -608,6 +608,12 @@ const server = http.createServer((req, res) => {
         const user = await authUser(token); const prof = await getProfile(user.id);
         if (!prof || prof.role !== 'admin') throw new Error('только админ');
         const users = await svcGet('dc_profiles?select=id,display_name,dcc_balance,role,games_played,wins&order=display_name.asc');
+        const emailById = {};                                   // email живёт в auth.users → Admin Auth API (service key)
+        try {
+          const ar = await fetch(`${process.env.SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`, { headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY } });
+          if (ar.ok) { const aj = await ar.json(); for (const u of (aj.users || [])) emailById[u.id] = u.email; }
+        } catch (e) { console.error('admin users email', e.message); }
+        for (const u of users) u.email = emailById[u.id] || null;
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ users }));
       } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
     })();
