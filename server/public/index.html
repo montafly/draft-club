@@ -1273,13 +1273,15 @@ function renderViewerTeams(){
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
     return `<div class="vteam${lead}"><div class="vthead"><span class="vtn"><span class="vava" data-uid="${escAttr(t.user_id||'')}">${avaHtml(t.user_id,t.name)}</span>${medal}${esc(t.name)}${fin}</span><span class="vtp">${f1(t.total)}</span></div>
-      <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}</div>
+      <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}${t.activeMs?` · на часах ${mmss(t.activeMs)}`:''}</div>
       <table>${VHEAD}<tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
   const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="position:static;width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт матч</span></div>`;
   const pbar=`<div class="row" style="margin-bottom:8px;justify-content:flex-end"><button class="btn" onclick="togglePOrder()">Состав: <b>${pOrder==='draft'?'как драфтили':'по позициям'}</b></button></div>`;
-  el.innerHTML=legend+pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 auto;min-width:0"></div><div class="vstandcol">${standTable()}</div></div></div><div class="right">${right}</div></div>`;
+  const chat=(sc.chat||[]);   // чат сохранён на финише драфта (dc_drafts.chat) — показываем над участниками
+  const chatBlock=chat.length?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Чат драфта</h3><div style="max-height:160px;overflow-y:auto;font-size:11px;line-height:1.5">${chat.map(c=>{const tm=c.t?new Date(c.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';return `<div style="padding:1px 0"><span class="mut" style="font-size:10px;margin-right:5px">${tm}</span><b style="color:var(--gold)">[${esc(c.name)}]</b> ${esc(c.text)}</div>`;}).join('')}</div></div>`:'';
+  el.innerHTML=chatBlock+legend+pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 auto;min-width:0"></div><div class="vstandcol">${standTable()}</div></div></div><div class="right">${right}</div></div>`;
   fetchViewerAvatars();   // дотянуть аватары участников из профилей и проставить в шапки колонок (#4)
   renderViewerMatchesList();   // блок матчей — сразу под участниками, в левой колонке (#14); выбранный матч восстанавливаем из кэша
 }

@@ -230,6 +230,7 @@ async function persistRosters(e) {
   // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-5000) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
+  try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { seat_ms: r.seatMs || {}, chat: (r.chat || []).slice(-200) }); } catch (err) { console.error('persist seat_ms/chat', err.message); } // личные таймеры (по seat) + чат для просмотрщика итогов
   // DCC: списываем бай-ины с сыгравших участников (идемпотентно через dc_drafts.charged_at)
   try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
 }
@@ -348,7 +349,7 @@ async function scoreDraft(draftId) {
       + (subUsed && subP && (subP.mstatus === 'pending' || subP.mstatus === 'live') ? 1 : 0);
     const finishOrder = rs.length && rs[0].finish_order != null ? rs[0].finish_order : null;
     const seat = rs.length ? rs[0].seat : null;
-    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, finishOrder, seat, players });
+    teams.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, toPlay, finishOrder, seat, activeMs: (d.seat_ms && d.seat_ms[seat]) || 0, players });
   }
   standings.sort((a, b) => b.total - a.total);
   standings.forEach((s, i) => { s.place = i + 1; });                                  // место по очкам — для медалей/контура в просмотрщике
@@ -374,7 +375,7 @@ async function scoreDraft(draftId) {
     await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled';
     try { await payPrizes(draftId, standings, d); } catch (err) { console.error('payPrizes', err.message); }
   }
-  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, hasRosters: rosters.length > 0 };
+  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, chat: d.chat || null, hasRosters: rosters.length > 0 };
 }
 
 // Кэш результатов scoreDraft: один пересчёт на драфт раз в SCORE_TTL, всем клиентам — из кэша.
