@@ -554,6 +554,28 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/draft/refresh-odds' && req.method === 'POST') {       // админ: спарсить кэфы (Win%/xG/CS) из FanTeam сейчас; для live-комнаты применить сразу
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { draftId } = JSON.parse(body || '{}');
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);
+        const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round,match_ids`); const d = drows[0];
+        if (!d) throw new Error('драфт не найден');
+        const { clubOdds } = await tourInfo(d.season_id, d.round, d.match_ids);   // прямой запрос (без 60с-кэша) → свежие данные
+        const total = clubOdds.length;
+        const withOdds = clubOdds.filter((o) => o.win != null || o.xg != null || o.cs != null).length;
+        let applied = false;
+        for (const [, ent] of rooms) { if (ent.room && String(ent.room.draftId) === String(draftId)) { await refreshOdds(ent); applied = true; break; } }  // живая комната → применяем сразу
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ total, withOdds, applied }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   if (url === '/api/draft/reconnect' && req.method === 'POST') {
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });

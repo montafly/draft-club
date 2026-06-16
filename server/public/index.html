@@ -1581,8 +1581,19 @@ function renderAdminDrafts(){
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
       принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}
       <div style="margin:8px 0">${rows}</div>
-      ${ctrl} <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button></div>`;
+      ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
+      <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
   }).join('');
+}
+async function refreshDraftOdds(id){
+  const m=document.getElementById('odds-'+id);if(m)m.textContent='парсю кэфы…';
+  try{const t=await authToken();const r=await fetch('/api/draft/refresh-odds',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    let txt=`кэфы: ${j.withOdds}/${j.total} клубов`;
+    if(j.withOdds<j.total)txt+=' — FanTeam ещё опубликовал не всё';
+    if(j.applied)txt+=' · применено в live-комнате';
+    if(m)m.textContent=txt;
+  }catch(e){if(m)m.textContent='ошибка: '+e.message;}
 }
 async function deleteDraft(id){
   if(!confirm('Удалить драфт безвозвратно (вместе с заявками и составами)?'))return;
