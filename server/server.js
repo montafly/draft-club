@@ -122,7 +122,9 @@ async function buildDraftPool(seasonId, round, matchIds) {
     const ids = (m.realTeamIds || [null, null]).slice(0, 2);
     let wh = null, wa = null;
     try { const inv = [1 / +od.home, 1 / +od.draw, 1 / +od.away]; const s = inv[0] + inv[1] + inv[2]; wh = Math.round(inv[0] / s * 100); wa = Math.round(inv[2] / s * 100); } catch {}
-    const xh = xg[0], xa = xg[1];
+    const nxg = (v) => (v == null || v === 0 || Number.isNaN(v)) ? null : v;   // xG=0 — плейсхолдер FanTeam «ещё не опубликовано» (реальный xG никогда не ровно 0)
+    const xh = nxg(xg[0]), xa = nxg(xg[1]);
+    if (Number.isNaN(wh)) wh = null; if (Number.isNaN(wa)) wa = null;          // нет кэфов → win=NaN → null (иначе считается «опубликованным»)
     clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
     clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
   }
@@ -156,7 +158,9 @@ async function tourInfo(seasonId, round, matchIds) {
     const ids = (m.realTeamIds || [null, null]).slice(0, 2);
     let wh = null, wa = null;
     try { const inv = [1 / +od.home, 1 / +od.draw, 1 / +od.away]; const s = inv[0] + inv[1] + inv[2]; wh = Math.round(inv[0] / s * 100); wa = Math.round(inv[2] / s * 100); } catch {}
-    const xh = xg[0], xa = xg[1];
+    const nxg = (v) => (v == null || v === 0 || Number.isNaN(v)) ? null : v;   // xG=0 — плейсхолдер FanTeam «ещё не опубликовано» (реальный xG никогда не ровно 0)
+    const xh = nxg(xg[0]), xa = nxg(xg[1]);
+    if (Number.isNaN(wh)) wh = null; if (Number.isNaN(wa)) wa = null;          // нет кэфов → win=NaN → null (иначе считается «опубликованным»)
     clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
     clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
     fixtures.push({ matchId: m.id, home: teams[ids[0]] || '', away: teams[ids[1]] || '', homeCode: abbr[ids[0]] || '', awayCode: abbr[ids[1]] || '', startTime: m.startTime || null, status: m.status || null });
