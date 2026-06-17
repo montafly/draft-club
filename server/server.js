@@ -141,6 +141,16 @@ async function buildDraftPool(seasonId, round, matchIds) {
     await sleep(250); // вежливый троттлинг FanTeam
   }
   for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (abbr[tid] || teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
+  // дизамбигуация: если в одном клубе 2+ игрока с одинаковой фамилией → показываем инициал имени (J. David); если инициалы тоже совпали — полное имя
+  const _g = {};
+  for (const u of units) { if (u.position === 'COACH' || !u.name) continue; const k = u.club + ' ' + u.name.toLowerCase(); (_g[k] = _g[k] || []).push(u); }
+  for (const u of units) { if (u.position !== 'COACH') u.disp = u.name; }
+  for (const k in _g) {
+    const g = _g[k]; if (g.length < 2) continue;
+    const inits = g.map((u) => (u.first || '').charAt(0).toUpperCase());
+    const initOk = inits.every(Boolean) && new Set(inits).size === inits.length;   // у всех есть имя и инициалы различны
+    for (const u of g) u.disp = u.first ? ((initOk ? u.first.charAt(0).toUpperCase() + '.' : u.first) + ' ' + u.name) : u.name;
+  }
   const matches = sel.map((m) => { const ids = (m.realTeamIds || [null, null]).slice(0, 2); return { home: teams[ids[0]] || '', away: teams[ids[1]] || '', startTime: m.startTime || null }; });
   return { units, clubOdds, matches };
 }
@@ -224,13 +234,16 @@ async function persistRosters(e) {
   for (const m of d.managers.values()) {
     const uid = seatUser[m.id]; if (!uid) continue;
     const fo = m.finishOrder != null ? m.finishOrder : null;
-    for (const u of m.roster) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: u.id, name: u.name, club: u.club, position: u.position, price: u.price, is_sub: false, finish_order: fo });
-    if (m.substitute) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: m.substitute.id, name: m.substitute.name, club: m.substitute.club, position: m.substitute.position, price: 0, is_sub: true, finish_order: fo });
+    for (const u of m.roster) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: u.id, name: u.name, disp: u.disp || u.name, club: u.club, position: u.position, price: u.price, is_sub: false, finish_order: fo });
+    if (m.substitute) rows.push({ draft_id: r.draftId, user_id: uid, seat: m.id, player_id: m.substitute.id, name: m.substitute.name, disp: m.substitute.disp || m.substitute.name, club: m.substitute.club, position: m.substitute.position, price: 0, is_sub: true, finish_order: fo });
   }
   if (!rows.length) return;
   await svcDelete(`dc_draft_rosters?draft_id=eq.${r.draftId}`);
   try { await svcPost('dc_draft_rosters', rows); }
-  catch (err) { await svcPost('dc_draft_rosters', rows.map(({ finish_order, ...x }) => x)); } // колонки finish_order ещё нет — сохраняем без неё
+  catch (err) {
+    try { await svcPost('dc_draft_rosters', rows.map(({ disp, ...x }) => x)); }                     // колонки disp ещё нет — без неё (finish_order сохраняем)
+    catch (e2) { await svcPost('dc_draft_rosters', rows.map(({ disp, finish_order, ...x }) => x)); } // нет ни disp, ни finish_order
+  }
   // полный лог пиков (с числом ставок и таймингом торгов) → dc_drafts.picks (jsonb); не критично — не валим сохранение составов
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-5000) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
@@ -319,7 +332,7 @@ async function scoreDraft(draftId) {
     for (const r of starters) {
       const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
       total += pp;
-      players.push({ name: r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r), breakdown: brk(r), events: evs(r) });
+      players.push({ name: r.disp || r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r), breakdown: brk(r), events: evs(r) });
     }
     // Замена срабатывает, если есть несыгравший стартовый (матч завершён, 0 минут — pending/live НЕ считаем «не вышел», иначе замена
     // зелёная по умолчанию, #15), которого она может закрыть. Проверяем КАЖДОГО несыгравшего отдельно: замена позиции P может закрыть
@@ -343,7 +356,7 @@ async function scoreDraft(draftId) {
         }
       }
       const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
-      players.push({ name: sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub), breakdown: brk(sub), events: evs(sub) });
+      players.push({ name: sub.disp || sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub), breakdown: brk(sub), events: evs(sub) });
     }
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });

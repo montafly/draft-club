@@ -278,8 +278,8 @@ export class Room {
           activeMs: this.seatMs[m.id] || 0,
 
           counts: countPos(m.roster),
-          roster: m.roster.map((u) => ({ id: u.id, name: u.name, club: u.club, code: u.code, position: u.position, price: u.price })),
-          substitute: m.substitute && { name: m.substitute.name, club: m.substitute.club, code: m.substitute.code, position: m.substitute.position },
+          roster: m.roster.map((u) => ({ id: u.id, name: u.name, disp: u.disp, club: u.club, code: u.code, position: u.position, price: u.price })),
+          substitute: m.substitute && { name: m.substitute.name, disp: m.substitute.disp, club: m.substitute.club, code: m.substitute.code, position: m.substitute.position },
         })),
       },
     };

@@ -2020,9 +2020,9 @@ function renderCols(){
       </div>
       ${formBlock(m.counts, m.finished)}
       <table><thead><tr><th style="width:16px">#</th><th style="width:26px">POS</th><th>PLAYER</th><th style="width:34px">TEAM</th><th class="right" style="width:40px">COST</th></tr></thead>
-      <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.name}</td><td>${u.code||u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
+      <tbody>${m.roster.map((u,i)=>`<tr><td class="mut">${i+1}</td><td class="${u.position.toLowerCase()}">${posShort(u.position)}</td><td>${u.disp||u.name}</td><td>${u.code||u.club}</td><td class="right">$${u.price??''}</td></tr>`).join('')}
       ${Array.from({length:Math.max(0,12-m.roster.length)},(_,i)=>`<tr><td class="mut">${m.roster.length+i+1}</td><td></td><td class="mut">—</td><td></td><td></td></tr>`).join('')}
-      ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.name}</td><td>${m.substitute.code||m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
+      ${m.substitute?`<tr class="subrow"><td class="mut">S</td><td class="${m.substitute.position.toLowerCase()}">${posShort(m.substitute.position)}</td><td>${m.substitute.disp||m.substitute.name}</td><td>${m.substitute.code||m.substitute.club}</td><td></td></tr>`:''}</tbody></table>
     </div>`).join('');
 }
 // два блока статуса раунда: слева — последняя покупка, справа — текущий статус (ждём номинацию / идут торги)
