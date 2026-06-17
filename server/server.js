@@ -652,6 +652,21 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/tts/say' && req.method === 'POST') {                  // админ: прослушать произвольный текст (превью произношения)
+    let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const { text } = JSON.parse(body || '{}');
+        const t = String(text || '').trim().slice(0, 300); if (!t) throw new Error('пустой текст');
+        const audio = await ttsSynth(t);
+        res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); res.end(audio);
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   if (url === '/api/admin/pron') {                                        // админ: текущие произношения + каталоги (ники + сыгранные игроки)
     (async () => {
       try {

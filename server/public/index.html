@@ -1023,7 +1023,7 @@ async function renderPron(){
     const t=await authToken();const r=await fetch('/api/admin/pron',{headers:{authorization:'Bearer '+t}});const j=await r.json();
     if(!r.ok)throw new Error(j.error||r.status);
     const pm={};(j.pron||[]).forEach(p=>pm[p.kind+':'+p.ref]=p.say);
-    const row=(kind,ref,label,sub)=>`<tr><td>${esc(label)}${sub?` <span class="mut">${esc(sub)}</span>`:''}</td><td><input id="prn-${kind}-${ref}" value="${escAttr(pm[kind+':'+ref]||'')}" placeholder="как произносить" style="width:220px;font-size:12px"></td><td><button class="btn" onclick="savePron('${kind}','${ref}')">OK</button></td></tr>`;
+    const row=(kind,ref,label,sub)=>`<tr><td>${esc(label)}${sub?` <span class="mut">${esc(sub)}</span>`:''}</td><td><input id="prn-${kind}-${ref}" value="${escAttr(pm[kind+':'+ref]||'')}" placeholder="как произносить" style="width:220px;font-size:12px"></td><td><button class="btn" onclick="previewPron('${kind}','${ref}')" title="Прослушать текущий текст">▶</button> <button class="btn" onclick="savePron('${kind}','${ref}')">OK</button></td></tr>`;
     const nicks=(j.nicks||[]).map(u=>row('nick',u.id,u.display_name||u.id.slice(0,8))).join('');
     const players=(j.players||[]).map(p=>row('player',p.player_id,p.name,p.club)).join('');
     el.innerHTML=`<input id="pronFilter" placeholder="поиск по списку…" oninput="filterPron()" style="margin-bottom:8px;width:240px">
@@ -1033,6 +1033,15 @@ async function renderPron(){
   }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
 }
 function filterPron(){const q=((document.getElementById('pronFilter')||{}).value||'').toLowerCase();document.querySelectorAll('#pronNicks tr,#pronPlayers tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+async function previewPron(kind,ref){
+  const inp=document.getElementById('prn-'+kind+'-'+ref),m=document.getElementById('pronMsg');
+  const text=(inp&&inp.value||'').trim();if(!text){if(m)m.textContent='впиши произношение для прослушки';return;}
+  if(m)m.textContent='…';
+  try{const t=await authToken();const r=await fetch('/api/tts/say',{method:'POST',headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:JSON.stringify({text})});
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||r.status);}
+    const url=URL.createObjectURL(await r.blob());const a=new Audio(url);a.onended=a.onerror=()=>{try{URL.revokeObjectURL(url);}catch(e){}};a.play();if(m)m.textContent='';}
+  catch(e){if(m)m.textContent='ошибка прослушки: '+e.message;}
+}
 async function savePron(kind,ref){
   const inp=document.getElementById('prn-'+kind+'-'+ref),m=document.getElementById('pronMsg');
   try{const t=await authToken();const r=await fetch('/api/admin/pron-set',{method:'POST',headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:JSON.stringify({kind,ref,say:inp.value})});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);if(m)m.textContent='сохранено ✓';}
