@@ -451,7 +451,7 @@
   <div id="draftbar">
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
     <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
-    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -749,13 +749,13 @@ function updateRtcBtns(){
     const camOn=RTC.on&&RTC.camOn;
     h+=`<button class="cbtn ${camOn?'on':'off'}" onclick="rtcCamClick()" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}<span>Камера</span></button>`;
   }
-  h+=`<button class="cbtn ${TTS_MUTE?'off':'on'}" onclick="toggleTts()" title="${TTS_MUTE?'Озвучка покупок выключена — включить':'Озвучка покупок включена — выключить'}">${TTS_MUTE?IC.spkOff:IC.spk}<span>Озвучка</span></button>`;
   box.innerHTML=h;
 }
 // --- Озвучка покупок (TTS): новые покупки детектим по стейту → очередь → проигрывание (синтез на сервере, Alena/good) ---
-let TTS_MUTE=(()=>{try{const v=localStorage.getItem('dcTtsMute');return v===null?true:v==='1';}catch(e){return true;}})(); // по умолчанию ВЫКЛ (фича ещё доводится) — включается тумблером «Озвучка» в баре
+let TTS_MUTE=(()=>{try{const v=localStorage.getItem('dcTtsMute');return v===null?false:v==='1';}catch(e){return false;}})(); // по умолчанию ВКЛ
 let SEEN_PICKS=null,SEEN_LOT=null; const TTSQ=[]; let ttsPlaying=false;
-function toggleTts(){TTS_MUTE=!TTS_MUTE;try{localStorage.setItem('dcTtsMute',TTS_MUTE?'1':'0');}catch(e){}if(TTS_MUTE)TTSQ.length=0;updateRtcBtns();}
+function updateTtsBtn(){const b=document.getElementById('ttsBtn');if(b){b.textContent='Озвучка: '+(TTS_MUTE?'выкл':'вкл');b.classList.toggle('r',TTS_MUTE);}}
+function toggleTts(){TTS_MUTE=!TTS_MUTE;try{localStorage.setItem('dcTtsMute',TTS_MUTE?'1':'0');}catch(e){}if(TTS_MUTE)TTSQ.length=0;updateTtsBtn();}
 function announcePicks(){
   if(!S||!S.started||!S.draft||!S.draft.managers){SEEN_PICKS=null;SEEN_LOT=null;return;}
   const d=S.draft;
@@ -1995,7 +1995,7 @@ function render(){
   {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
   if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
