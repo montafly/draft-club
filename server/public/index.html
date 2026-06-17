@@ -753,28 +753,37 @@ function updateRtcBtns(){
   box.innerHTML=h;
 }
 // --- Озвучка покупок (TTS): новые покупки детектим по стейту → очередь → проигрывание (синтез на сервере, Alena/good) ---
-let TTS_MUTE=(()=>{try{return localStorage.getItem('dcTtsMute')==='1';}catch(e){return false;}})();
-let SEEN_PICKS=null; const TTSQ=[]; let ttsPlaying=false;
+let TTS_MUTE=(()=>{try{const v=localStorage.getItem('dcTtsMute');return v===null?true:v==='1';}catch(e){return true;}})(); // по умолчанию ВЫКЛ (фича ещё доводится) — включается тумблером «Озвучка» в баре
+let SEEN_PICKS=null,SEEN_LOT=null; const TTSQ=[]; let ttsPlaying=false;
 function toggleTts(){TTS_MUTE=!TTS_MUTE;try{localStorage.setItem('dcTtsMute',TTS_MUTE?'1':'0');}catch(e){}if(TTS_MUTE)TTSQ.length=0;updateRtcBtns();}
 function announcePicks(){
-  if(!S||!S.started||!S.draft||!S.draft.managers){SEEN_PICKS=null;return;}
+  if(!S||!S.started||!S.draft||!S.draft.managers){SEEN_PICKS=null;SEEN_LOT=null;return;}
+  const d=S.draft;
   const cur=new Set(),fresh=[];
-  for(const m of S.draft.managers)for(const u of (m.roster||[])){if(u.position==='COACH')continue;const k=m.id+':'+u.id;cur.add(k);if(SEEN_PICKS&&!SEEN_PICKS.has(k))fresh.push({m,u});}
-  if(SEEN_PICKS===null){SEEN_PICKS=cur;return;}   // первый стейт драфта (вход/реконнект) — засеваем без объявления
-  for(const f of fresh)queuePick(f.m,f.u);
+  for(const m of d.managers)for(const u of (m.roster||[])){if(u.position==='COACH')continue;const k=m.id+':'+u.id;cur.add(k);if(SEEN_PICKS&&!SEEN_PICKS.has(k))fresh.push({m,u});}
+  const lotNo=(d.lot&&d.lot.unit)?d.lot.no:null;
+  if(SEEN_PICKS===null){SEEN_PICKS=cur;SEEN_LOT=lotNo;return;}   // первый стейт драфта (вход/реконнект) — засеваем без объявления
+  for(const f of fresh)queuePick(f.m,f.u);                       // покупки (закрытые лоты)
   SEEN_PICKS=cur;
+  if(lotNo!=null&&lotNo!==SEEN_LOT)queueNominate(d.lot.unit);    // новая номинация → «В торгах …»
+  SEEN_LOT=lotNo;
 }
 function queuePick(m,u){
   if(TTS_MUTE)return;
   const seat=((S.lobby&&S.lobby.seats)||[]).find(s=>s.id===m.id);
-  TTSQ.push({playerId:u.id,playerName:u.disp||u.name,buyerUserId:seat&&seat.userId,buyerName:m.name,price:u.price});
+  TTSQ.push({ep:"pick",playerId:u.id,playerName:u.disp||u.name,buyerUserId:seat&&seat.userId,buyerName:m.name,price:u.price});
+  pumpTts();
+}
+function queueNominate(u){
+  if(TTS_MUTE||!u)return;
+  TTSQ.push({ep:"nominate",playerId:u.id,playerName:u.disp||u.name});
   pumpTts();
 }
 async function pumpTts(){
   if(ttsPlaying||!TTSQ.length||TTS_MUTE)return;ttsPlaying=true;
   const b=TTSQ.shift();
   try{
-    const r=await fetch('/api/tts/pick',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+    const r=await fetch("/api/tts/"+(b.ep||"pick"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)});
     if(r.ok){const url=URL.createObjectURL(await r.blob());const a=new Audio(url);const done=()=>{try{URL.revokeObjectURL(url);}catch(e){}ttsPlaying=false;pumpTts();};a.onended=done;a.onerror=done;a.play().catch(done);return;}
   }catch(e){}
   ttsPlaying=false;pumpTts();

@@ -204,6 +204,24 @@ async function svcUpsert(path, rows) {
 const _ttsCache = new Map();                              // hash(text) -> Buffer
 function _hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
 function mlnWord(n) { n = Math.abs(Math.round(+n || 0)); const t = n % 100, o = n % 10; if (t >= 11 && t <= 14) return 'миллионов'; if (o === 1) return 'миллион'; if (o >= 2 && o <= 4) return 'миллиона'; return 'миллионов'; }
+// грубый транслит латиницы в кириллицу — базовая «заглушка» произношения (точные правит админ вручную)
+function translitRu(s) {
+  s = String(s || ''); if (!s) return '';
+  const di = { shch: 'щ', sh: 'ш', ch: 'ч', zh: 'ж', kh: 'х', ph: 'ф', th: 'т', ts: 'ц', ya: 'я', yu: 'ю', yo: 'ё', ck: 'к', qu: 'ку' };
+  const si = { a: 'а', b: 'б', c: 'к', d: 'д', e: 'е', f: 'ф', g: 'г', h: 'х', i: 'и', j: 'дж', k: 'к', l: 'л', m: 'м', n: 'н', o: 'о', p: 'п', q: 'к', r: 'р', s: 'с', t: 'т', u: 'у', v: 'в', w: 'в', x: 'кс', y: 'й', z: 'з' };
+  return s.split(/(\s+|[-'’.])/).map((tok) => {
+    if (!tok || /^(\s+|[-'’.])$/.test(tok)) return tok;
+    const low = tok.toLowerCase(); let out = '', i = 0;
+    while (i < low.length) {
+      let m = null;
+      for (const L of [4, 3, 2]) { const sub = low.slice(i, i + L); if (di[sub]) { m = di[sub]; i += L; break; } }
+      if (m === null) { const c = low[i]; m = (si[c] !== undefined) ? si[c] : (/[a-z]/.test(c) ? '' : c); i++; }
+      out += m;
+    }
+    if (tok[0] === tok[0].toUpperCase()) out = out.charAt(0).toUpperCase() + out.slice(1);
+    return out;
+  }).join('');
+}
 async function ttsSynth(text) {
   const key = _hash(text); if (_ttsCache.has(key)) return _ttsCache.get(key);
   const body = new URLSearchParams({ text, lang: 'ru-RU', voice: 'alena', emotion: 'good', format: 'mp3', folderId: process.env.YANDEX_FOLDER_ID || '' });
@@ -642,11 +660,25 @@ const server = http.createServer((req, res) => {
           const refs = [playerId, buyerUserId].filter((x) => x != null).map((x) => '"' + x + '"').join(',');
           if (refs) { const rows = await svcGet(`dc_pronunciations?ref=in.(${refs})&select=kind,ref,say`); for (const r of rows) pron[r.kind + ':' + r.ref] = r.say; }
         } catch (e) { /* нет таблицы/оверрайдов — берём фолбэк-имена */ }
-        const psay = pron['player:' + playerId] || playerName || 'игрок';
-        const nsay = pron['nick:' + buyerUserId] || buyerName || 'участник';
+        const psay = pron['player:' + playerId] || translitRu(playerName) || 'игрок';
+        const nsay = pron['nick:' + buyerUserId] || translitRu(buyerName) || 'участник';
         const p = Math.round(+price || 0);
         const text = `${psay} был куплен игроком ${nsay} за ${p} ${mlnWord(p)}.`;
         const audio = await ttsSynth(text);
+        res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); res.end(audio);
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
+  if (url === '/api/tts/nominate' && req.method === 'POST') {             // озвучка номинации: «В торгах {игрок}»
+    let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { playerId, playerName } = JSON.parse(body || '{}');
+        let say = null;
+        try { const rows = await svcGet(`dc_pronunciations?kind=eq.player&ref=eq.${encodeURIComponent(String(playerId))}&select=say`); if (rows[0]) say = rows[0].say; } catch (e) {}
+        const psay = say || translitRu(playerName) || 'игрок';
+        const audio = await ttsSynth(`В торгах ${psay}.`);
         res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); res.end(audio);
       } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
     });
