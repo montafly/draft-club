@@ -143,7 +143,7 @@ async function buildDraftPool(seasonId, round, matchIds) {
   for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (abbr[tid] || teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
   // дизамбигуация: если в одном клубе 2+ игрока с одинаковой фамилией → показываем инициал имени (J. David); если инициалы тоже совпали — полное имя
   const _g = {};
-  for (const u of units) { if (u.position === 'COACH' || !u.name) continue; const k = u.club + ' ' + u.name.toLowerCase(); (_g[k] = _g[k] || []).push(u); }
+  for (const u of units) { if (u.position === 'COACH' || !u.name) continue; const k = u.club + '|' + u.name.toLowerCase(); (_g[k] = _g[k] || []).push(u); }
   for (const u of units) { if (u.position !== 'COACH') u.disp = u.name; }
   for (const k in _g) {
     const g = _g[k]; if (g.length < 2) continue;
@@ -706,10 +706,17 @@ const server = http.createServer((req, res) => {
         const user = await authUser(token); const prof = await getProfile(user.id);
         if (!prof || prof.role !== 'admin') throw new Error('только админ');
         const pron = await svcGet('dc_pronunciations?select=kind,ref,say').catch(() => []);
-        const nicks = await svcGet('dc_profiles?select=id,display_name&order=display_name.asc');
-        const rrows = await svcGet('dc_draft_rosters?select=player_id,name,club,position');
+        const nrows = await svcGet('dc_profiles?select=id,display_name&order=display_name.asc');
+        const nicks = nrows.map((u) => ({ id: u.id, display_name: u.display_name, suggest: translitRu(u.display_name) }));
         const seen = new Set(); const players = [];
-        for (const r of rrows) { if (r.position === 'COACH' || seen.has(r.player_id)) continue; seen.add(r.player_id); players.push({ player_id: r.player_id, name: r.name, club: r.club }); }
+        const addP = (pid, name, club) => { const ref = String(pid); if (!pid || seen.has(ref)) return; seen.add(ref); players.push({ player_id: ref, name, club, suggest: translitRu(name) }); };
+        const rrows = await svcGet('dc_draft_rosters?select=player_id,name,club,position');
+        for (const r of rrows) if (r.position !== 'COACH') addP(r.player_id, r.name, r.club);   // сыгранные
+        try {                                                                                    // + весь пул активных драфтов (recruiting/finalized/live) — готовить произношение заранее
+          const active = await svcGet('dc_drafts?status=in.(recruiting,finalized,live)&select=id,match_ids');
+          const doneKeys = new Set();
+          for (const d of active) { const key = (d.match_ids || []).join(','); if (doneKeys.has(key)) continue; doneKeys.add(key); try { const pool = await poolForDraftCached(d.id); for (const u of (pool.units || [])) if (u.position !== 'COACH') addP(u.id, u.name, u.club); } catch (e) {} }
+        } catch (e) {}
         players.sort((a, b) => String(a.club).localeCompare(String(b.club)) || String(a.name).localeCompare(String(b.name)));
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ pron, nicks, players }));
       } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
