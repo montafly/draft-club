@@ -2327,9 +2327,9 @@ function renderNom(mode,ro){
   const el=document.getElementById('plist');if(!el)return;
   let html='';
   for(const pos of POSORD){
-    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=SEASON_STATS[a.id],B=SEASON_STATS[b.id];return (B?B[0]:-1)-(A?A[0]:-1)||(B?B[1]:-1)-(A?A[1]:-1)||a.name.localeCompare(b.name,'ru');}); // очки↓, минуты↓, алфавит
+    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=SEASON_STATS[a.id],B=SEASON_STATS[b.id];return (B?B[1]:-1)-(A?A[1]:-1)||(B?B[0]:-1)-(A?A[0]:-1)||a.name.localeCompare(b.name,'ru');}); // минуты↓, очки↓, алфавит
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]} MIN</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
