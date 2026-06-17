@@ -1995,7 +1995,7 @@ function render(){
   {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
   if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();loadSeasonStats();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
@@ -2288,6 +2288,14 @@ function nomPanel(d){
 }
 // юниты для панели пиков: ходящему — движковый eligible-список; остальным (read-only) — всё, что ещё на доске (#11)
 let browseMineOnly=true; // в режиме ожидания: показывать только тех, кого я реально могу купить (лимит позиции/клуба, бюджет)
+let SEASON_STATS={},_ssKey=null,_ssLoading=false;   // pid -> [pts,min] накопленные за турнир (для подсказки в номинации)
+function loadSeasonStats(){
+  if(!S||!S.meta||!S.meta.season)return;
+  const key=S.meta.season+'|'+S.meta.round;
+  if(key===_ssKey||_ssLoading)return;
+  _ssLoading=true;
+  fetch(`/api/draft/seasonstats?season=${S.meta.season}&round=${S.meta.round}`).then(r=>r.json()).then(j=>{SEASON_STATS=j.stats||{};_ssKey=key;_ssLoading=false;if(S&&S.started)renderBottom();}).catch(()=>{_ssLoading=false;});
+}
 function availUnits(){
   const d=S.draft;
   if(actMine()&&d.actorOptions&&d.actorOptions.units)return d.actorOptions.units;
@@ -2319,9 +2327,9 @@ function renderNom(mode,ro){
   const el=document.getElementById('plist');if(!el)return;
   let html='';
   for(const pos of POSORD){
-    const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
+    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=SEASON_STATS[a.id],B=SEASON_STATS[b.id];return (B?B[0]:-1)-(A?A[0]:-1)||(B?B[1]:-1)-(A?A[1]:-1)||a.name.localeCompare(b.name,'ru');}); // очки↓, минуты↓, алфавит
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span></div>`).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]} MIN</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }

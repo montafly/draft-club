@@ -338,6 +338,29 @@ async function draftPoints(ids) {
   }
   return { playerPts, playerMin, coachPts, matchInfo, allConfirmed: ids.length > 0 && confirmed === ids.length, playerBreak, playerEvents, coachBreak };
 }
+// накопленные за турнир очки/минуты по игроку (подсказка в номинации) — сумма по СЫГРАННЫМ матчам сезона до тура uptoRound. Статы сыгранных матчей неизменны → кэш 10 мин.
+const _seasonStatsCache = new Map();                       // `${season}|${upto}` -> {t, map}
+async function seasonStats(seasonId, uptoRound) {
+  const key = seasonId + '|' + uptoRound, now = Date.now();
+  const c = _seasonStatsCache.get(key); if (c && now - c.t < 600000) return c.map;
+  const map = {};                                          // pid -> {pts, min}
+  for (let k = 1; k <= uptoRound; k++) {
+    let listing; try { listing = await ftGet(`real_matches?season_id=${seasonId}&round=${k}`); } catch (e) { continue; }
+    for (const m of (listing.realMatches || [])) {
+      if (m.status !== 'confirmed') continue;              // только сыгранные
+      let det; try { det = await ftDetail(m.id); } catch (e) { continue; }
+      for (const r of (det.realPlayerMatchStats || [])) {
+        const pid = r.realPlayerId, br = cpBreak(r.stats || {}, r.position || '');
+        const e = map[pid] || (map[pid] = { pts: 0, min: 0 });
+        e.pts += br.reduce((a, b) => a + b.pts, 0); e.min += (r.minutesPlayed || 0);
+      }
+      await sleep(100);                                    // вежливый троттлинг FanTeam
+    }
+  }
+  for (const k in map) map[k].pts = Math.round(map[k].pts * 10) / 10;
+  _seasonStatsCache.set(key, { t: now, map });
+  return map;
+}
 // standings драфта; статус settled когда все матчи confirmed
 async function scoreDraft(draftId) {
   const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = drows[0];
@@ -573,6 +596,20 @@ const server = http.createServer((req, res) => {
     poolForDraftCached(draftId)
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    return;
+  }
+  if (url === '/api/draft/seasonstats') {                                // накопленные очки/минуты по игрокам сезона (для подсказки в номинации)
+    const q = new URLSearchParams((req.url.split('?')[1] || ''));
+    (async () => {
+      try {
+        let sid = q.get('season'), rnd = q.get('round'); const draftId = q.get('draftId');
+        if ((!sid || !rnd) && draftId) { const d = (await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round`))[0]; if (d) { sid = d.season_id; rnd = d.round; } }
+        if (!sid || !rnd) throw new Error('нужны season+round или draftId');
+        const map = await seasonStats(+sid, +rnd);
+        const out = {}; for (const k in map) out[k] = [map[k].pts, map[k].min];   // компактно: [pts, min]
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=120' }); res.end(JSON.stringify({ stats: out }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    })();
     return;
   }
   if (url === '/api/draft/launch' && req.method === 'POST') {

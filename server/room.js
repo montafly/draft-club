@@ -253,6 +253,7 @@ export class Room {
     return {
       started: true,
       isTest: !this.allowedUserIds,
+      meta: this.draftMeta ? { season: this.draftMeta.seasonId, round: this.draftMeta.round } : null,   // для подсказки накопленных очков в номинации
       lobby,
       draft: {
         phase: d.phase,
