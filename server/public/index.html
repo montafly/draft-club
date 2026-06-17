@@ -1584,6 +1584,7 @@ function renderAdminDrafts(){
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> · ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
       принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}
       <div class="row" style="gap:6px;align-items:center;margin:8px 0"><span class="mut" style="font-size:12px">Старт (${tzLabel()}):</span><input id="dwhen-${d.id}" type="datetime-local" value="${d.starts_at?tzWallString(new Date(d.starts_at)):''}" style="font-size:12px"><button class="btn" onclick="saveDraftTime(${d.id})">Сохранить время</button></div>
+      ${['recruiting','finalized'].includes(d.status)?`<div class="row" style="gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap"><span class="mut" style="font-size:12px">Бай-ин / приз 1 / приз 2 (DCC):</span><input id="dbuyin-${d.id}" type="number" min="0" value="${d.buyin}" title="бай-ин" style="width:80px;font-size:12px"><input id="dp1-${d.id}" type="number" min="0" value="${d.prize1}" title="приз за 1 место" style="width:80px;font-size:12px"><input id="dp2-${d.id}" type="number" min="0" value="${d.prize2}" title="приз за 2 место" style="width:80px;font-size:12px"><button class="btn" onclick="saveDraftEconomy(${d.id})">Сохранить</button></div>`:''}
       <div style="margin:8px 0">${rows}</div>
       ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
       <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
@@ -1633,6 +1634,15 @@ async function saveDraftTime(id){
   const {error}=await sb.from('dc_drafts').update({starts_at:utc?utc.toISOString():null}).eq('id',id);
   if(error){if(m)m.textContent='не удалось изменить время: '+error.message;return;}
   if(m)m.textContent='время старта обновлено';
+  await loadDrafts();
+}
+async function saveDraftEconomy(id){
+  const b=document.getElementById('dbuyin-'+id),p1=document.getElementById('dp1-'+id),p2=document.getElementById('dp2-'+id),m=document.getElementById('adminMsg');
+  const buyin=Math.round(Number(b&&b.value)),prize1=Math.round(Number(p1&&p1.value)),prize2=Math.round(Number(p2&&p2.value));
+  if([buyin,prize1,prize2].some(x=>!Number.isFinite(x)||x<0)){if(m)m.textContent='бай-ин и призы — неотрицательные числа';return;}
+  const {error}=await sb.from('dc_drafts').update({buyin,prize1,prize2}).eq('id',id);
+  if(error){if(m)m.textContent='не удалось изменить бай-ин/призы: '+error.message;return;}
+  if(m)m.textContent='бай-ин/призы обновлены';
   await loadDrafts();
 }
 async function launchDraftBtn(id){
