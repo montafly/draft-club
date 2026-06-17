@@ -195,6 +195,24 @@ async function svcDelete(path) {
   const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'DELETE', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, prefer: 'return=minimal' } });
   if (!r.ok) throw new Error('db del ' + r.status);
 }
+// upsert по первичному ключу (kind,ref) — для произношений
+async function svcUpsert(path, rows) {
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'POST', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
+  if (!r.ok) throw new Error('db upsert ' + r.status + ' ' + (await r.text()));
+}
+// --- Озвучка покупок (Yandex SpeakKit): синтез mp3 + кэш в памяти процесса ---
+const _ttsCache = new Map();                              // hash(text) -> Buffer
+function _hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
+function mlnWord(n) { n = Math.abs(Math.round(+n || 0)); const t = n % 100, o = n % 10; if (t >= 11 && t <= 14) return 'миллионов'; if (o === 1) return 'миллион'; if (o >= 2 && o <= 4) return 'миллиона'; return 'миллионов'; }
+async function ttsSynth(text) {
+  const key = _hash(text); if (_ttsCache.has(key)) return _ttsCache.get(key);
+  const body = new URLSearchParams({ text, lang: 'ru-RU', voice: 'alena', emotion: 'good', format: 'mp3', folderId: process.env.YANDEX_FOLDER_ID || '' });
+  const r = await fetch('https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize', { method: 'POST', headers: { authorization: 'Api-Key ' + (process.env.YANDEX_TTS_API_KEY || ''), 'content-type': 'application/x-www-form-urlencoded' }, body });
+  if (!r.ok) throw new Error('tts ' + r.status + ' ' + (await r.text()).slice(0, 150));
+  const buf = Buffer.from(await r.arrayBuffer());
+  if (_ttsCache.size > 500) _ttsCache.clear();             // простой бэкстоп от роста памяти
+  _ttsCache.set(key, buf); return buf;
+}
 async function launchDraft(draftId) {
   const rows = await svcGet(`dc_drafts?id=eq.${draftId}&select=*`); const d = rows[0];
   if (!d) throw new Error('драфт не найден');
@@ -610,6 +628,60 @@ const server = http.createServer((req, res) => {
         let n = 0; const m = JSON.stringify({ type: 'reconnect' });
         for (const c of target.clients) { if (c.readyState === 1) { c.send(m); n++; } }
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ reconnected: n }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
+  if (url === '/api/tts/pick' && req.method === 'POST') {                 // озвучка покупки: {playerId,playerName,buyerUserId,buyerName,price} → mp3
+    let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { playerId, playerName, buyerUserId, buyerName, price } = JSON.parse(body || '{}');
+        const pron = {};
+        try {
+          const refs = [playerId, buyerUserId].filter((x) => x != null).map((x) => '"' + x + '"').join(',');
+          if (refs) { const rows = await svcGet(`dc_pronunciations?ref=in.(${refs})&select=kind,ref,say`); for (const r of rows) pron[r.kind + ':' + r.ref] = r.say; }
+        } catch (e) { /* нет таблицы/оверрайдов — берём фолбэк-имена */ }
+        const psay = pron['player:' + playerId] || playerName || 'игрок';
+        const nsay = pron['nick:' + buyerUserId] || buyerName || 'участник';
+        const p = Math.round(+price || 0);
+        const text = `${psay} был куплен игроком ${nsay} за ${p} ${mlnWord(p)}.`;
+        const audio = await ttsSynth(text);
+        res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-store' }); res.end(audio);
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
+  if (url === '/api/admin/pron') {                                        // админ: текущие произношения + каталоги (ники + сыгранные игроки)
+    (async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const pron = await svcGet('dc_pronunciations?select=kind,ref,say').catch(() => []);
+        const nicks = await svcGet('dc_profiles?select=id,display_name&order=display_name.asc');
+        const rrows = await svcGet('dc_draft_rosters?select=player_id,name,club,position');
+        const seen = new Set(); const players = [];
+        for (const r of rrows) { if (r.position === 'COACH' || seen.has(r.player_id)) continue; seen.add(r.player_id); players.push({ player_id: r.player_id, name: r.name, club: r.club }); }
+        players.sort((a, b) => String(a.club).localeCompare(String(b.club)) || String(a.name).localeCompare(String(b.name)));
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ pron, nicks, players }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    })();
+    return;
+  }
+  if (url === '/api/admin/pron-set' && req.method === 'POST') {           // админ: задать/очистить произношение
+    let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token); const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const { kind, ref, say } = JSON.parse(body || '{}');
+        if (!['player', 'nick'].includes(kind) || ref == null) throw new Error('bad kind/ref');
+        const s = (say || '').trim();
+        if (!s) await svcDelete(`dc_pronunciations?kind=eq.${kind}&ref=eq.${encodeURIComponent(String(ref))}`);
+        else await svcUpsert('dc_pronunciations', [{ kind, ref: String(ref), say: s }]);
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true }));
       } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
     });
     return;

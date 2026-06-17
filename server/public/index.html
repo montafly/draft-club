@@ -397,6 +397,9 @@
         <h2>Начисление DCC</h2>
         <p class="mut" style="font-size:11px;margin:0 0 8px">Начисли баланс игроку (1 USDT = 1 DCC). Можно и со знаком минус (списание/корректировка). Списание бай-инов происходит автоматически при завершении драфта.</p>
         <div id="adminUsers"><span class="mut">загрузка…</span></div>
+        <h2 style="margin-top:18px">Произношение для озвучки</h2>
+        <p class="mut" style="font-size:11px;margin:0 0 8px">Кириллицей, ударение знаком + перед ударной гласной (напр. Дав+ид, Диоманд+е). Пусто — берётся имя как есть. Применяется к голосовой озвучке покупок.</p>
+        <div id="pronBox"><span class="mut">загрузка…</span></div>
       </div>
       <div class="card2">
         <h2>Создать драфт</h2>
@@ -746,7 +749,35 @@ function updateRtcBtns(){
     const camOn=RTC.on&&RTC.camOn;
     h+=`<button class="cbtn ${camOn?'on':'off'}" onclick="rtcCamClick()" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}<span>Камера</span></button>`;
   }
+  h+=`<button class="cbtn ${TTS_MUTE?'off':'on'}" onclick="toggleTts()" title="${TTS_MUTE?'Озвучка покупок выключена — включить':'Озвучка покупок включена — выключить'}">${TTS_MUTE?IC.spkOff:IC.spk}<span>Озвучка</span></button>`;
   box.innerHTML=h;
+}
+// --- Озвучка покупок (TTS): новые покупки детектим по стейту → очередь → проигрывание (синтез на сервере, Alena/good) ---
+let TTS_MUTE=(()=>{try{return localStorage.getItem('dcTtsMute')==='1';}catch(e){return false;}})();
+let SEEN_PICKS=null; const TTSQ=[]; let ttsPlaying=false;
+function toggleTts(){TTS_MUTE=!TTS_MUTE;try{localStorage.setItem('dcTtsMute',TTS_MUTE?'1':'0');}catch(e){}if(TTS_MUTE)TTSQ.length=0;updateRtcBtns();}
+function announcePicks(){
+  if(!S||!S.started||!S.draft||!S.draft.managers){SEEN_PICKS=null;return;}
+  const cur=new Set(),fresh=[];
+  for(const m of S.draft.managers)for(const u of (m.roster||[])){if(u.position==='COACH')continue;const k=m.id+':'+u.id;cur.add(k);if(SEEN_PICKS&&!SEEN_PICKS.has(k))fresh.push({m,u});}
+  if(SEEN_PICKS===null){SEEN_PICKS=cur;return;}   // первый стейт драфта (вход/реконнект) — засеваем без объявления
+  for(const f of fresh)queuePick(f.m,f.u);
+  SEEN_PICKS=cur;
+}
+function queuePick(m,u){
+  if(TTS_MUTE)return;
+  const seat=((S.lobby&&S.lobby.seats)||[]).find(s=>s.id===m.id);
+  TTSQ.push({playerId:u.id,playerName:u.disp||u.name,buyerUserId:seat&&seat.userId,buyerName:m.name,price:u.price});
+  pumpTts();
+}
+async function pumpTts(){
+  if(ttsPlaying||!TTSQ.length||TTS_MUTE)return;ttsPlaying=true;
+  const b=TTSQ.shift();
+  try{
+    const r=await fetch('/api/tts/pick',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+    if(r.ok){const url=URL.createObjectURL(await r.blob());const a=new Audio(url);const done=()=>{try{URL.revokeObjectURL(url);}catch(e){}ttsPlaying=false;pumpTts();};a.onended=done;a.onerror=done;a.play().catch(done);return;}
+  }catch(e){}
+  ttsPlaying=false;pumpTts();
 }
 
 // --- детект говорящего: AnalyserNode на свой и чужие аудио-потоки, подсветка ника/плитки ---
@@ -966,7 +997,7 @@ function showSection(sec){
   const map={lobby:'secLobby',all:'secAll',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
   document.getElementById(map[sec]).classList.add('active');
   const b=document.getElementById('backToDraftBtn');if(b)b.style.display=myRoom?'inline-block':'none'; // показываем «← Вернуться в драфт» только если в руме
-  if(sec==='admin'){refreshAdminTime();renderAdminUsers();}
+  if(sec==='admin'){refreshAdminTime();renderAdminUsers();renderPron();}
   if(sec==='profile')renderLedger();
   if(sec==='lobby'||sec==='all'||sec==='admin'||sec==='mine')loadDrafts();
 }
@@ -986,6 +1017,27 @@ async function renderLedger(){
   }catch(e){el.innerHTML='<p class="mut" style="font-size:11px">не удалось загрузить историю</p>';}
 }
 let ADMIN_USERS=[];
+async function renderPron(){
+  const el=document.getElementById('pronBox');if(!el)return;
+  try{
+    const t=await authToken();const r=await fetch('/api/admin/pron',{headers:{authorization:'Bearer '+t}});const j=await r.json();
+    if(!r.ok)throw new Error(j.error||r.status);
+    const pm={};(j.pron||[]).forEach(p=>pm[p.kind+':'+p.ref]=p.say);
+    const row=(kind,ref,label,sub)=>`<tr><td>${esc(label)}${sub?` <span class="mut">${esc(sub)}</span>`:''}</td><td><input id="prn-${kind}-${ref}" value="${escAttr(pm[kind+':'+ref]||'')}" placeholder="как произносить" style="width:220px;font-size:12px"></td><td><button class="btn" onclick="savePron('${kind}','${ref}')">OK</button></td></tr>`;
+    const nicks=(j.nicks||[]).map(u=>row('nick',u.id,u.display_name||u.id.slice(0,8))).join('');
+    const players=(j.players||[]).map(p=>row('player',p.player_id,p.name,p.club)).join('');
+    el.innerHTML=`<input id="pronFilter" placeholder="поиск по списку…" oninput="filterPron()" style="margin-bottom:8px;width:240px">
+      <div style="font-weight:700;margin:6px 0 4px">Участники</div><div style="max-height:200px;overflow:auto"><table style="font-size:13px;width:100%"><tbody id="pronNicks">${nicks||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
+      <div style="font-weight:700;margin:12px 0 4px">Игроки (сыгранные)</div><div style="max-height:380px;overflow:auto"><table style="font-size:13px;width:100%"><tbody id="pronPlayers">${players||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
+      <div id="pronMsg" class="mut" style="font-size:12px;margin-top:6px"></div>`;
+  }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
+}
+function filterPron(){const q=((document.getElementById('pronFilter')||{}).value||'').toLowerCase();document.querySelectorAll('#pronNicks tr,#pronPlayers tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';});}
+async function savePron(kind,ref){
+  const inp=document.getElementById('prn-'+kind+'-'+ref),m=document.getElementById('pronMsg');
+  try{const t=await authToken();const r=await fetch('/api/admin/pron-set',{method:'POST',headers:{authorization:'Bearer '+t,'content-type':'application/json'},body:JSON.stringify({kind,ref,say:inp.value})});const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);if(m)m.textContent='сохранено ✓';}
+  catch(e){if(m)m.textContent='ошибка: '+e.message;}
+}
 async function renderAdminUsers(){
   const el=document.getElementById('adminUsers');if(!el)return;
   try{
@@ -1925,7 +1977,7 @@ function render(){
   {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
   if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
