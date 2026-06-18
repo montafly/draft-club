@@ -23,10 +23,18 @@ function median(arr) {
 const devig2 = (yes, no) => { const iy = 1 / +yes, ino = 1 / +no; const s = iy + ino; return s > 0 ? iy / s : null; };
 const devig3 = (h, d, a) => { const ih = 1 / +h, id = 1 / +d, ia = 1 / +a, s = ih + id + ia; return s > 0 ? [ih / s, id / s, ia / s] : null; };
 
-async function ssGet(p) {
-  const r = await fetch(`${SS_API}/${p}`, { headers: { accept: 'application/json', 'user-agent': UA } });
-  if (!r.ok) throw new Error('sstats ' + r.status + ' ' + p);
-  return r.json();
+// Опциональный ключ из .env (SSTATS_API_KEY): без него 30 req/min (shared pool, ловит 429),
+// с ключом 120/min + 300k/день. Ключ → заголовок apikey.
+const SS_KEY = (typeof process !== 'undefined' && process.env && process.env.SSTATS_API_KEY) || null;
+async function ssGet(p, { retries = 3 } = {}) {
+  const headers = { accept: 'application/json', 'user-agent': UA };
+  if (SS_KEY) headers.apikey = SS_KEY;
+  for (let i = 0; ; i++) {
+    const r = await fetch(`${SS_API}/${p}`, { headers });
+    if (r.ok) return r.json();
+    if ((r.status === 429 || r.status >= 500) && i < retries) { await sleep(3000 + i * 3000); continue; } // backoff на лимит/5xx: 3с,6с,9с
+    throw new Error('sstats ' + r.status + ' ' + p);
+  }
 }
 
 // --- нормализация имён команд (сборные: много вариантов написания) ---
@@ -142,7 +150,7 @@ function oddsToMetrics(books) {
 
 // --- ПУБЛИЧНОЕ: clubOdds в формате FanTeam ({club, win, xg, cs}) + отчёт о матчинге ---
 // fixtures: [{home, away, startTime}] — имена и время от FanTeam
-export async function sstatsClubOdds(fixtures, { throttle = 2100 } = {}) {
+export async function sstatsClubOdds(fixtures, { throttle = SS_KEY ? 700 : 2100 } = {}) {
   const dates = [...new Set(fixtures.flatMap((f) => {
     if (!f.startTime) return [];
     const d = new Date(f.startTime);
@@ -150,7 +158,7 @@ export async function sstatsClubOdds(fixtures, { throttle = 2100 } = {}) {
     // дата матча по UTC + соседние сутки (часовые сдвиги/поздние матчи)
     return [day(new Date(d.getTime() - 864e5)), day(d), day(new Date(d.getTime() + 864e5))];
   }))];
-  const ssGames = await ssGamesForDates(dates, { throttle: 700 });
+  const ssGames = await ssGamesForDates(dates, { throttle: SS_KEY ? 300 : 700 });
   const clubOdds = [], report = [];
   for (const fix of fixtures) {
     const mt = matchFixture(fix, ssGames);

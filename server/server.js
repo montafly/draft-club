@@ -473,17 +473,19 @@ async function scoreDraftCached(draftId, force) {
 // Доливка кэфов из sstats для предпросмотра драфта: кэш по draftId (TTL 15 мин — implied-кэфы стабильны),
 // дедуп параллельных запусков. sstatsClubOdds медленный (~2с/матч) → НИКОГДА не зовём синхронно в эндпоинт,
 // только в фоне; по готовности чистим tourCache, чтобы превью пересобралось с доливкой.
-const sstatsCache = new Map();    // draftId -> { t, byClub }
+const sstatsCache = new Map();    // draftId -> { t, byClub, full }
 const sstatsInflight = new Map(); // draftId -> Promise
-const SSTATS_TTL = 15 * 60 * 1000;
-function sstatsFresh(draftId) { const c = sstatsCache.get(draftId); return c && (Date.now() - c.t < SSTATS_TTL) ? c : null; }
+const SSTATS_TTL = 15 * 60 * 1000;        // полное покрытие — кэш надолго (implied-кэфы стабильны)
+const SSTATS_TTL_PARTIAL = 2 * 60 * 1000; // частичное (часть матчей не долилась, напр. 429) — короткий TTL, чтобы переоткрытие добрало
+function sstatsFresh(draftId) { const c = sstatsCache.get(draftId); if (!c) return null; const ttl = c.full ? SSTATS_TTL : SSTATS_TTL_PARTIAL; return (Date.now() - c.t < ttl) ? c : null; }
 function fetchSstatsForDraft(draftId, fixtures) {
   if (sstatsInflight.has(draftId)) return sstatsInflight.get(draftId);
   const p = (async () => {
     try {
       const { clubOdds } = await sstatsClubOdds(fixtures);
       const byClub = {}; for (const o of clubOdds) byClub[o.club] = o;
-      sstatsCache.set(draftId, { t: Date.now(), byClub });
+      const full = clubOdds.length >= fixtures.length * 2;   // 2 клуба на матч; меньше → доливка неполная
+      sstatsCache.set(draftId, { t: Date.now(), byClub, full });
       tourCache.delete(draftId);   // следующий /api/draft/tour пересоберётся со свежей доливкой
       return byClub;
     } catch (err) { console.error('sstats preview', err.message); return null; }
