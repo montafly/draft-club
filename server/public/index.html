@@ -1812,7 +1812,7 @@ async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
-function onRoom(code){myRoom=code;history.replaceState(null,'','?room='+code+(VOICE?'&voice=1':''));
+function onRoom(code){myRoom=code;_chatSeen=null;history.replaceState(null,'','?room='+code+(VOICE?'&voice=1':''));
   if(VOICE){enterVoiceMode(code);return;}                                  // голосовой компаньон: показываем только панель мика, игровой UI скрыт
   setVp(true);
   document.getElementById('landing').style.display='none';document.getElementById('topbar').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('draft').style.display='flex';
@@ -1888,7 +1888,7 @@ function showErr(t){const el=document.getElementById('err');el.textContent=t;set
 // Сэмплы: gavel.mp3 (freesound #173941, CC0) · team_celebration.ogg (Google Sound Library "Female Crowd Celebration", CC BY 4.0 — атрибуция на лендинге). ---
 const SND={ctx:null,master:null,bus:null,enabled:(localStorage.getItem('dcSound')!=='0'),buf:{}};
 // громкость по событиям (множители) + общая; сохраняется в localStorage. Дефолты — отправная точка, после тюна можно зашить как глобальные.
-const SVOL_DEF={master:0.9,ambient:0.75,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:1.2,teamDone:0.5,draftDone:0.5}; // дефолты = персональные настройки Матвея, зафиксированы 2026-06-11
+const SVOL_DEF={master:0.9,ambient:0.75,turnNominate:1,turnBid:1,bidUp:1,pass:1,roundFinal:1.2,teamDone:0.5,draftDone:0.5,chatMsg:0.8}; // дефолты = персональные настройки Матвея, зафиксированы 2026-06-11
 let SVOL=(()=>{try{return Object.assign({},SVOL_DEF,JSON.parse(localStorage.getItem('dcSvol')||'{}'));}catch(e){return Object.assign({},SVOL_DEF);}})();
 function saveSvol(){try{localStorage.setItem('dcSvol',JSON.stringify(SVOL));}catch(e){}}
 function setSvol(name,v){SVOL[name]=+v;saveSvol();if(name==='master'&&SND.master)SND.master.gain.value=SVOL.master;}
@@ -1921,6 +1921,7 @@ function playBuf(file,opt){opt=opt||{};const dest=SND.bus||SND.master;sndLoad(fi
   src.connect(g);g.connect(dest);src.start(t0,off,d+0.03);src.stop(t0+d+0.06);}).catch(()=>{});}
 function sndPreload(){if(!SND.enabled)return;sndLoad('gavel.mp3').catch(()=>{});sndLoad('team_celebration.ogg').catch(()=>{});}
 const SFX={
+  chatMsg:()=>{tone({f:880,dur:0.07,type:'sine',vol:0.22,at:0});tone({f:1320,dur:0.10,type:'sine',vol:0.20,at:0.07});}, // новое сообщение в чате — короткий блип
   turnNominate:()=>{tone({f:587,dur:0.12,type:'square',vol:0.26,at:0});tone({f:784,dur:0.12,type:'square',vol:0.26,at:0.11});tone({f:1175,dur:0.30,type:'triangle',vol:0.32,at:0.22});}, // твоя очередь выставлять — восходящая фанфара
   turnBid:()=>{tone({f:880,dur:0.11,type:'triangle',vol:0.34,at:0,attack:0.003});tone({f:880,dur:0.13,type:'triangle',vol:0.34,at:0.12,attack:0.003});}, // твоя очередь делать бид — двойной пульс «тук-тук»
   bidUp:()=>{tone({f:659,dur:0.14,type:'sine',vol:0.34,at:0});tone({f:988,dur:0.20,type:'sine',vol:0.34,at:0.12});}, // чужое повышение ставки — две ноты вверх
@@ -1934,7 +1935,7 @@ function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(!f)return;const c
   const bus=c.createGain();bus.gain.value=(SVOL[name]==null?1:SVOL[name]);bus.connect(SND.master);
   const prev=SND.bus;SND.bus=bus;try{f();}catch(e){}SND.bus=prev;
   setTimeout(()=>{try{bus.disconnect();}catch(e){}},5000);}
-const SND_LABELS={master:'Общая',ambient:'Эмбиент (пока твой ход выставлять)',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён'};
+const SND_LABELS={master:'Общая',ambient:'Эмбиент (пока твой ход выставлять)',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён',chatMsg:'Сообщение в чате'};
 function onSvol(k,v){setSvol(k,v);const s=document.getElementById('svv_'+k);if(s)s.textContent=Math.round(v*100)+'%';}
 function buildSoundPanel(){const el=document.getElementById('soundVolPanel');if(!el)return;
   el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="${k==='ambient'?'ambientPreview()':`sndCtx();sndPreload();sfx('${k}')`}">▶</button>`;
@@ -2017,7 +2018,7 @@ function render(){
   {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
   if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();loadSeasonStats();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();chatNotify();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();loadSeasonStats();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
@@ -2076,6 +2077,26 @@ async function fetchViewerAvatars(){
   renderVAvatars();
 }
 function renderVAvatars(){const ts=(VIEW&&VIEW.score&&VIEW.score.teams)||[];document.querySelectorAll('#vTeams .vava').forEach(el=>{const uid=el.dataset.uid;const t=ts.find(x=>String(x.user_id)===uid);el.innerHTML=avaHtml(uid,t&&t.name);});}
+let _chatSeen=null,_chatPopT=null; // #3: счётчик увиденных сообщений + таймер всплывашки
+// детект новых ЧУЖИХ сообщений чата → всплывашка вверху по центру + звук (чат свёрнут/незаметен)
+function chatNotify(){
+  const ch=(S&&S.lobby&&S.lobby.chat)||[];
+  if(_chatSeen===null){_chatSeen=ch.length;return;}        // первый стейт/реконнект — база без сигнала
+  if(ch.length<=_chatSeen){_chatSeen=ch.length;return;}    // нет новых (или сброс комнаты)
+  const fresh=ch.slice(_chatSeen);_chatSeen=ch.length;
+  const others=fresh.filter(c=>c.name!==myName);           // свои сообщения не сигналим
+  if(!others.length)return;
+  const m=others[others.length-1];
+  showChatPop(m.name,m.text);sfx('chatMsg');
+}
+function showChatPop(name,text){
+  let el=document.getElementById('chatPop');
+  if(!el){el=document.createElement('div');el.id='chatPop';el.style.cssText='position:fixed;top:54px;left:50%;transform:translateX(-50%);z-index:60;max-width:min(460px,86vw);background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:8px 14px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-size:13px;cursor:pointer';el.title='Сообщение в чате драфта';el.onclick=()=>{el.style.display='none';const cb=document.getElementById('chatBox');if(cb)cb.classList.remove('collap');};document.body.appendChild(el);}
+  el.innerHTML=`<b style="color:var(--gold)">${esc(name)}</b> <span style="opacity:.92">${esc(text)}</span>`;
+  el.style.display='block';
+  if(_chatPopT)clearTimeout(_chatPopT);
+  _chatPopT=setTimeout(()=>{if(el)el.style.display='none';},4500);
+}
 function renderChat(){
   const el=document.getElementById('chatLog');if(!el)return;
   const ch=(S&&S.lobby&&S.lobby.chat)||[];
