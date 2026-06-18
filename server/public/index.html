@@ -2243,7 +2243,7 @@ function renderBottom(){
     updateRtcBtns(); // контролы мик/камера доступны и в предруме (#: лобби)
     return;
   }
-  if(d.phase==='done'){el.innerHTML='<div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div>';return;}
+  if(d.phase==='done'){el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div></div>';updateRtcBtns();return;} // #4: сохраняем бар мик/камеры после финиша (раньше #rtcCtlBar пропадал → кнопки исчезали у всех)
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
   if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
