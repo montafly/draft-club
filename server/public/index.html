@@ -1656,7 +1656,7 @@ function renderAdminDrafts(){
       <div class="row" style="gap:6px;align-items:center;margin:8px 0"><span class="mut" style="font-size:12px">Старт (${tzLabel()}):</span><input id="dwhen-${d.id}" type="datetime-local" value="${d.starts_at?tzWallString(new Date(d.starts_at)):''}" style="font-size:12px"><button class="btn" onclick="saveDraftTime(${d.id})">Сохранить время</button></div>
       ${['recruiting','finalized'].includes(d.status)?`<div class="row" style="gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap"><span class="mut" style="font-size:12px">Бай-ин / приз 1 / приз 2 (DCC):</span><input id="dbuyin-${d.id}" type="number" min="0" value="${d.buyin}" title="бай-ин" style="width:80px;font-size:12px"><input id="dp1-${d.id}" type="number" min="0" value="${d.prize1}" title="приз за 1 место" style="width:80px;font-size:12px"><input id="dp2-${d.id}" type="number" min="0" value="${d.prize2}" title="приз за 2 место" style="width:80px;font-size:12px"><button class="btn" onclick="saveDraftEconomy(${d.id})">Сохранить</button></div>`:''}
       <div style="margin:8px 0">${rows}</div>
-      ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
+      ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу. Пробелы FanTeam доливаются из sstats.net в фоне.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
       <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
   }).join('');
 }
@@ -1664,9 +1664,10 @@ async function refreshDraftOdds(id){
   const m=document.getElementById('odds-'+id);if(m)m.textContent='парсю кэфы…';
   try{const t=await authToken();const r=await fetch('/api/draft/refresh-odds',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t},body:JSON.stringify({draftId:id})});
     const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
-    let txt=`кэфы: ${j.withOdds}/${j.total} клубов`;
+    let txt=`кэфы: ${j.withOdds}/${j.total} клубов (FanTeam)`;
     if(j.withOdds<j.total)txt+=' — FanTeam ещё опубликовал не всё';
     if(j.applied)txt+=' · применено в live-комнате';
+    if(j.sstatsRunning)txt+=' · пробелы доливаю из sstats в фоне (обновится в комнате через ~минуту)';
     if(m)m.textContent=txt;
   }catch(e){if(m)m.textContent='ошибка: '+e.message;}
 }

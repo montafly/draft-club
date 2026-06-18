@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
 import { authUser, getProfile, clientConfig } from './auth.js';
+import { sstatsClubOdds } from './sstats.js';   // вторичный источник кэфов (sstats.net), доливка дырок FanTeam
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
@@ -660,9 +661,16 @@ const server = http.createServer((req, res) => {
         const { clubOdds } = await tourInfo(d.season_id, d.round, d.match_ids);   // прямой запрос (без 60с-кэша) → свежие данные
         const total = clubOdds.length;
         const withOdds = clubOdds.filter((o) => o.win != null || o.xg != null || o.cs != null).length;
+        const gaps = total - withOdds;                                            // клубы, по которым FanTeam ещё молчит → пробуем sstats
         let applied = false;
-        for (const [, ent] of rooms) { if (ent.room && String(ent.room.draftId) === String(draftId)) { await refreshOdds(ent); applied = true; break; } }  // живая комната → применяем сразу
-        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ total, withOdds, applied }));
+        for (const [, ent] of rooms) {
+          if (ent.room && String(ent.room.draftId) === String(draftId)) {         // живая комната → FanTeam применяем сразу, sstats-доливку запускаем в фоне (медленно, прилетит через broadcastPool)
+            applied = true;
+            refreshOdds(ent, { sstats: gaps > 0 }).catch((err) => console.error('refresh-odds bg', err.message));
+            break;
+          }
+        }
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ total, withOdds, applied, sstatsRunning: applied && gaps > 0 }));
       } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
     });
     return;
@@ -881,21 +889,41 @@ function broadcastPool(e) {
 }
 // Коэф/xG/CS снапшотятся в комнату на launchDraft — часто задолго до матчей, когда FanTeam их ещё не опубликовал (→ нули у части клубов).
 // На старте аукциона (ближе к матчам) подтягиваем свежие через лёгкий tourInfo (один запрос) и доливаем недостающие поля, не затирая уже валидные.
-async function refreshOdds(e) {
+async function refreshOdds(e, opts = {}) {
   const meta = e.room && e.room.draftMeta;
-  if (!meta) return;
-  let fresh;
-  try { ({ clubOdds: fresh } = await tourInfo(meta.seasonId, meta.round, meta.matchIds)); } catch (err) { return console.error('refreshOdds', err.message); }
-  if (!fresh || !fresh.length || !fresh.some((o) => o.win != null || o.xg != null || o.cs != null)) return; // всё ещё пусто — оставляем как было
-  const freshBy = {}; for (const o of fresh) freshBy[o.club] = o;
-  let changed = false;
-  e.room.clubOdds = (e.room.clubOdds || []).map((o) => {
-    const f = freshBy[o.club]; if (!f) return o;
-    const merged = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
-    if (merged.win !== o.win || merged.xg !== o.xg || merged.cs !== o.cs) changed = true;
-    return merged;
-  });
-  if (changed) broadcastPool(e);
+  if (!meta) return { ft: 0, ss: 0 };
+  const hasGaps = () => (e.room.clubOdds || []).some((o) => o.win == null || o.xg == null || o.cs == null);
+  // долить недостающие поля из map by[club], не затирая уже валидные значения; вернуть число изменённых клубов
+  const apply = (by) => {
+    let n = 0;
+    e.room.clubOdds = (e.room.clubOdds || []).map((o) => {
+      const f = by[o.club]; if (!f) return o;
+      const merged = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
+      if (merged.win !== o.win || merged.xg !== o.xg || merged.cs !== o.cs) n++;
+      return merged;
+    });
+    return n;
+  };
+  // 1) основной источник — свежий FanTeam (один лёгкий tourInfo)
+  let ftFilled = 0;
+  try {
+    const { clubOdds: fresh } = await tourInfo(meta.seasonId, meta.round, meta.matchIds);
+    if (fresh && fresh.some((o) => o.win != null || o.xg != null || o.cs != null)) {
+      const by = {}; for (const o of fresh) by[o.club] = o;
+      ftFilled = apply(by);
+    }
+  } catch (err) { console.error('refreshOdds ft', err.message); }
+  if (ftFilled) broadcastPool(e);   // отдаём FanTeam-доливку сразу, не дожидаясь медленного sstats
+  // 2) вторичный — sstats.net, ТОЛЬКО по явному запросу (медленный, троттлится ~2с/матч): закрывает то, что FanTeam ещё не опубликовал
+  let ssFilled = 0;
+  if (opts.sstats && hasGaps()) {
+    try {
+      const fixtures = (e.room.matches || []).filter((m) => m.home && m.away).map((m) => ({ home: m.home, away: m.away, startTime: m.startTime }));
+      const { clubOdds: ss } = await sstatsClubOdds(fixtures);
+      if (ss && ss.length) { const by = {}; for (const o of ss) by[o.club] = o; ssFilled = apply(by); if (ssFilled) broadcastPool(e); }
+    } catch (err) { console.error('refreshOdds sstats', err.message); }
+  }
+  return { ft: ftFilled, ss: ssFilled };
 }
 async function joinAuthed(ws, msg) {
   const user = await authUser(msg.token);              // валидация токена → {id,email}
