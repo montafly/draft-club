@@ -1639,19 +1639,34 @@ function populateAllFilters(){                              // опции фил
   fillSel('fTournament',[...new Set(DRAFTS.map(d=>d.tournament))].filter(Boolean).map(t=>({v:t,t})));
   fillSel('fStatus',[...new Set(DRAFTS.map(d=>d.status))].filter(Boolean).sort((a,b)=>STORDER.indexOf(a)-STORDER.indexOf(b)).map(s=>({v:s,t:STATUS_SHORT[s]||s})));
 }
+// группировка драфтов по типу + сортировка по таймингу турнира; завершённые сворачиваются
+let _grpOpen={}; // ключ группы -> раскрыта ли (по умолчанию false = свёрнуто)
+function toggleGrp(k){_grpOpen[k]=!_grpOpen[k];renderLobbyAll();renderMine();}
+const _dtkey=d=>d.starts_at?Date.parse(d.starts_at):(d.created_at?Date.parse(d.created_at):0);
+const _cmpDraft=(a,b)=>(b.round||0)-(a.round||0)||_dtkey(b)-_dtkey(a)||b.id-a.id; // тур↓ (тур 2 выше тура 1), затем тайминг↓ (позже сыгранный выше), затем id↓
+function draftGroup(title,arr,collapseKey,rowFn){
+  if(!arr.length)return '';
+  if(collapseKey){const open=!!_grpOpen[collapseKey];
+    return `<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase;cursor:pointer" onclick="toggleGrp('${collapseKey}')" title="${open?'свернуть':'раскрыть'}">${open?'▾':'▸'} ${title} (${arr.length})</h3>`+(open?arr.map(rowFn).join(''):'');}
+  return `<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase">${title} (${arr.length})</h3>`+arr.map(rowFn).join('');
+}
 function renderLobbyAll(){
   const el=document.getElementById('lobAllList');if(!el)return;
   const v=id=>{const s=document.getElementById(id);return s?s.value:'';};
   const fl=v('fLeague'),ft=v('fTournament'),fs=v('fStatus');
-  let list=DRAFTS;
+  if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов пока нет.</div>';return;}
+  let list=DRAFTS.slice();
   if(fl)list=list.filter(d=>d.league===fl);
   if(ft)list=list.filter(d=>d.tournament===ft);
   if(fs)list=list.filter(d=>d.status===fs);
-  if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов пока нет.</div>';return;}
-  // сортировка по ТАЙМИНГУ проведения (старт), а не по времени создания: будущие/запланированные/запись сверху, сыгранные ниже (по убыванию)
-  const tkey=d=>d.starts_at?Date.parse(d.starts_at):(d.created_at?Date.parse(d.created_at):0);
-  list=list.slice().sort((a,b)=>tkey(b)-tkey(a)||b.id-a.id);
-  el.innerHTML=list.length?list.map(d=>draftRow(d)).join(''):'<div class="empty">Под фильтр ничего не подходит.</div>';
+  list.sort(_cmpDraft);
+  const planned=list.filter(d=>d.status==='recruiting'||d.status==='finalized'||d.status==='live'); // LIVE отображаем тут
+  const played=list.filter(d=>d.status==='done');
+  const done=list.filter(d=>d.status==='settled'||d.status==='cancelled');
+  const html=draftGroup('Запланированные',planned,null,d=>draftRow(d))
+    +draftGroup('Сыгранные',played,null,d=>draftRow(d))
+    +draftGroup('Завершённые',done,fs?null:'all',d=>draftRow(d)); // завершённые свёрнуты по умолчанию (кроме случая, когда выбран явный статус-фильтр)
+  el.innerHTML=html||'<div class="empty">Под фильтр ничего не подходит.</div>';
 }
 function renderAdminDrafts(){
   const el=document.getElementById('adminDraftsList');if(!el)return;
@@ -1707,13 +1722,14 @@ function renderMine(){                                      // «Мои драф
   const dById={};DRAFTS.forEach(d=>dById[d.id]=d);
   const mine=APPS.filter(a=>a.user_id===session.user.id);
   if(!mine.length){el.innerHTML='<div class="empty">Ты пока не подавал заявок. Загляни в Лобби → Запись.</div>';return;}
-  const g={live:[],planned:[],past:[]};
+  const g={planned:[],played:[],done:[]};
   for(const a of mine){const d=dById[a.draft_id];if(!d)continue;
-    if(d.status==='settled'||d.status==='cancelled')g.past.push([a,d]);
-    else if(d.status==='live'||d.status==='done')g.live.push([a,d]);
-    else g.planned.push([a,d]);}
-  const sec=(t,arr)=>arr.length?`<h3 style="margin:14px 0 8px;color:var(--mut);text-transform:uppercase">${t}</h3>`+arr.map(([a,d])=>draftRow(d,{app:a})).join(''):'';
-  el.innerHTML=(sec('LIVE',g.live)+sec('Запланированные',g.planned)+sec('Прошедшие',g.past))||'<div class="empty">—</div>';
+    if(d.status==='recruiting'||d.status==='finalized'||d.status==='live')g.planned.push([a,d]); // LIVE — в запланированных
+    else if(d.status==='done')g.played.push([a,d]);
+    else g.done.push([a,d]);} // settled/cancelled
+  const bt=(x,y)=>_cmpDraft(x[1],y[1]);g.planned.sort(bt);g.played.sort(bt);g.done.sort(bt);
+  const rowFn=([a,d])=>draftRow(d,{app:a});
+  el.innerHTML=(draftGroup('Запланированные',g.planned,null,rowFn)+draftGroup('Сыгранные',g.played,null,rowFn)+draftGroup('Завершённые',g.done,'mine',rowFn))||'<div class="empty">—</div>';
 }
 async function loadFlags(){try{const r=await fetch('/api/flags');const j=await r.json();AUTOPLAY_ON=!!j.autoplay;const c=document.getElementById('autoToggle');if(c)c.checked=AUTOPLAY_ON;}catch{}}
 async function toggleAutoplay(){
