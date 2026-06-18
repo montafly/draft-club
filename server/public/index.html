@@ -1648,6 +1648,9 @@ function renderLobbyAll(){
   if(ft)list=list.filter(d=>d.tournament===ft);
   if(fs)list=list.filter(d=>d.status===fs);
   if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов пока нет.</div>';return;}
+  // сортировка по ТАЙМИНГУ проведения (старт), а не по времени создания: будущие/запланированные/запись сверху, сыгранные ниже (по убыванию)
+  const tkey=d=>d.starts_at?Date.parse(d.starts_at):(d.created_at?Date.parse(d.created_at):0);
+  list=list.slice().sort((a,b)=>tkey(b)-tkey(a)||b.id-a.id);
   el.innerHTML=list.length?list.map(d=>draftRow(d)).join(''):'<div class="empty">Под фильтр ничего не подходит.</div>';
 }
 function renderAdminDrafts(){
