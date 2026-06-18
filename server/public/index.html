@@ -1551,9 +1551,9 @@ function renderModalPool(){
   const el=document.getElementById('mplist');if(!el)return;
   let html='';
   for(const pos of POSORD){
-    const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
+    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=MSTATS[a.id],B=MSTATS[b.id];return (B?B[1]:-1)-(A?A[1]:-1)||(B?B[0]:-1)-(A?A[0]:-1)||a.name.localeCompare(b.name,'ru');}); // минуты↓, очки↓, алфавит — как в номинации драфта
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=MSTATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=MSTATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.sel||u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
@@ -2351,7 +2351,7 @@ function renderNom(mode,ro){
   for(const pos of POSORD){
     const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=SEASON_STATS[a.id],B=SEASON_STATS[b.id];return (B?B[1]:-1)-(A?A[1]:-1)||(B?B[0]:-1)-(A?A[0]:-1)||a.name.localeCompare(b.name,'ru');}); // минуты↓, очки↓, алфавит
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.sel||u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
@@ -2363,14 +2363,14 @@ function selectPlayer(id,mode){
   if(mode==='nominate'){
     const mx=S.draft.actorOptions.maxOpen;
     const q=[1,5,10,15,20,30,40,50].map(v=>`<button class="btn qbid qb" onclick="document.getElementById('open').value=${v};pickQuick(this)" ${v<=mx?'':'disabled'}>${v}</button>`).join('');
-    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club} · старт <span class="stepper" style="display:inline-flex;vertical-align:middle;margin:0 2px"><button class="btn step" onclick="stepOpen(-1)" aria-label="меньше">−</button><input id="open" type="number" min="1" max="${mx}" value="1" oninput="clrQuick()"><button class="btn step" onclick="stepOpen(1)" aria-label="больше">+</button></span> (макс ${mx})
+    sel.innerHTML=`Выбран: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.sel||u.name} · ${u.club} · старт <span class="stepper" style="display:inline-flex;vertical-align:middle;margin:0 2px"><button class="btn step" onclick="stepOpen(-1)" aria-label="меньше">−</button><input id="open" type="number" min="1" max="${mx}" value="1" oninput="clrQuick()"><button class="btn step" onclick="stepOpen(1)" aria-label="больше">+</button></span> (макс ${mx})
       <div class="qrow" style="margin:6px 0;display:flex;gap:4px;align-items:stretch">
         <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${q}</div>
         <button class="btn qbid qb" style="flex:none;width:52px;background:var(--gold);color:#1b1206;border-color:var(--gold)" onclick="document.getElementById('open').value=${mx};pickQuick(this)">MAX<br>${mx}</button>
       </div>
       <button class="btn p" style="width:100%" onclick='confirmNominate(${id})'>Подтвердить выставление</button>`;
   }else{
-    sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.first?u.first+' ':''}${u.name} · ${u.club}
+    sel.innerHTML=`Замена: <b class="${u.position.toLowerCase()}">${posShort(u.position)}</b> ${u.sel||u.name} · ${u.club}
       <button class="btn p" onclick='send({type:"pickSubstitute",unitId:${id}})'>Подтвердить замену</button>`;
   }
 }

@@ -145,12 +145,13 @@ async function buildDraftPool(seasonId, round, matchIds) {
   // дизамбигуация: если в одном клубе 2+ игрока с одинаковой фамилией → показываем инициал имени (J. David); если инициалы тоже совпали — полное имя
   const _g = {};
   for (const u of units) { if (u.position === 'COACH' || !u.name) continue; const k = u.club + '|' + u.name.toLowerCase(); (_g[k] = _g[k] || []).push(u); }
-  for (const u of units) { if (u.position !== 'COACH') u.disp = u.name; }
+  // disp — для ростера/итогов; sel — для окна выбора (#7): по умолчанию «N. Williams», при совпадении фамилий в клубе полное имя
+  for (const u of units) { if (u.position !== 'COACH') { u.disp = u.name; u.sel = u.first ? (u.first.charAt(0).toUpperCase() + '. ' + u.name) : u.name; } }
   for (const k in _g) {
     const g = _g[k]; if (g.length < 2) continue;
     const inits = g.map((u) => (u.first || '').charAt(0).toUpperCase());
     const initOk = inits.every(Boolean) && new Set(inits).size === inits.length;   // у всех есть имя и инициалы различны
-    for (const u of g) u.disp = u.first ? ((initOk ? u.first.charAt(0).toUpperCase() + '.' : u.first) + ' ' + u.name) : u.name;
+    for (const u of g) { u.disp = u.first ? ((initOk ? u.first.charAt(0).toUpperCase() + '.' : u.first) + ' ' + u.name) : u.name; u.sel = u.first ? (u.first + ' ' + u.name) : u.name; }
   }
   const matches = sel.map((m) => { const ids = (m.realTeamIds || [null, null]).slice(0, 2); return { home: teams[ids[0]] || '', away: teams[ids[1]] || '', startTime: m.startTime || null }; });
   return { units, clubOdds, matches };
@@ -351,9 +352,10 @@ async function seasonStats(seasonId, uptoRound) {
       if (m.status !== 'confirmed') continue;              // только сыгранные
       let det; try { det = await ftDetail(m.id); } catch (e) { continue; }
       for (const r of (det.realPlayerMatchStats || [])) {
-        const pid = r.realPlayerId, br = cpBreak(r.stats || {}, r.position || '');
+        const pid = r.realPlayerId, br = cpBreak(r.stats || {}, r.position || ''), pts = br.reduce((a, b) => a + b.pts, 0), min = (r.minutesPlayed || 0);
         const e = map[pid] || (map[pid] = { pts: 0, min: 0 });
-        e.pts += br.reduce((a, b) => a + b.pts, 0); e.min += (r.minutesPlayed || 0);
+        e.pts += pts; e.min += min;
+        if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); const ce = map[ck] || (map[ck] = { pts: 0, min: 0 }); ce.pts += pts; ce.min += min; }   // тренер (id=-tid) = очки/минуты вышедших на замену (#9)
       }
       await sleep(100);                                    // вежливый троттлинг FanTeam
     }
