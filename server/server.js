@@ -519,7 +519,7 @@ async function tourForDraftCached(draftId) {
       fetchSstatsForDraft(draftId, fixtures);   // фон, не ждём
     }
   }
-  const data = { league: d.league, tournament: d.tournament, round: d.round, clubOdds, fixtures, sstatsPending, sstatsFilled };
+  const data = { league: d.league, tournament: d.tournament, season: d.season_id, round: d.round, clubOdds, fixtures, sstatsPending, sstatsFilled };
   tourCache.set(draftId, { t: now, data });
   return data;
 }

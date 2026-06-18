@@ -1502,6 +1502,7 @@ async function openDraftMatches(id){
   document.getElementById('matchesTitle').textContent=`${LEAGUE_ICON[d.league]||''} ${d.league||''} · ${d.tournament||''}, тур ${d.round||''}`;
   body.innerHTML='<div class="mut">Загрузка…</div>';document.getElementById('matchesPool').innerHTML='';m.style.display='flex';
   matchesDraftId=id;matchesTries=0;if(matchesTimer){clearTimeout(matchesTimer);matchesTimer=null;}
+  MSTATS={};_mstatsKey=null; // сброс на новый драфт; подгрузим под его season/round из ответа /api/draft/tour
   loadDraftMatchesData(id);
   loadModalPool(id); // правая панель — браузер игроков (тяжёлый пул, грузим отдельно)
 }
@@ -1510,13 +1511,20 @@ async function loadDraftMatchesData(id){
   try{const r=await fetch('/api/draft/tour?draftId='+id);const j=await r.json();if(j.error)throw new Error(j.error);
     if(matchesDraftId!==id)return; // окно уже на другом драфте/закрыто
     renderDraftMatches(j);
+    loadModalStats(j.season,j.round); // PTS/MIN для браузера игроков (один раз на season/round)
     if(j.sstatsPending&&matchesTries<3){matchesTries++;if(matchesTimer)clearTimeout(matchesTimer);
       matchesTimer=setTimeout(()=>{if(matchesDraftId===id&&document.getElementById('matchesModal').style.display!=='none')loadDraftMatchesData(id);},70000);}
   }catch(e){if(matchesDraftId===id){const body=document.getElementById('matchesBody');if(body)body.innerHTML='<div class="err">Не удалось загрузить матчи: '+((e&&e.message)||e)+'</div>';}}
 }
 function closeDraftMatches(){document.getElementById('matchesModal').style.display='none';matchesDraftId=null;if(matchesTimer){clearTimeout(matchesTimer);matchesTimer=null;}}
 // Браузер игроков в модалке (предпросмотр, read-only): список+фильтры как в драфте, но на пуле из /api/draft/pool. Своё состояние/ids, чтобы не пересекаться с боевым POOL.
-let MPOOL=[],mpFilt={q:'',t:'',p:''};
+let MPOOL=[],mpFilt={q:'',t:'',p:''},MSTATS={},_mstatsKey=null; // MSTATS: накопленные за сезон PTS/MIN по player_id для браузера лобби (как в номинации)
+// подгрузить накопленную статистику сезона для предпросмотра (тот же эндпоинт, что в драфте); по готовности перерисовать список
+function loadModalStats(season,round){
+  if(season==null||round==null)return;
+  const key=season+'/'+round;if(_mstatsKey===key)return;_mstatsKey=key;
+  fetch(`/api/draft/seasonstats?season=${season}&round=${round}`).then(r=>r.json()).then(j=>{MSTATS=j.stats||{};if(document.getElementById('mplist'))renderModalPool();}).catch(()=>{_mstatsKey=null;});
+}
 async function loadModalPool(id){
   const wrap=document.getElementById('matchesPool');if(!wrap)return;
   wrap.innerHTML='<div class="mut">Загрузка игроков… (первый раз до ~5с)</div>';
@@ -1545,7 +1553,7 @@ function renderModalPool(){
   for(const pos of POSORD){
     const grp=list.filter(u=>u.position===pos).sort((a,b)=>a.club.localeCompare(b.club,'ru')||a.name.localeCompare(b.name,'ru'));
     if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>`<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span></div>`).join('');
+    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=MSTATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.first?u.first+' ':''}${u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
   }
   el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
 }
