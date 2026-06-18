@@ -955,14 +955,19 @@ async function refreshOdds(e, opts = {}) {
     }
   } catch (err) { console.error('refreshOdds ft', err.message); }
   if (ftFilled) broadcastPool(e);   // отдаём FanTeam-доливку сразу, не дожидаясь медленного sstats
-  // 2) вторичный — sstats.net, ТОЛЬКО по явному запросу (медленный, троттлится ~2с/матч): закрывает то, что FanTeam ещё не опубликовал
+  // 2) вторичный — sstats.net: закрываем пробелы FanTeam. Тёплый кэш (нагрет превью «Матчи») мёрджим сразу;
+  //    холодный — фоновая доливка (старт аукциона не блокируем), применяем к комнате по готовности. Кэш общий с превью (дедуп).
   let ssFilled = 0;
   if (opts.sstats && hasGaps()) {
-    try {
+    const fresh = sstatsFresh(e.room.draftId);
+    if (fresh) {
+      ssFilled = apply(fresh.byClub); if (ssFilled) broadcastPool(e);
+    } else {
       const fixtures = (e.room.matches || []).filter((m) => m.home && m.away).map((m) => ({ home: m.home, away: m.away, startTime: m.startTime }));
-      const { clubOdds: ss } = await sstatsClubOdds(fixtures);
-      if (ss && ss.length) { const by = {}; for (const o of ss) by[o.club] = o; ssFilled = apply(by); if (ssFilled) broadcastPool(e); }
-    } catch (err) { console.error('refreshOdds sstats', err.message); }
+      fetchSstatsForDraft(e.room.draftId, fixtures)
+        .then((byClub) => { if (byClub && e.room) { const n = apply(byClub); if (n) broadcastPool(e); } })
+        .catch((err) => console.error('refreshOdds sstats', err.message));
+    }
   }
   return { ft: ftFilled, ss: ssFilled };
 }
@@ -1024,7 +1029,7 @@ wss.on('connection', (ws) => {
           return;
         }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
-        else if (msg.type === 'start') { e.room.start(); refreshOdds(e).catch(() => {}); }
+        else if (msg.type === 'start') { e.room.start(); refreshOdds(e, { sstats: true }).catch(() => {}); }
         else if (msg.type === 'draw') {
           if (!ws.seatId) throw new Error('вы зритель');
           const code = ws.roomCode;
@@ -1033,7 +1038,7 @@ wss.on('connection', (ws) => {
             setTimeout(() => {
               const e2 = rooms.get(code);
               if (e2 && e2.room.drawOrder && !e2.room.draft) {
-                try { e2.room.start(); refreshOdds(e2).catch(() => {}); } catch (err) { console.error('draw start', err.message); }
+                try { e2.room.start(); refreshOdds(e2, { sstats: true }).catch(() => {}); } catch (err) { console.error('draw start', err.message); }
                 broadcast(code); syncStatus(e2);
               }
             }, drawMs);

@@ -2016,7 +2016,7 @@ function render(){
 function renderFixtures(){
   const el=document.getElementById('matches');if(!el)return;
   if(!MATCHES.length){el.innerHTML='<span class="mut">—</span>';return;}
-  el.innerHTML='<div class="mlist">'+MATCHES.map((m,i)=>`<div class="mrow"><span class="mut mnum">${i+1}.</span><span class="mh" title="${clubCode(m.home).toUpperCase()}">${m.home}</span><span class="mut mdash">–</span><span class="ma" title="${clubCode(m.away).toUpperCase()}">${m.away}</span></div>`).join('')+'</div>';
+  el.innerHTML='<div class="mlist">'+MATCHES.map((m,i)=>`<div class="mrow"><span class="mut mnum">${i+1}.</span><span class="mh" title="${clubCode(m.home).toUpperCase()}">${m.home}</span><span class="mut mdash">–</span><span class="ma" title="${clubCode(m.away).toUpperCase()}">${m.away}</span>${m.startTime?`<span class="mut" style="margin-left:8px;font-size:11px">${fmtKick(m.startTime).replace(', ',' | ')}</span>`:''}</div>`).join('')+'</div>';
 }
 const LOGCOL={nominate:'var(--gold)',bid:'#efe0b0',pass:'var(--miss)',win:'var(--acc)',done:'var(--gold)',sub:'#bb8fce',join:'var(--mut)',leave:'var(--mut)',info:'var(--mut)'};
 function renderLog(){
