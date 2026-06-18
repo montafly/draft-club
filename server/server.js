@@ -470,15 +470,54 @@ async function scoreDraftCached(draftId, force) {
   return { ...data, updatedAt: at };
 }
 
+// Доливка кэфов из sstats для предпросмотра драфта: кэш по draftId (TTL 15 мин — implied-кэфы стабильны),
+// дедуп параллельных запусков. sstatsClubOdds медленный (~2с/матч) → НИКОГДА не зовём синхронно в эндпоинт,
+// только в фоне; по готовности чистим tourCache, чтобы превью пересобралось с доливкой.
+const sstatsCache = new Map();    // draftId -> { t, byClub }
+const sstatsInflight = new Map(); // draftId -> Promise
+const SSTATS_TTL = 15 * 60 * 1000;
+function sstatsFresh(draftId) { const c = sstatsCache.get(draftId); return c && (Date.now() - c.t < SSTATS_TTL) ? c : null; }
+function fetchSstatsForDraft(draftId, fixtures) {
+  if (sstatsInflight.has(draftId)) return sstatsInflight.get(draftId);
+  const p = (async () => {
+    try {
+      const { clubOdds } = await sstatsClubOdds(fixtures);
+      const byClub = {}; for (const o of clubOdds) byClub[o.club] = o;
+      sstatsCache.set(draftId, { t: Date.now(), byClub });
+      tourCache.delete(draftId);   // следующий /api/draft/tour пересоберётся со свежей доливкой
+      return byClub;
+    } catch (err) { console.error('sstats preview', err.message); return null; }
+    finally { sstatsInflight.delete(draftId); }
+  })();
+  sstatsInflight.set(draftId, p);
+  return p;
+}
+
 // Сводка тура для предпросмотра драфта в лобби (матчи + котировки клубов), кэш 60с — один запрос к FanTeam на драфт.
+// Если FanTeam ещё не опубликовал часть кэфов — доливаем из sstats (свежий кэш мёрджим сразу, иначе запускаем фоном).
 const tourCache = new Map(); // draftId -> { t, data }
 async function tourForDraftCached(draftId) {
   const c = tourCache.get(draftId), now = Date.now();
   if (c && now - c.t < 60000) return c.data;
   const rows = await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round,match_ids,league,tournament`); const d = rows[0];
   if (!d) throw new Error('драфт не найден');
-  const { clubOdds, fixtures } = await tourInfo(d.season_id, d.round, d.match_ids);
-  const data = { league: d.league, tournament: d.tournament, round: d.round, clubOdds, fixtures };
+  let { clubOdds, fixtures } = await tourInfo(d.season_id, d.round, d.match_ids);
+  let sstatsPending = false, sstatsFilled = 0;
+  if (clubOdds.some((o) => o.win == null || o.xg == null || o.cs == null)) {   // есть пробелы FanTeam
+    const fresh = sstatsFresh(draftId);
+    if (fresh) {
+      clubOdds = clubOdds.map((o) => {
+        const f = fresh.byClub[o.club]; if (!f) return o;
+        const m = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
+        if (m.win !== o.win || m.xg !== o.xg || m.cs !== o.cs) sstatsFilled++;
+        return m;
+      });
+    } else {
+      sstatsPending = true;
+      fetchSstatsForDraft(draftId, fixtures);   // фон, не ждём
+    }
+  }
+  const data = { league: d.league, tournament: d.tournament, round: d.round, clubOdds, fixtures, sstatsPending, sstatsFilled };
   tourCache.set(draftId, { t: now, data });
   return data;
 }
