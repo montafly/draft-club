@@ -1090,6 +1090,31 @@ wss.on('connection', (ws) => {
         rooms.set(code, { room: new Room(), clients: new Set() });
         attach(ws, code);
         await joinAuthed(ws, msg);
+      } else if (msg.type === 'createTestRoom') {              // соло-тест (только админ): рум с ботами-заглушками на реальных матчах; админ ходит за всех (делегирование). Не пишется в БД, не нумеруется, виден только админу.
+        const user = await authUser(msg.token);
+        const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') return sendErr(ws, 'только админ');
+        const matchIds = (msg.matchIds || []).map(Number).filter(Boolean);
+        if (!matchIds.length) return sendErr(ws, 'не выбраны матчи');
+        const seats = Math.max(2, Math.min(12, +msg.seats || 5));
+        const pool = await buildDraftPool(msg.seasonId, +msg.round, matchIds);
+        if (!pool.units.length) return sendErr(ws, 'пул игроков не собрался');
+        const code = makeCode();
+        const room = new Room(undefined, seats, pool.units, pool.clubOdds, pool.matches);
+        room.draftMeta = { seasonId: msg.seasonId, round: +msg.round, matchIds };
+        room.allowedUserIds = null;                            // тест-рум (isTest)
+        const myName = (prof.display_name) || (user.email || 'Admin').split('@')[0];
+        rooms.set(code, { room, clients: new Set() });
+        ws.user = user; ws.name = myName;
+        attach(ws, code);
+        const mySeat = room.join(user.id, myName); ws.seatId = mySeat; room.setReady(mySeat, true);
+        for (let i = 1; i < seats; i++) {                      // боты-заглушки: готовы + делегируют ход админу (canActAs → admin ходит за всех)
+          const bs = room.join('bot-' + code + '-' + i, 'Бот ' + (i + 1));
+          if (bs != null) { room.setReady(bs, true); room.delegate[bs] = mySeat; }
+        }
+        ws.send(JSON.stringify({ type: 'joined', you: mySeat, name: myName, rtc: ws.rtcId, uid: user.id }));
+        broadcast(code);
+        return;
       } else if (msg.type === 'joinRoom') {
         const code = String(msg.code || '').toUpperCase();
         if (!rooms.has(code)) return sendErr(ws, 'Комната не найдена');

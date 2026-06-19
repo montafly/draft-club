@@ -252,6 +252,14 @@
   .bids .b.out{color:var(--miss);background:#3a1a17;border-radius:4px;padding:2px 6px}
   .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.filters input{flex:1 1 100%;min-width:0}.filters select{flex:1 1 0;min-width:0}
   .plist{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px}.pitem{padding:4px 8px;cursor:pointer;border-bottom:1px solid #1d2935}.pitem:hover{background:#1d2935}
+  /* браузер игроков (#plist в драфте, #mplist в превью «Матчи») — таблица: POS · Игрок · Клуб · PTS · Min */
+  #plist .phdr,#mplist .phdr{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:26px 1fr 34px 30px 36px;gap:4px;background:#16212c;color:var(--mut);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;padding:5px 6px;border-bottom:1px solid var(--line);text-align:center}
+  #plist .phdr span:nth-child(2),#mplist .phdr span:nth-child(2){text-align:left}
+  #plist .pitem,#mplist .pitem{display:grid;grid-template-columns:26px 1fr 34px 30px 36px;gap:4px;align-items:center;padding:4px 6px}
+  #plist .pcol-pos,#mplist .pcol-pos{font-size:10px;font-weight:700;text-align:center}
+  #plist .pcol-name,#mplist .pcol-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #plist .pcol-team,#mplist .pcol-team{font-size:11px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #plist .pcol-num,#mplist .pcol-num{text-align:center;font-variant-numeric:tabular-nums;font-size:12px}
   .sel{margin-top:8px;padding:8px;border:1px dashed var(--acc);border-radius:8px}
   .panel.pickactive{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset;background:color-mix(in srgb,var(--acc) 16%,var(--panel))}.panel.pickro{opacity:.62}.panel.pickro .pitem{cursor:default}.panel.pickro .pitem:hover{background:none}.badge.go{background:#1f3a2a;color:var(--acc)}.pickgo{margin:-2px 0 8px}
   .err{color:var(--miss)}
@@ -477,6 +485,7 @@
       </div>
       <div class="card2" data-sec="drafts">
         <button class="btn p" onclick="createDraft()">Создать драфт</button>
+        <button class="btn" onclick="createTestRoom()" style="background:#5a3a8c;color:#fff;border-color:#5a3a8c" title="Соло-тест: рум с ботами-заглушками на выбранных матчах (турнир/тур/матчи сверху), ты ходишь за всех. В БД не пишется, не нумеруется, виден только тебе. Бай-ины не нужны.">Тестовый рум (соло)</button>
         <div id="dCreateMsg" class="mut" style="margin-top:8px"></div>
         <div id="dPreview" style="margin-top:10px"></div>
       </div>
@@ -1372,6 +1381,16 @@ function renderMatches(){
 }
 function allMatches(on){document.querySelectorAll('.mch').forEach(c=>c.checked=on);}
 function fmtKick(s){if(!s)return '—';try{return new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch{return s;}}
+async function createTestRoom(){ // соло-тест: рум с ботами на выбранных матчах (та же форма турнир/тур/матчи), ходишь за всех; в БД не пишется
+  const msg=document.getElementById('dCreateMsg');
+  const t=TOURNAMENTS[+document.getElementById('dTour').value];
+  const chosen=[...document.querySelectorAll('.mch')].filter(c=>c.checked).map(c=>loadedMatches[+c.dataset.i]);
+  if(!chosen.length){if(msg)msg.textContent='загрузи матчи тура и отметь хотя бы один (бай-ины не нужны)';return;}
+  const seats=Math.max(2,Math.min(12,+document.getElementById('dSlots').value||5));
+  const token=await authToken();if(!token){showAuth();return;}
+  if(msg)msg.textContent='собираю пул игроков и создаю тестовый рум… (до ~10с)';
+  send({type:'createTestRoom',token,seasonId:t.season,round:+document.getElementById('dRound').value,matchIds:chosen.map(m=>m.matchId),seats});
+}
 async function createDraft(){
   const msg=document.getElementById('dCreateMsg');
   const t=TOURNAMENTS[+document.getElementById('dTour').value];
@@ -1482,6 +1501,8 @@ async function refreshOpenMatch(){
 }
 async function refreshViewer(b){if(!VIEW||!VIEW.draft)return;if(b){b.disabled=true;b.textContent='…';}await loadViewer(VIEW.draft.id,false,true);if(b){b.disabled=false;b.textContent='Обновить';}}
 const f1=v=>(v==null||v===''?'':Number(v).toFixed(1));
+const xgDec=arr=>arr.some(v=>v!=null&&Math.round(v*100)%10!==0)?2:1; // сотая доля xG хоть у одного клуба → показываем все в 0.00, иначе 0.0
+const fxg=(v,dec)=>v==null?'—':Number(v).toFixed(dec);
 const fpts=p=>p.mstatus==='pending'?'<span class="mut">–</span>':(p.counted?'<b>'+f1(p.points)+'</b>':f1(p.points));   // ещё не сыграл → прочерк, а не 0 (dnp/live остаются числом)
 const VSTAT={played:'<span class="vok">✓</span>',final:'<span class="vok">✓</span>',dnp:'<span class="vno">✗</span>',live:'<span class="vlive">●</span>',pending:'⏳'};
 // градиент PTS в ростерах: перцентиль по очкам всех сыгравших игроков драфта (зелёный=много / белый=середина / красный=мало) — как Σ в «Матчах»
@@ -1538,8 +1559,9 @@ function renderViewerClubs(){
   const od=(VIEW.score&&VIEW.score.clubOdds)||[];
   if(!od.length)return '<span class="mut">—</span>';
   const rows=od.slice().sort((a,b)=>{const x=(b.xg==null?-1:b.xg)-(a.xg==null?-1:a.xg);return x||String(a.club).localeCompare(String(b.club));});
+  const xd=xgDec(rows.map(r=>r.xg));
   return '<table style="font-size:11px"><thead><tr><th>КЛУБ</th><th class="right">П%</th><th class="right">xG</th><th class="right">CS</th></tr></thead><tbody>'+
-    rows.map(r=>`<tr><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg!=null?r.xg:'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>';
+    rows.map(r=>`<tr><td class="cn" title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${fxg(r.xg,xd)}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>';
 }
 function viewerHist(){
   const sc=VIEW.score;const b=document.getElementById('histBody');const el=document.getElementById('hist');
@@ -1748,13 +1770,13 @@ function renderModalPool(){
   mpFilt={q,t,p};
   const list=MPOOL.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
   const el=document.getElementById('mplist');if(!el)return;
-  let html='';
-  for(const pos of POSORD){
-    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=MSTATS[a.id],B=MSTATS[b.id];return (B?B[1]:-1)-(A?A[1]:-1)||(B?B[0]:-1)-(A?A[0]:-1)||a.name.localeCompare(b.name,'ru');}); // минуты↓, очки↓, алфавит — как в номинации драфта
-    if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=MSTATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.sel||u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
-  }
-  el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
+  const pr=u=>{const i=POSORD.indexOf(u.position);return i<0?99:i;};
+  const mnv=u=>{const s=MSTATS[u.id];return s?s[1]:-1;},ptv=u=>{const s=MSTATS[u.id];return s?s[0]:-1;};
+  list.sort((a,b)=>pr(a)-pr(b)||mnv(b)-mnv(a)||ptv(b)-ptv(a)||a.name.localeCompare(b.name,'ru')); // позиция, затем минуты↓, очки↓, алфавит
+  if(!list.length){el.innerHTML='<div class="pitem mut" style="display:block">ничего не найдено</div>';return;}
+  const hdr='<div class="phdr"><span>POS</span><span>Игрок</span><span>Клуб</span><span class="num">PTS</span><span class="num">Min</span></div>';
+  el.innerHTML=hdr+list.map(u=>{const s=MSTATS[u.id];const pts=s?f1(s[0]):'—';const min=s?s[1]+"'":'—';
+    return `<div class="pitem"><span class="pcol-pos ${u.position.toLowerCase()}">${posShort(u.position)}</span><span class="pcol-name">${u.sel||u.name}</span><span class="pcol-team mut" title="${u.club}">${u.code||u.club}</span><span class="pcol-num">${pts}</span><span class="pcol-num">${min}</span></div>`;}).join('');
 }
 function renderDraftMatches(j){
   const body=document.getElementById('matchesBody'),fx=j.fixtures||[],od=j.clubOdds||[];
@@ -1764,8 +1786,9 @@ function renderDraftMatches(j){
   }).join('')+'</tbody></table>':'<div class="mut">Матчи не найдены.</div>';
   const rows=od.slice().sort((a,b)=>{const x=(b.xg==null?-1:b.xg)-(a.xg==null?-1:a.xg);return x||String(a.club).localeCompare(String(b.club));});
   const hasOdds=rows.some(r=>r.win!=null||r.xg!=null||r.cs!=null);   // FanTeam ещё мог не опубликовать (xG=0 нормализован в null на сервере)
+  const xd=xgDec(rows.map(r=>r.xg));
   const oddTbl=hasOdds?'<table style="font-size:12px;width:100%"><thead><tr><th>КЛУБ</th><th class="right">П%</th><th class="right">xG</th><th class="right">CS</th></tr></thead><tbody>'+
-    rows.map(r=>`<tr><td title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg!=null?r.xg:'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>'
+    rows.map(r=>`<tr><td title="${r.club}">${r.club}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${fxg(r.xg,xd)}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td></tr>`).join('')+'</tbody></table>'
     :(j.sstatsPending?'<div class="mut">Коэффициентов FanTeam пока нет — доливаю из sstats… обновится автоматически.</div>':'<div class="mut">Коэффициенты пока не опубликованы FanTeam.</div>');
   const srcNote=j.sstatsFilled>0?'<div class="mut" style="font-size:11px;margin-top:4px">Часть коэффициентов — из sstats (FanTeam ещё не опубликовал).</div>'
     :(j.sstatsPending&&hasOdds?'<div class="mut" style="font-size:11px;margin-top:4px">Остальное доливаю из sstats…</div>':'');
@@ -2233,8 +2256,8 @@ function soundsFromState(prev,next){
 updateSoundBtn();buildSoundPanel();
 function ordered(){const d=S.draft;const by=new Map(d.managers.map(m=>[m.id,m]));return (d.order||d.managers.map(m=>m.id)).map(id=>by.get(id)).filter(Boolean);}
 function formBlock(c, done){const seg=POSORD.map(k=>{const[mn,mx]=LIM[k];const n=c[k]||0;const cls=n<mn?'need':n>=mx?'full':'ok';return `<div class="seg ${cls}"><span class="segc">${posShort(k)}</span><span class="segr">${mn}-${mx}</span></div>`;}).join('');
-  const form=POSORD.map(k=>c[k]||0).join('-'); // формация ВРТ-ЗАЩ-ПЗ-НАП-ТРЕНЕР
-  return `<div class="form"><div class="segs">${seg}</div><div class="formn" title="Формация: вратарь-защита-полузащита-нападение-тренер"><span class="fl">Форм</span><span class="fv">${form}</span></div></div>`;}
+  const form=['DEF','MID','FWD'].map(k=>c[k]||0).join('-'); // формация ЗАЩ-ПЗ-НАП (вратарь и тренер видны в своих блоках)
+  return `<div class="form"><div class="segs">${seg}</div><div class="formn" title="Формация: защита-полузащита-нападение (вратарь и тренер — в своих блоках)"><span class="fl">Форм</span><span class="fv">${form}</span></div></div>`;}
 
 // раскладка зависит от фазы: в лобби блок «Лобби» + «Матчи тура» уезжают в левую колонку (под участников),
 // правая колонка прячется → камеры занимают всю ширину. В аукционе всё возвращается в правую колонку (стопкой).
@@ -2464,8 +2487,9 @@ function renderClubs(){
   // подсветка строки по остатку слотов: full(0/зачёркнуто) → красный(1) → по числу занятых: зелёный(0)/св.-зел(−1)/жёлтый(−2)/св.-красн(−3)
   const slotCls=(left)=>{if(left<=0)return'full';if(left===1)return'sl-r';const t=lim-left;return t<=0?'sl-g':t===1?'sl-lg':t===2?'sl-y':'sl-lr';};
   const ar=(k)=>clubSortK===k?`<span class="sar">${clubSortDir<0?'▾':'▴'}</span>`:'';
+  const xd=xgDec(rows.map(r=>r.xg));
   el.innerHTML='<table class="ctab" style="font-size:11px"><thead><tr><th data-k="club">КЛУБ</th><th data-k="win" class="right">Win'+ar('win')+'</th><th data-k="xg" class="right">xG'+ar('xg')+'</th><th data-k="cs" class="right">CS'+ar('cs')+'</th><th data-k="left" style="text-align:center;min-width:32px">СЛОТ'+ar('left')+'</th></tr></thead><tbody>'+
-    rows.map(r=>`<tr class="${slotCls(r.left)}"><td class="cn" title="${r.club}">${r.code}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${r.xg??'—'}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
+    rows.map(r=>`<tr class="${slotCls(r.left)}"><td class="cn" title="${r.club}">${r.code}</td><td class="right">${r.win!=null?r.win+'%':'—'}</td><td class="right">${fxg(r.xg,xd)}</td><td class="right">${r.cs!=null?r.cs+'%':'—'}</td><td style="text-align:center">${r.left}</td></tr>`).join('')+'</tbody></table>';
   el.querySelectorAll('th[data-k]').forEach(th=>{th.style.cursor='pointer';th.onclick=()=>{const k=th.dataset.k;clubSortDir=(clubSortK===k)?-clubSortDir:-1;clubSortK=k;renderClubs();};});
 }
 
@@ -2510,11 +2534,11 @@ function renderBottom(){
   if(d.phase==='done'){el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div></div>';updateRtcBtns();return;} // #4: сохраняем бар мик/камеры после финиша (раньше #rtcCtlBar пропадал → кнопки исчезали у всех)
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
-  if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};
+  if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};const st=SEASON_STATS[u.id];
     const op=oppInfo(u.club);const oppTxt=op?(op.home?clubCode(op.opp).toUpperCase():clubCode(op.opp).toLowerCase()):'—';
     lotH+=`<div class="lotcard ${u.position.toLowerCase()}">
       <div class="lc-top"><div class="lc-pos">${posShort(u.position)}</div><div class="lc-id"><div class="lc-nm">${u.first?u.first[0]+'. ':''}${u.name}</div><div class="lc-cl">${u.club}</div></div></div>
-      <div class="lc-odds"><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
+      <div class="lc-odds"><span>PTS<b>${st?f1(st[0]):'—'}</b></span><span>Min<b>${st?st[1]+"'":'—'}</b></span><span>Win<b>${od.win!=null?od.win+'%':'—'}</b></span><span>xG<b>${od.xg??'—'}</b></span><span>CS<b>${od.cs!=null?od.cs+'%':'—'}</b></span><span title="Соперник (CAPS — дома, строчные — в гостях)">Opp<b>${oppTxt}</b></span></div></div>
       ${actionBox(d)}${preFoldBox(d)}
       <div class="bids">${ordered().map(m=>{let s,c,row='';
         if(m.id===d.lot.highBidder){s='лидер $'+d.lot.highBid;c='st-high';}
@@ -2611,13 +2635,13 @@ function renderNom(mode,ro){
   nomFilt={q,t,p};
   const list=units.filter(u=>(!t||u.club===t)&&(!p||u.position===p)&&(!q||u.name.toLowerCase().includes(q)));
   const el=document.getElementById('plist');if(!el)return;
-  let html='';
-  for(const pos of POSORD){
-    const grp=list.filter(u=>u.position===pos).sort((a,b)=>{const A=SEASON_STATS[a.id],B=SEASON_STATS[b.id];return (B?B[1]:-1)-(A?A[1]:-1)||(B?B[0]:-1)-(A?A[0]:-1)||a.name.localeCompare(b.name,'ru');}); // минуты↓, очки↓, алфавит
-    if(!grp.length)continue;
-    html+=`<div class="pblockh">${posShort(pos)} · ${grp.length}</div>`+grp.map(u=>{const s=SEASON_STATS[u.id];const tail=s?` <span class="mut">| ${s[0]} PTS / ${s[1]}'</span>`:'';return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="${u.position.toLowerCase()}">${posShort(u.position)}</span> &nbsp;${u.sel||u.name} · <span title="${u.club}">${u.code||u.club}</span>${tail}</div>`;}).join('');
-  }
-  el.innerHTML=html||'<div class="pitem mut">ничего не найдено</div>';
+  const pr=u=>{const i=POSORD.indexOf(u.position);return i<0?99:i;};
+  const mnv=u=>{const s=SEASON_STATS[u.id];return s?s[1]:-1;},ptv=u=>{const s=SEASON_STATS[u.id];return s?s[0]:-1;};
+  list.sort((a,b)=>pr(a)-pr(b)||mnv(b)-mnv(a)||ptv(b)-ptv(a)||a.name.localeCompare(b.name,'ru')); // позиция, затем минуты↓, очки↓, алфавит
+  if(!list.length){el.innerHTML='<div class="pitem mut" style="display:block">ничего не найдено</div>';return;}
+  const hdr='<div class="phdr"><span>POS</span><span>Игрок</span><span>Клуб</span><span class="num">PTS</span><span class="num">Min</span></div>';
+  el.innerHTML=hdr+list.map(u=>{const s=SEASON_STATS[u.id];const pts=s?f1(s[0]):'—';const min=s?s[1]+"'":'—';
+    return `<div class="pitem"${ro?'':` onclick="selectPlayer(${u.id},'${mode}')"`}><span class="pcol-pos ${u.position.toLowerCase()}">${posShort(u.position)}</span><span class="pcol-name">${u.sel||u.name}</span><span class="pcol-team mut" title="${u.club}">${u.code||u.club}</span><span class="pcol-num">${pts}</span><span class="pcol-num">${min}</span></div>`;}).join('');
 }
 let selId=null;
 function pickQuick(el){const r=el.closest('.qrow');if(r)r.querySelectorAll('.qb').forEach(b=>b.classList.toggle('qsel',b===el));}
