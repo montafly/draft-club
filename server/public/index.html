@@ -441,9 +441,17 @@
         <div id="adminMsg" class="mut" style="margin-bottom:8px"></div>
         <div id="adminDraftsList"><div class="empty">загрузка…</div></div>
       </div>
+      <div class="card2">
+        <h3>Соединения (диагностика)</h3>
+        <div class="row" style="margin-bottom:8px;align-items:center"><button class="btn" onclick="loadConnStats()">Обновить</button><span id="connStatsMsg" class="mut" style="margin-left:8px"></span></div>
+        <div id="connStatsBox"><div class="empty">нажми «Обновить» — покажет, у кого флапает соединение (реконнекты/обрывы/RTT с момента рестарта сервера)</div></div>
+      </div>
     </div>
   </main>
 </div>
+
+<!-- баннер потери соединения (глобальный, фиксированный) -->
+<div id="connBar" style="display:none;position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;align-items:center;gap:10px;background:#3a2424;border:1px solid #e05050;color:#ffdede;padding:7px 14px;border-radius:9px;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.45)"><span>Соединение потеряно — переподключаюсь…</span><button class="btn" style="padding:3px 10px" onclick="wsKick()">Синхронизировать</button></div>
 
 <!-- КОКПИТ ДРАФТА -->
 <div id="draft" style="display:none;flex:1;min-height:0;flex-direction:column">
@@ -451,7 +459,7 @@
   <div id="draftbar">
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
     <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
-    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><button class="btn" id="syncBtn" onclick="wsKick()" title="Принудительно пересинхронизировать состояние с сервером, если рум подтупливает (без перезахода)">⟳ Синхр.</button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -540,7 +548,7 @@ const LIM={GK:[1,1],DEF:[3,5],MID:[2,5],FWD:[1,3],COACH:[1,1]};
 const POSORD=['GK','DEF','MID','FWD','COACH'];
 const posShort=p=>p==='COACH'?'COA':p;
 const mmss=ms=>{const s=Math.round((ms||0)/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
-let ws=null,wsBackoff=0,wsPingTimer=null,wsPongTimer=null,wsReconnTimer=null,wsManualClose=false;
+let ws=null,wsBackoff=0,wsPingTimer=null,wsPongTimer=null,wsReconnTimer=null,wsManualClose=false,wsLastVer=null,lastStateAt=0,connDownTimer=null;
 let me=null,myRtc=null,myUid=null,VOICE=false,voiceListenHere=false,S=null,POOL=[],CLUBODDS=[],MATCHES=[],myName='',myRoom='',sb=null,session=null,PROFILE={},authedOnce=false;
 function onWsMessage(e){const m=JSON.parse(e.data);
   if(m.type==='pong'){clearTimeout(wsPongTimer);wsPongTimer=null;return;} // ответ на keepalive-пинг клиента
@@ -551,16 +559,16 @@ function onWsMessage(e){const m=JSON.parse(e.data);
   else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
-  else if(m.type==='state'){const prev=S;S=m.state;render();soundsFromState(prev,S);updateAmbient(S);}}
+  else if(m.type==='state'){const prev=S;S=m.state;if(typeof m.ver==='number')wsLastVer=m.ver;lastStateAt=Date.now();render();soundsFromState(prev,S);updateAmbient(S);}}
 // WS keepalive + авто-reconnect: раньше сокет создавался один раз и не переподключался (упал → клиент мёртв до ручного F5). Теперь watchdog рвёт мёртвый half-open сокет, reconnect с backoff поднимает заново и пере-входит в комнату. RTC (медиа) идёт P2P и переживает флап — восстанавливается только сигнальный канал (по нему же ходит сигналинг RTC).
-function wsStartPing(){ // app-watchdog: шлём ping, ждём pong; нет ответа за 8с → сокет мёртв → close → reconnect (ловит half-open, который onclose сам не покажет)
+function wsStartPing(){ // app-watchdog: шлём ping (с версией стейта), ждём pong; нет ответа за 5с → сокет мёртв → close → reconnect (ловит half-open, который onclose сам не покажет). Раньше было 20с/8с (до 28с фриза рума) — ускорено до 10с/5с, чтобы мёртвый сокет ловился за секунды и idle не дотягивал до порога прокси (VPN/судовой интернет)
   wsStopPing();
   wsPingTimer=setInterval(()=>{
     if(!ws||ws.readyState!==1)return;
-    try{ws.send(JSON.stringify({type:'ping'}));}catch(e){}
+    try{ws.send(JSON.stringify({type:'ping',...(wsLastVer!=null?{ver:wsLastVer}:{})}));}catch(e){} // ver → сервер досылает стейт, если клиент отстал (потерянный broadcast)
     clearTimeout(wsPongTimer);
-    wsPongTimer=setTimeout(()=>{try{ws.close();}catch(e){}},8000);
-  },20000);
+    wsPongTimer=setTimeout(()=>{try{ws.close();}catch(e){}},5000);
+  },10000);
 }
 function wsStopPing(){clearInterval(wsPingTimer);wsPingTimer=null;clearTimeout(wsPongTimer);wsPongTimer=null;}
 function wsScheduleReconnect(){
@@ -573,11 +581,24 @@ function wsConnect(){
   wsManualClose=false;
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
   ws.onmessage=onWsMessage;
-  ws.onopen=()=>{wsBackoff=0;wsStartPing();if(myRoom)enterRoom(myRoom,VOICE);}; // переоткрытие → пере-вход в комнату (свежий стейт прилетит сам), на первой загрузке myRoom пуст — вход делает onAuthed
-  ws.onclose=()=>{wsStopPing();if(!wsManualClose)wsScheduleReconnect();};
+  ws.onopen=()=>{wsBackoff=0;connUp();wsStartPing();if(myRoom)enterRoom(myRoom,VOICE);}; // переоткрытие → пере-вход в комнату (свежий стейт прилетит сам), на первой загрузке myRoom пуст — вход делает onAuthed
+  ws.onclose=()=>{wsStopPing();if(!wsManualClose){connDown();wsScheduleReconnect();}};
   ws.onerror=()=>{try{ws.close();}catch(e){}}; // ошибка → close → reconnect
 }
 wsConnect();
+// Видимый статус соединения + ручной ресинк: раньше при реконнект-гэпе клик молча пропадал (send глотает закрытый сокет), игрок видел замёрзший рум и шёл перезаходить. Теперь — баннер «переподключаюсь» и кнопка «Синхронизировать».
+function inRoomNow(){return !!myRoom&&document.getElementById('draft').style.display!=='none';}
+function setConnDown(down){const b=document.getElementById('connBar');if(b)b.style.display=down?'flex':'none';}
+function connDown(){clearTimeout(connDownTimer);connDownTimer=setTimeout(()=>setConnDown(true),1500);} // дебаунс: быстрый реконнект баннером не мигнёт
+function connUp(){clearTimeout(connDownTimer);setConnDown(false);}
+function wsResync(){send({type:'resync'});}                        // попросить сервер прислать свежий полный стейт (без пере-входа в комнату)
+function wsKick(){ // вернулись на вкладку / нажали «Синхронизировать»: фоновые таймеры могли затормозить watchdog и сокет мог тихо умереть — проверяем НЕМЕДЛЕННО
+  if(!ws||ws.readyState===3){wsBackoff=0;wsConnect();return;}        // закрыт → поднимаем сейчас, без ожидания backoff
+  if(ws.readyState===1){                                             // «открыт», но мог стать зомби в фоне → немедленный ping (быстрый детект) + ресинк стейта
+    try{ws.send(JSON.stringify({type:'ping',...(wsLastVer!=null?{ver:wsLastVer}:{})}));clearTimeout(wsPongTimer);wsPongTimer=setTimeout(()=>{try{ws.close();}catch(e){}},5000);}catch(e){}
+    if(inRoomNow())wsResync();
+  }
+}
 // --- WebRTC видео/аудио: mesh между местами. Видео-элементы живут в RTC.videoEls (вне render()), после каждого ре-рендера переставляются в плитки .cam ---
 const RTC={on:false,ice:null,stream:null,pcs:{},videoEls:{},audioEls:{},streams:{},camState:{},micState:{},localMute:{},forceRelay:{},camOn:false,micOn:true};
 const IC={
@@ -989,8 +1010,8 @@ function tick(){
 setInterval(tick,1000);
 function maybeRefreshDrafts(){if(authedOnce&&!document.hidden&&document.getElementById('viewer').style.display!=='block'&&document.getElementById('draft').style.display!=='block')loadDrafts();}
 setInterval(maybeRefreshDrafts,12000); // подхватываем смену статуса драфта (finalized→live и т.д.) без перезагрузки
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeRefreshDrafts();}); // вернулись на вкладку — сразу обновить (фоновые таймеры тормозят)
-window.addEventListener('focus',maybeRefreshDrafts);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){wsKick();maybeRefreshDrafts();}}); // вернулись на вкладку — проверить живость сокета + ресинк рума + обновить списки (фоновые таймеры тормозят, сокет мог тихо умереть)
+window.addEventListener('focus',()=>{wsKick();maybeRefreshDrafts();});
 function viewFromUrl(){const v=new URLSearchParams(location.search).get('view');return ['lobby','all','mine','profile','admin'].includes(v)?v:null;}
 function navClick(e,sec){
   if(e.metaKey||e.ctrlKey||e.shiftKey||e.button){return;} // модификатор/средняя кнопка → нативное открытие в новой вкладке
@@ -1788,7 +1809,28 @@ async function launchDraftBtn(id){
     await loadDrafts();
   }catch(e){if(m)m.textContent='ошибка запуска: '+e.message;}
 }
-async function enterRoom(code,voice){if(!code)return;const t=await authToken();if(!t){showAuth();return;}VOICE=!!voice;send({type:'joinRoom',code,token:t,...(voice?{voice:true}:{})});}
+async function enterRoom(code,voice){if(!code)return;const t=await authToken();if(!t){showAuth();return;}VOICE=!!voice;wsLastVer=null;send({type:'joinRoom',code,token:t,...(voice?{voice:true}:{})});}
+async function loadConnStats(){ // админ-диагностика: кто флапает (реконнекты/обрывы/RTT). Данные in-memory на сервере, сбрасываются рестартом.
+  const box=document.getElementById('connStatsBox'),msg=document.getElementById('connStatsMsg');if(!box)return;
+  try{
+    const t=await authToken();
+    const r=await fetch('/api/admin/connstats',{headers:{authorization:'Bearer '+t}});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    const rows=j.stats||[];
+    if(msg)msg.textContent=`с рестарта сервера ${j.sinceMin}м · ${rows.length} польз. · сортировка по флапу`;
+    if(!rows.length){box.innerHTML='<div class="empty">пока никто не подключался</div>';return;}
+    box.innerHTML='<table style="font-size:12px;width:100%"><thead><tr style="text-align:left"><th>Игрок</th><th>сейчас</th><th>конн.</th><th>реконн.</th><th>обрывы</th><th>RTT</th><th>видели</th></tr></thead><tbody>'+
+      rows.map(s=>{
+        const flap=(s.reconnects||0)+(s.terminates||0);
+        const col=flap>=8?'#e05050':flap>=3?'#e0b050':'var(--mut)';
+        const rtt=s.lastRttMs==null?'—':(s.lastRttMs+' мс');
+        const rttCol=s.lastRttMs==null?'var(--mut)':(s.lastRttMs>=400?'#e05050':s.lastRttMs>=150?'#e0b050':'var(--acc)');
+        const seen=s.lastSeenAgo==null?'—':((s.lastSeenAgo<60?s.lastSeenAgo+'с':Math.round(s.lastSeenAgo/60)+'м')+' назад');
+        const live=s.live>0?`<span style="color:var(--acc)">● ${s.live}</span>`:'<span class="mut">—</span>';
+        return `<tr><td>${esc(s.name||s.uid)}</td><td>${live}</td><td>${s.connects}</td><td style="color:${col};font-weight:700">${s.reconnects}</td><td style="color:${col};font-weight:700">${s.terminates}</td><td style="color:${rttCol}">${rtt}</td><td class="mut">${seen}</td></tr>`;
+      }).join('')+'</tbody></table>';
+  }catch(e){if(msg)msg.textContent='ошибка: '+(e.message||e);}
+}
 async function reconnectAllBtn(id){ // админ: переподключить всех в живой комнате (состояние/заявки сохраняются)
   const m=document.getElementById('adminMsg');
   if(!confirm('Переподключить всех в комнате? Все участники на пару секунд перезагрузятся и зайдут заново. Состояние драфта и заявки сохранятся. Не делай это во время активной номинации/ставки.'))return;

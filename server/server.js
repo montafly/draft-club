@@ -738,6 +738,24 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/admin/connstats' && req.method === 'GET') {            // диагностика соединений (admin): кто флапает — реконнекты/обрывы/RTT
+    (async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);
+        const prof = await getProfile(user.id);
+        if (!prof || prof.role !== 'admin') throw new Error('только админ');
+        const now = Date.now();
+        const stats = [...connStats.entries()].map(([uid, s]) => ({
+          uid, name: s.name, live: s.live, connects: s.connects, reconnects: s.reconnects,
+          terminates: s.terminates, closes: s.closes, lastRttMs: s.lastRttMs,
+          lastSeenAgo: s.lastSeen ? Math.round((now - s.lastSeen) / 1000) : null,
+        })).sort((a, b) => (b.reconnects + b.terminates) - (a.reconnects + a.terminates));
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ stats, sinceMin: Math.round((now - serverStartAt) / 60000) }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    })();
+    return;
+  }
   if (url === '/api/tts/pick' && req.method === 'POST') {                 // озвучка покупки: {playerId,playerName,buyerUserId,buyerName,price} → mp3
     let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
@@ -895,26 +913,43 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 let rtcSeq = 0;                                          // уникальный id соединения для WebRTC-mesh (игроки и зрители)
 
+// Диагностика соединений: userId -> метрики. In-memory, сбрасывается рестартом. Цель — видеть, у кого флапает соединение (реконнекты/обрывы/RTT), а не ловить «у меня не работает» на слух.
+const connStats = new Map();
+const serverStartAt = Date.now();
+function statFor(user, name) {
+  if (!user) return null;
+  let s = connStats.get(user.id);
+  if (!s) { s = { name: name || 'Player', connects: 0, reconnects: 0, terminates: 0, closes: 0, live: 0, lastRttMs: null, firstSeen: Date.now(), lastSeen: Date.now() }; connStats.set(user.id, s); }
+  if (name) s.name = name;
+  return s;
+}
+
 // WS keepalive: пингуем клиентов; мёртвый (half-open) сокет не ответит pong → terminate → честный 'close' → presence чистится (dupLive прикрывает гонку реконнекта)
 const WS_PING_MS = 30000;
 const wsHeartbeat = setInterval(() => {
   for (const ws of wss.clients) {
-    if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
+    if (ws.isAlive === false) { if (ws.user) { const s = connStats.get(ws.user.id); if (s) s.terminates++; } try { ws.terminate(); } catch {} continue; }  // мёртвый half-open → terminate + учёт в диагностике
     ws.isAlive = false;
+    ws._pingAt = Date.now();                                          // для замера RTT по ответному pong
     try { ws.ping(); } catch {}
   }
 }, WS_PING_MS);
 wss.on('close', () => clearInterval(wsHeartbeat));
 
 const DRAW_SPIN_MS = 6500, DRAW_REVEAL_MS = 2000; // жеребьёвка: (n-1) спинов + показ финального порядка; последний выбирается автоматом (синхронно с клиентом)
-function broadcast(code) {
-  const e = rooms.get(code);
-  if (!e) return;
+// Сериализация стейта комнаты + инъекция rtc-списка для mesh. Общий код broadcast / resync / ver-досылки на ping.
+function roomState(e) {
   const state = e.room.serialize();
   if (state.lobby) state.lobby.rtc = [...e.clients]    // все в комнате для mesh: {id(rtcId), name, seat|null}
     .filter((c) => c.user && c.rtcId)
     .map((c) => ({ id: c.rtcId, name: c.name || 'Player', seat: c.seatId == null ? null : c.seatId, uid: c.user.id, listen: c.voiceListen === true }));
-  const msg = JSON.stringify({ type: 'state', state });
+  return state;
+}
+function broadcast(code) {
+  const e = rooms.get(code);
+  if (!e) return;
+  e.ver = (e.ver || 0) + 1;                            // монотонная версия стейта: клиент шлёт свою в ping, отставание → досылаем стейт (страховка от потерянного broadcast)
+  const msg = JSON.stringify({ type: 'state', state: roomState(e), ver: e.ver });
   for (const c of e.clients) if (c.readyState === 1) c.send(msg);
 }
 function sendErr(ws, message) { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'error', message })); }
@@ -978,6 +1013,7 @@ async function joinAuthed(ws, msg) {
   const prof = await getProfile(user.id);
   const name = (prof && prof.display_name) || (user.email || 'Player').split('@')[0];
   ws.user = user;
+  { const s = statFor(user, name); s.connects++; if (s.connects > 1) s.reconnects++; s.live++; s.lastSeen = Date.now(); }  // диагностика: каждый authed-вход = коннект; >1 = реконнект (флап)
   if (msg.voice) {                                     // голосовой компаньон: тот же аккаунт со второго устройства ТОЛЬКО для голоса
     ws.voice = true;                                   // НЕ занимаем/не реюзаем место → seatId=null → действия запрещены, presence места на ПК не трогаем
     ws.name = name + ' (голос)';                       // в mesh виден как отдельный голосовой пир
@@ -997,12 +1033,19 @@ async function joinAuthed(ws, msg) {
 
 wss.on('connection', (ws) => {
   ws.roomCode = null; ws.seatId = null; ws.user = null; ws.rtcId = ++rtcSeq; ws.name = null;
-  ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; });   // ответ на протокольный ping heartbeat'а
+  ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; if (ws._pingAt && ws.user) { const s = connStats.get(ws.user.id); if (s) { s.lastRttMs = Date.now() - ws._pingAt; s.lastSeen = Date.now(); } } });   // ответ на протокольный ping heartbeat'а + замер RTT для диагностики
   ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
     try {
-      if (msg.type === 'ping') { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'pong' })); return; }   // app-watchdog клиента: эхо-pong
+      if (msg.type === 'ping') {                                        // app-watchdog клиента: эхо-pong (+ страховочная досылка стейта, если клиент отстал по версии)
+        if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'pong' }));
+        if (typeof msg.ver === 'number' && ws.roomCode) {
+          const e = rooms.get(ws.roomCode);
+          if (e && msg.ver < (e.ver || 0) && ws.readyState === 1) ws.send(JSON.stringify({ type: 'state', state: roomState(e), ver: e.ver }));
+        }
+        return;
+      }
       if (msg.type === 'createRoom') {
         const code = makeCode();
         rooms.set(code, { room: new Room(), clients: new Set() });
@@ -1019,6 +1062,13 @@ wss.on('connection', (ws) => {
         if (msg.type === 'rtc') { // сигналинг WebRTC: точечно пересылаем целевому пиру по rtcId (игроки и зрители), без рассылки стейта
           const target = [...e.clients].find((c) => c.rtcId === msg.to);
           if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.rtcId, data: msg.data }));
+          return;
+        }
+        if (msg.type === 'resync') { // клиент просит свежий полный стейт (возврат на вкладку / кнопка «Синхронизировать») — без пере-входа в комнату
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({ type: 'pool', units: e.room.pool, clubOdds: e.room.clubOdds, matches: e.room.matches }));
+            ws.send(JSON.stringify({ type: 'state', state: roomState(e), ver: e.ver || 0 }));
+          }
           return;
         }
         if (msg.type === 'voiceListen') { ws.voiceListen = !!msg.on; broadcast(ws.roomCode); return; } // голосовой компаньон слушает у себя → ПК того же аккаунта приглушит свой звук
@@ -1064,6 +1114,7 @@ wss.on('connection', (ws) => {
     } catch (err) { sendErr(ws, err.message); }
   });
   ws.on('close', () => {
+    if (ws.user) { const s = connStats.get(ws.user.id); if (s) { s.closes++; s.live = Math.max(0, s.live - 1); s.lastSeen = Date.now(); } }  // диагностика соединений
     const e = rooms.get(ws.roomCode);
     if (!e) return;
     e.clients.delete(ws);
