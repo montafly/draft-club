@@ -110,6 +110,8 @@ function mergeBreak(lines) {
 const POSMAP = { goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Одинокий win без xg И cs — плейсхолдер FanTeam (uniform-кэфы 3/3/3 → win=33% + xG=0): не «опубликовано», прячем кривой процент (sstats дольёт реальные)
+function sanOdds(c) { if (c.xg == null && c.cs == null) c.win = null; return c; }
 // Собрать пул движка по выбранным матчам драфта: игроки + тренеры + коэф/xG/CS по клубам
 async function buildDraftPool(seasonId, round, matchIds) {
   const idset = new Set((matchIds || []).map(Number));
@@ -126,8 +128,8 @@ async function buildDraftPool(seasonId, round, matchIds) {
     const nxg = (v) => (v == null || v === 0 || Number.isNaN(v)) ? null : v;   // xG=0 — плейсхолдер FanTeam «ещё не опубликовано» (реальный xG никогда не ровно 0)
     const xh = nxg(xg[0]), xa = nxg(xg[1]);
     if (Number.isNaN(wh)) wh = null; if (Number.isNaN(wa)) wa = null;          // нет кэфов → win=NaN → null (иначе считается «опубликованным»)
-    clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
-    clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
+    clubOdds.push(sanOdds({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null }));
+    clubOdds.push(sanOdds({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null }));
   }
   const units = [], seen = new Set(), involved = new Set();
   for (const m of sel) {
@@ -173,8 +175,8 @@ async function tourInfo(seasonId, round, matchIds) {
     const nxg = (v) => (v == null || v === 0 || Number.isNaN(v)) ? null : v;   // xG=0 — плейсхолдер FanTeam «ещё не опубликовано» (реальный xG никогда не ровно 0)
     const xh = nxg(xg[0]), xa = nxg(xg[1]);
     if (Number.isNaN(wh)) wh = null; if (Number.isNaN(wa)) wa = null;          // нет кэфов → win=NaN → null (иначе считается «опубликованным»)
-    clubOdds.push({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null });
-    clubOdds.push({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null });
+    clubOdds.push(sanOdds({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null }));
+    clubOdds.push(sanOdds({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null }));
     fixtures.push({ matchId: m.id, home: teams[ids[0]] || '', away: teams[ids[1]] || '', homeCode: abbr[ids[0]] || '', awayCode: abbr[ids[1]] || '', startTime: m.startTime || null, status: m.status || null });
   }
   return { clubOdds, fixtures };
@@ -472,34 +474,45 @@ async function scoreDraftCached(draftId, force) {
   return { ...data, updatedAt: at };
 }
 
-// Доливка кэфов из sstats для предпросмотра драфта: кэш по draftId (TTL 15 мин — implied-кэфы стабильны),
-// дедуп параллельных запусков. sstatsClubOdds медленный (~2с/матч) → НИКОГДА не зовём синхронно в эндпоинт,
-// только в фоне; по готовности чистим tourCache, чтобы превью пересобралось с доливкой.
-const sstatsCache = new Map();    // draftId -> { t, byClub, full }
-const sstatsInflight = new Map(); // draftId -> Promise
-const SSTATS_TTL = 15 * 60 * 1000;        // полное покрытие — кэш надолго (implied-кэфы стабильны)
+// Доливка кэфов из sstats: кэш по ТУРУ (набор матчей home~away), а НЕ по драфту — все драфты одного тура переиспользуют
+// одну загрузку. Полное покрытие кэшируется надолго (6ч): implied-кэфы стабильны, тянем 1 раз на тур. Частичное — коротко,
+// чтобы переоткрытие добрало. sstatsClubOdds медленный (~2с/матч) → только в фоне; по готовности чистим tourCache.
+const sstatsCache = new Map();    // tourKey -> { t, byClub, full }
+const sstatsInflight = new Map(); // tourKey -> Promise
+const SSTATS_TTL = 6 * 60 * 60 * 1000;    // полное покрытие — 6ч (тянем 1 раз на тур, переиспользуют все драфты)
 const SSTATS_TTL_PARTIAL = 2 * 60 * 1000; // частичное (часть матчей не долилась, напр. 429) — короткий TTL, чтобы переоткрытие добрало
-function sstatsFresh(draftId) { const c = sstatsCache.get(draftId); if (!c) return null; const ttl = c.full ? SSTATS_TTL : SSTATS_TTL_PARTIAL; return (Date.now() - c.t < ttl) ? c : null; }
-function fetchSstatsForDraft(draftId, fixtures) {
-  if (sstatsInflight.has(draftId)) return sstatsInflight.get(draftId);
+function tourKeyOf(fixtures) { return (fixtures || []).filter((f) => f && f.home && f.away).map((f) => f.home + '~' + f.away).sort().join(','); }
+function sstatsFresh(fixtures) { const c = sstatsCache.get(tourKeyOf(fixtures)); if (!c) return null; const ttl = c.full ? SSTATS_TTL : SSTATS_TTL_PARTIAL; return (Date.now() - c.t < ttl) ? c : null; }
+function fetchSstatsForDraft(fixtures) {
+  const key = tourKeyOf(fixtures);
+  if (sstatsInflight.has(key)) return sstatsInflight.get(key);
   const p = (async () => {
     try {
       const { clubOdds } = await sstatsClubOdds(fixtures);
       const byClub = {}; for (const o of clubOdds) byClub[o.club] = o;
-      const full = clubOdds.length >= fixtures.length * 2;   // 2 клуба на матч; меньше → доливка неполная
-      sstatsCache.set(draftId, { t: Date.now(), byClub, full });
-      tourCache.delete(draftId);   // следующий /api/draft/tour пересоберётся со свежей доливкой
+      const need = (fixtures || []).filter((f) => f && f.home && f.away).length;
+      const full = clubOdds.length >= need * 2;   // 2 клуба на матч; меньше → доливка неполная
+      sstatsCache.set(key, { t: Date.now(), byClub, full });
+      tourCache.clear();   // превью всех драфтов этого тура пересоберётся со свежей доливкой
       return byClub;
     } catch (err) { console.error('sstats preview', err.message); return null; }
-    finally { sstatsInflight.delete(draftId); }
+    finally { sstatsInflight.delete(key); }
   })();
-  sstatsInflight.set(draftId, p);
+  sstatsInflight.set(key, p);
   return p;
 }
 
 // Сводка тура для предпросмотра драфта в лобби (матчи + котировки клубов), кэш 60с — один запрос к FanTeam на драфт.
 // Если FanTeam ещё не опубликовал часть кэфов — доливаем из sstats (свежий кэш мёрджим сразу, иначе запускаем фоном).
 const tourCache = new Map(); // draftId -> { t, data }
+// Слияние кэфов FanTeam + sstats. FanTeam — основной, НО только если у клуба он ПОЛНЫЙ (win/xg/cs все непустые).
+// Если FanTeam по клубу неполный (хоть одно поле пусто) — берём sstats ПОВЕРХ (sstats приоритетнее по каждому полю; чего нет у sstats — добираем из FanTeam).
+// Иначе кривой частичный FanTeam (напр. win=33% без xg/cs) «прилипал» и не перетирался доливкой sstats.
+function mergeClubOdds(o, f) {
+  if (!f) return o;
+  if (o.win != null && o.xg != null && o.cs != null) return o;   // FanTeam полный — оставляем как есть
+  return { club: o.club, win: f.win ?? o.win, xg: f.xg ?? o.xg, cs: f.cs ?? o.cs };
+}
 async function tourForDraftCached(draftId) {
   const c = tourCache.get(draftId), now = Date.now();
   if (c && now - c.t < 60000) return c.data;
@@ -508,23 +521,39 @@ async function tourForDraftCached(draftId) {
   let { clubOdds, fixtures } = await tourInfo(d.season_id, d.round, d.match_ids);
   let sstatsPending = false, sstatsFilled = 0;
   if (clubOdds.some((o) => o.win == null || o.xg == null || o.cs == null)) {   // есть пробелы FanTeam
-    const fresh = sstatsFresh(draftId);
+    const fresh = sstatsFresh(fixtures);
     if (fresh) {
       clubOdds = clubOdds.map((o) => {
-        const f = fresh.byClub[o.club]; if (!f) return o;
-        const m = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
+        const m = mergeClubOdds(o, fresh.byClub[o.club]);
         if (m.win !== o.win || m.xg !== o.xg || m.cs !== o.cs) sstatsFilled++;
         return m;
       });
     } else {
       sstatsPending = true;
-      fetchSstatsForDraft(draftId, fixtures);   // фон, не ждём
+      fetchSstatsForDraft(fixtures);   // фон, не ждём
     }
   }
   const data = { league: d.league, tournament: d.tournament, season: d.season_id, round: d.round, clubOdds, fixtures, sstatsPending, sstatsFilled };
   tourCache.set(draftId, { t: now, data });
   return data;
 }
+
+// Прогрев кэфов: фоном подтягиваем FanTeam + sstats для ближайших туров, чтобы к открытию «Матчи» доливка уже была готова
+// (без ожидания ~минуты). Дедуп по туру (season+round+match_ids) — один прогрев на тур, sstats тянется 1 раз (кэш по туру 6ч).
+async function warmUpcomingOdds() {
+  try {
+    const rows = await svcGet(`dc_drafts?status=in.(recruiting,finalized,live)&select=id,season_id,round,match_ids`);
+    const seen = new Set();
+    for (const d of rows || []) {
+      const key = d.season_id + '|' + d.round + '|' + (d.match_ids || []).slice().sort((a, b) => a - b).join(',');
+      if (seen.has(key)) continue; seen.add(key);
+      tourForDraftCached(d.id).catch(() => {});   // прогрев одного драфта на тур: внутри запустит фоновую доливку sstats, если её ещё нет
+    }
+  } catch (err) { console.error('warmUpcomingOdds', err.message); }
+}
+const WARM_MS = 10 * 60 * 1000;
+setTimeout(warmUpcomingOdds, 15000);     // ~через 15с после старта/деплоя — прогреть ближайшие туры
+setInterval(warmUpcomingOdds, WARM_MS);  // и периодически держать кэш тёплым
 
 // Пул игроков драфта для предпросмотра в лобби (как пул аукциона). Тяжёлый (per-match membership) → кэш 10 мин: предматчевые составы стабильны.
 const poolCache = new Map(); // draftId -> { t, data }
@@ -971,7 +1000,7 @@ async function refreshOdds(e, opts = {}) {
   const meta = e.room && e.room.draftMeta;
   if (!meta) return { ft: 0, ss: 0 };
   const hasGaps = () => (e.room.clubOdds || []).some((o) => o.win == null || o.xg == null || o.cs == null);
-  // долить недостающие поля из map by[club], не затирая уже валидные значения; вернуть число изменённых клубов
+  // FanTeam-доливка: дозаполняем недостающие поля из свежего FanTeam, не затирая уже валидные (оба источника FanTeam)
   const apply = (by) => {
     let n = 0;
     e.room.clubOdds = (e.room.clubOdds || []).map((o) => {
@@ -979,6 +1008,16 @@ async function refreshOdds(e, opts = {}) {
       const merged = { club: o.club, win: o.win ?? f.win, xg: o.xg ?? f.xg, cs: o.cs ?? f.cs };
       if (merged.win !== o.win || merged.xg !== o.xg || merged.cs !== o.cs) n++;
       return merged;
+    });
+    return n;
+  };
+  // sstats-доливка: где FanTeam НЕполный по клубу — берём sstats поверх (mergeClubOdds), чтобы кривой частичный FanTeam не «прилипал»
+  const applySs = (by) => {
+    let n = 0;
+    e.room.clubOdds = (e.room.clubOdds || []).map((o) => {
+      const m = mergeClubOdds(o, by[o.club]);
+      if (m.win !== o.win || m.xg !== o.xg || m.cs !== o.cs) n++;
+      return m;
     });
     return n;
   };
@@ -996,13 +1035,13 @@ async function refreshOdds(e, opts = {}) {
   //    холодный — фоновая доливка (старт аукциона не блокируем), применяем к комнате по готовности. Кэш общий с превью (дедуп).
   let ssFilled = 0;
   if (opts.sstats && hasGaps()) {
-    const fresh = sstatsFresh(e.room.draftId);
+    const fixtures = (e.room.matches || []).filter((m) => m.home && m.away).map((m) => ({ home: m.home, away: m.away, startTime: m.startTime }));
+    const fresh = sstatsFresh(fixtures);
     if (fresh) {
-      ssFilled = apply(fresh.byClub); if (ssFilled) broadcastPool(e);
+      ssFilled = applySs(fresh.byClub); if (ssFilled) broadcastPool(e);
     } else {
-      const fixtures = (e.room.matches || []).filter((m) => m.home && m.away).map((m) => ({ home: m.home, away: m.away, startTime: m.startTime }));
-      fetchSstatsForDraft(e.room.draftId, fixtures)
-        .then((byClub) => { if (byClub && e.room) { const n = apply(byClub); if (n) broadcastPool(e); } })
+      fetchSstatsForDraft(fixtures)
+        .then((byClub) => { if (byClub && e.room) { const n = applySs(byClub); if (n) broadcastPool(e); } })
         .catch((err) => console.error('refreshOdds sstats', err.message));
     }
   }

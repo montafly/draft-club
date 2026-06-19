@@ -45,6 +45,29 @@
   .dchip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;color:#fff;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
   .ddet{padding:2px 14px 14px;border-top:1px solid var(--line)}
   .p-recruiting{background:#2c3a47;color:#9fb4c6}.p-finalized{background:#3a2c47;color:#cba6e0}.p-live{background:#1f3a2a;color:var(--acc)}.p-done{background:#1f2f42;color:#7fb8e8}.p-settled{background:#3a3320;color:var(--gold)}.p-cancelled{background:#3a2424;color:#e08a8a}
+  /* лобби: карточки ближайших драфтов, сгруппированы по дню старта */
+  .daygrp{margin-bottom:18px}
+  .dayhdr{font-size:12px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:0 0 10px}
+  .regcard{background:var(--panel);border:1px solid var(--line);border-left:3px solid #9fb4c6;border-radius:10px;padding:11px 14px;margin:0 0 8px}
+  .regcard.st-finalized{border-left-color:#cba6e0}.regcard.st-live{border-left-color:var(--acc)}
+  .regtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .regtop .regt{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+  .regtop .regt .tm{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .regtop .regt .countdown{font-size:11px;color:var(--mut);font-weight:500;font-variant-numeric:tabular-nums}
+  .regsub{font-size:12px;color:var(--mut);margin:3px 0 9px}
+  .regparams{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+  .pchip{font-size:11px;background:#0f1822;border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:#c4d3e0;white-space:nowrap}
+  .pchip b{color:#fff}
+  .regwho{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:11px;min-height:24px}
+  .achip{display:inline-flex;align-items:center;gap:5px;font-size:12px;border-radius:8px;padding:3px 5px 3px 10px;background:#22303d;border:1px solid var(--line)}
+  .achip.acc{background:rgba(39,174,96,.16);border-color:#2e7d32}
+  .achip.rej{background:rgba(224,80,80,.12);border-color:rgba(224,80,80,.4);opacity:.6;text-decoration:line-through}
+  .achip.pend{background:#2b2410;border-color:#5a4a1a}
+  .achip .anm{font-weight:600}
+  .chipbtn{border:none;border-radius:5px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:1;padding:0;color:#fff}
+  .chipbtn.ok{background:#2e7d32}.chipbtn.no{background:#a33}
+  .chipbtn:hover{filter:brightness(1.25)}
+  .regact{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .dfilters{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
   .dfilters label{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:6px}
   .dfilters select{font-size:12px;padding:4px 8px}
@@ -292,7 +315,7 @@
           <div id="lerr" class="err" style="margin-top:8px"></div>
         </div>
         <div class="card2">
-          <h3>Собираются сейчас — открыта запись</h3>
+          <h3>Ближайшие драфты</h3>
           <div id="lobRegList"><div class="empty">загрузка…</div></div>
         </div>
       </div>
@@ -1211,6 +1234,10 @@ const TZ='Europe/Nicosia'; // Кипр/Киев — одна зона EET/EEST (
 let loadedMatches=[];
 // время поля трактуем как киевское (datetime-local без таймзоны = настенное время зоны TZ)
 function tzWallString(date){const p=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});const h=p.hour==='24'?'00':p.hour;return `${p.year}-${p.month}-${p.day}T${h}:${p.minute}`;}
+// группировка лобби по календарному дню старта (в выбранной TZ)
+function tzDayKey(iso){if(!iso)return '';try{return new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));}catch{return '';}}
+function dayHeader(iso){if(!iso)return 'Без даты';try{const dt=new Date(iso);const wd=new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,weekday:'long'}).format(dt);const dm=new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'numeric',month:'long'}).format(dt);return wd.charAt(0).toUpperCase()+wd.slice(1)+', '+dm+' ('+tzLabel()+')';}catch{return 'Без даты';}}
+function hhmm(iso){if(!iso)return '';try{return new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,hour:'2-digit',minute:'2-digit'}).format(new Date(iso));}catch{return '';}}
 // смещение/метка/часы для произвольной IANA-зоны
 function offMin(tz,d){const p=new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).reduce((a,x)=>(a[x.type]=x.value,a),{});const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+(p.hour==='24'?0:p.hour),+p.minute,+p.second);return Math.round((asUTC-d.getTime())/60000);}
 function offLabel(tz,d){const m=offMin(tz,d);const s=m>=0?'+':'-';const ah=Math.floor(Math.abs(m)/60);const am=Math.abs(m)%60;return 'UTC'+s+ah+(am?':'+String(am).padStart(2,'0'):'');}
@@ -1299,7 +1326,7 @@ function computeDraftSeq(){
   const counted=DRAFTS.filter(d=>!parts(d).some(isTestName)); // реальные = без тест-аккаунтов
   const grp={};
   for(const d of counted){const k=(d.league||'')+'|'+(d.tournament||'');(grp[k]=grp[k]||[]).push(d);}
-  for(const k in grp)grp[k].sort((a,b)=>(a.starts_at?Date.parse(a.starts_at):0)-(b.starts_at?Date.parse(b.starts_at):0)||a.id-b.id).forEach((d,i)=>m[d.id]=i+1);
+  for(const k in grp)grp[k].sort((a,b)=>(a.starts_at?Date.parse(a.starts_at):Infinity)-(b.starts_at?Date.parse(b.starts_at):Infinity)||a.id-b.id).forEach((d,i)=>m[d.id]=i+1); // без даты — в конец (а не #1)
   return m;
 }
 function seqTag(d){const n=d&&DRAFT_SEQ[d.id];return n?`#${n} `:'';}
@@ -1542,19 +1569,48 @@ function evLogRows(){
 }
 function renderEvLog(){const b=document.getElementById('evLogBody');if(b)b.innerHTML=evLogRows();document.querySelectorAll('#evLogHead .btn').forEach(x=>x.classList.toggle('p',x.dataset.f===(VIEW.logTeam||'both')));}
 function setLogTeam(v){VIEW.logTeam=v;renderEvLog();}
-function renderLobbyReg(){
+function renderLobbyReg(){                                    // «Лобби» → ближайшие драфты: запись/финализированные/live, сгруппированы по дню старта, сорт по времени ↑
   const el=document.getElementById('lobRegList');if(!el)return;
-  const rec=DRAFTS.filter(d=>d.status==='recruiting');
-  el.innerHTML=rec.length?rec.map(d=>{
-    const applied=MYAPPS.has(d.id);const an=applicantNames(d.id);
-    return `<div class="card2" style="margin:0 0 10px"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> ${seqTag(d)}· ${d.tournament}, тур ${d.round} · матчей ${(d.match_ids||[]).length}<br>
-      старт: ${fmtStart(d.starts_at)} · слотов ${d.slots} · бай-ин ${d.buyin} DCC · призы ${d.prize1}/${d.prize2}
-      <div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>
-      ${applied
-        ? `<span class="mut" style="font-size:12px;margin-top:8px;display:inline-block">Заявка отправлена ✓</span> <button class="btn" style="margin-top:8px" onclick="unapplyFromDraft(${d.id})">Отменить заявку</button>`
-        : `<button class="btn p" style="margin-top:8px" onclick="applyToDraft(${d.id})">Оставить заявку (${d.buyin} DCC)</button>`}
-      <button class="btn" style="margin:8px 0 0 6px" onclick="openDraftMatches(${d.id})">Матчи</button></div>`;
-  }).join(''):'<div class="empty">Сейчас нет открытых на запись драфтов.</div>';
+  const isAdmin=PROFILE.role==='admin';
+  const rec=DRAFTS.filter(d=>['recruiting','finalized','live'].includes(d.status));
+  if(!rec.length){el.innerHTML='<div class="empty">Ближайших драфтов нет.</div>';return;}
+  rec.sort((a,b)=>(a.starts_at?Date.parse(a.starts_at):Infinity)-(b.starts_at?Date.parse(b.starts_at):Infinity)||a.id-b.id); // по времени старта ↑ (без даты — в конец)
+  const days=[],byDay={};
+  for(const d of rec){const k=d.starts_at?tzDayKey(d.starts_at):'nodate';if(!byDay[k]){byDay[k]=[];days.push(k);}byDay[k].push(d);}
+  el.innerHTML=days.map(k=>{
+    const arr=byDay[k];const hdr=(k==='nodate')?'Без даты':dayHeader(arr[0].starts_at);
+    return `<div class="daygrp"><div class="dayhdr">${hdr}</div>${arr.map(d=>regCard(d,isAdmin)).join('')}</div>`;
+  }).join('');
+}
+function regCard(d,isAdmin){
+  const applied=MYAPPS.has(d.id);
+  const apps=APPS.filter(a=>a.draft_id===d.id);
+  const acc=apps.filter(a=>a.status==='accepted').length,over=acc>d.slots;
+  const time=hhmm(d.starts_at);
+  const who=apps.length?apps.map(a=>{
+    const nm=PROFNAMES[a.user_id]||a.user_id.slice(0,8);
+    const cls=a.status==='accepted'?'acc':a.status==='rejected'?'rej':'pend';
+    const adm=isAdmin?`<button class="chipbtn ok" title="Принять" onclick="setApp(${a.id},'accepted')">✓</button><button class="chipbtn no" title="Отклонить" onclick="setApp(${a.id},'rejected')">✗</button>`:'';
+    return `<span class="achip ${cls}" title="${esc(nm)} · ${a.status}"><span class="anm">${esc(nm)}</span>${adm}</span>`;
+  }).join(''):'<span class="mut" style="font-size:12px">пока никто не записался</span>';
+  let playerAct='';
+  if(d.status==='recruiting')playerAct=applied?`<span class="mut" style="font-size:12px">заявка отправлена</span> <button class="btn" onclick="unapplyFromDraft(${d.id})">Отменить заявку</button>`:`<button class="btn p" onclick="applyToDraft(${d.id})">Оставить заявку (${d.buyin} DCC)</button>`;
+  else if(d.status==='finalized')playerAct='<span class="mut" style="font-size:12px">состав зафиксирован</span>';
+  else if(d.status==='live'){const myA=APPS.find(a=>a.draft_id===d.id&&a.user_id===session.user.id&&a.status==='accepted');playerAct=myA?`<button class="btn p" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:`<button class="btn" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`;}
+  let adminAct='';
+  if(isAdmin){
+    if(d.status==='recruiting')adminAct=`<button class="btn p" onclick="setDraftStatus(${d.id},'finalized')" ${(acc<1||over)?'disabled':''}>Финализировать (${acc})</button>`+(over?'<span class="err" style="font-size:11px;margin-left:4px">лимит превышен</span>':'');
+    else if(d.status==='finalized')adminAct=`<button class="btn p" onclick="launchDraftBtn(${d.id})">Запустить live</button> <button class="btn" onclick="setDraftStatus(${d.id},'recruiting')">Вернуть в набор</button>`;
+    else if(d.status==='live')adminAct=`<button class="btn" onclick="reconnectAllBtn(${d.id})" title="Переподключить всех">Переподключить</button> <button class="btn" onclick="launchDraftBtn(${d.id})" title="Воскресить комнату из БД">Воскресить</button>`;
+  }
+  const num=seqTag(d).trim();
+  return `<div class="regcard st-${d.status}">
+    <div class="regtop"><span class="dpill p-${d.status}">${STATUS_SHORT[d.status]||d.status}</span><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b>${num?` <span class="mut" style="font-weight:700">${num}</span>`:''}<span class="regt">${time?'<span class="tm">'+time+'</span>':'<span class="mut" style="font-size:12px">время не задано</span>'}${d.starts_at?`<span class="countdown" data-start="${d.starts_at}"></span>`:''}</span></div>
+    <div class="regsub">${esc(d.tournament)} · тур ${d.round}</div>
+    <div class="regparams"><span class="pchip">Матчей <b>${(d.match_ids||[]).length}</b></span><span class="pchip">Слотов <b>${acc}/${d.slots}</b></span><span class="pchip">Бай-ин <b>${d.buyin}</b> DCC</span><span class="pchip">Призы <b>${d.prize1}/${d.prize2}</b></span></div>
+    <div class="regwho">${who}</div>
+    <div class="regact">${playerAct} <button class="btn" onclick="openDraftMatches(${d.id})">Матчи</button> ${adminAct}</div>
+  </div>`;
 }
 // Окно «Матчи»: матчи выбранные на драфт + котировки клубов (П%/xG/CS), как во время драфта. Данные — /api/draft/tour (tourInfo, кэш 60с). Время матча — fmtKick (выше).
 let matchesDraftId=null,matchesTimer=null,matchesTries=0; // авто-обновление, пока sstats доливает пробелы FanTeam
