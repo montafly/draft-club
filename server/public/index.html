@@ -1702,7 +1702,7 @@ function populateAllFilters(){                              // опции фил
 }
 // группировка драфтов по типу + сортировка по таймингу турнира; завершённые сворачиваются
 let _grpOpen={}; // ключ группы -> раскрыта ли (по умолчанию false = свёрнуто)
-function toggleGrp(k){_grpOpen[k]=!_grpOpen[k];renderLobbyAll();renderMine();}
+function toggleGrp(k){_grpOpen[k]=!_grpOpen[k];renderLobbyAll();renderMine();renderAdminDrafts();}
 const _dtkey=d=>d.starts_at?Date.parse(d.starts_at):(d.created_at?Date.parse(d.created_at):0);
 const _cmpDraft=(a,b)=>(b.round||0)-(a.round||0)||_dtkey(b)-_dtkey(a)||b.id-a.id; // тур↓ (тур 2 выше тура 1), затем тайминг↓ (позже сыгранный выше), затем id↓
 function draftGroup(title,arr,collapseKey,rowFn){
@@ -1732,7 +1732,7 @@ function renderLobbyAll(){
 function renderAdminDrafts(){
   const el=document.getElementById('adminDraftsList');if(!el)return;
   if(!DRAFTS.length){el.innerHTML='<div class="empty">Драфтов ещё нет.</div>';return;}
-  el.innerHTML=DRAFTS.map(d=>{
+  const acard=(d)=>{
     const apps=APPS.filter(a=>a.draft_id===d.id);
     const acc=apps.filter(a=>a.status==='accepted').length;const over=acc>d.slots;
     const rows=apps.length?apps.map(a=>{
@@ -1758,7 +1758,11 @@ function renderAdminDrafts(){
       <div style="margin:8px 0">${rows}</div>
       ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу. Пробелы FanTeam доливаются из sstats.net в фоне.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
       <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
-  }).join('');
+  };
+  const list=DRAFTS.slice().sort(_cmpDraft);
+  el.innerHTML=draftGroup('Активные',list.filter(d=>['recruiting','finalized','live'].includes(d.status)),null,acard)
+    +draftGroup('Сыгранные',list.filter(d=>d.status==='done'),'aplayed',acard)            // сыгранные (done) — свёрнуты по умолчанию
+    +draftGroup('Завершённые',list.filter(d=>d.status==='settled'||d.status==='cancelled'),'adone',acard); // settled/cancelled — свёрнуты
 }
 async function refreshDraftOdds(id){
   const m=document.getElementById('odds-'+id);if(m)m.textContent='парсю кэфы…';
