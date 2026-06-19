@@ -497,8 +497,9 @@
   <!-- тонкий тулбар драфта (под общей шапкой сайта), п.10 -->
   <div id="draftbar">
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
+    <button class="btn" id="syncBtn" onclick="wsKick()" style="background:#2f81f7;color:#fff;border-color:#2f81f7;font-weight:700" title="Принудительно пересинхронизировать состояние с сервером, если рум подтупливает (без перезахода)">⟳ Синхронизировать</button>
     <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
-    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><button class="btn" id="syncBtn" onclick="wsKick()" title="Принудительно пересинхронизировать состояние с сервером, если рум подтупливает (без перезахода)">⟳ Синхр.</button><span id="err" class="err"></span>
+    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
