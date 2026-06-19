@@ -37,6 +37,13 @@ export class Room {
     this.drawAt = null;                  // момент запуска жеребьёвки (для синхронной анимации у всех)
     this.delegate = {};                  // передача хода (#8): ownerSeatId -> delegateSeatId
     this.preFold = { lotNo: null, seats: new Set() };   // заранее-пас по текущему лоту (#10)
+    this.connSummary = {};               // диагностика связи per-draft: userId -> {name, disconnects, reconnects} (для conn_log в БД)
+  }
+  _connBump(userId, name, field) {
+    if (!userId) return;
+    const s = this.connSummary[userId] || (this.connSummary[userId] = { name: name || '', disconnects: 0, reconnects: 0 });
+    if (name) s.name = name;
+    s[field]++;
   }
 
   // --- передача хода (#8): владелец места отдаёт управление другому месту, забирает обратно ---
@@ -111,7 +118,7 @@ export class Room {
   join(userId, name) {
     // переподключение по аккаунту (userId)
     const existing = this.seats.find((s) => s.userId === userId);
-    if (existing) { existing.connected = true; existing.name = name; this.logEvent('join', `${name} — переподключился`); return existing.id; }
+    if (existing) { existing.connected = true; existing.name = name; this.logEvent('join', `${name} — переподключился`); this._connBump(userId, name, 'reconnects'); return existing.id; }
     if (this.allowedUserIds && !this.allowedUserIds.has(userId)) return null; // не принят → зритель
     if (this.seats.length >= this.maxSeats) return null; // мест нет → зритель
     const id = this.seats.length + 1;
@@ -130,7 +137,7 @@ export class Room {
 
   disconnect(seatId) {
     const s = this.seats.find((x) => x.id === seatId);
-    if (s) { s.connected = false; this.logEvent('leave', `${s.name} — отключился`); }
+    if (s) { s.connected = false; this.logEvent('leave', `${s.name} — отключился`); this._connBump(s.userId, s.name, 'disconnects'); }
   }
 
   addSpectator(userId, name) { if (userId && !this.seats.find((s) => s.userId === userId) && !this.spectators.has(userId)) { this.spectators.set(userId, name); this.logEvent('join', `${name} — смотрит (зритель)`); } }

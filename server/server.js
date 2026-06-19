@@ -288,6 +288,17 @@ async function persistRosters(e) {
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { picks: d.picks || [] }); } catch (err) { console.error('persist picks', err.message); }
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { events: (r.events || []).slice(-5000) }); } catch (err) { console.error('persist events', err.message); } // полный лог действий для истории в просмотрщике
   try { await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { seat_ms: r.seatMs || {}, chat: (r.chat || []).slice(-200) }); } catch (err) { console.error('persist seat_ms/chat', err.message); } // личные таймеры (по seat) + чат для просмотрщика итогов
+  // диагностика связи per-draft → dc_drafts.conn_log: по каждому участнику обрывы/реконнекты (per-draft, из room) + RTT-снапшот (last/min/max, из connStats). Безопасно до DDL (в try/catch)
+  try {
+    const conn = {};
+    for (const seat of r.seats) {
+      if (!seat.userId) continue;
+      const cs = r.connSummary[seat.userId] || { disconnects: 0, reconnects: 0 };
+      const st = connStats.get(seat.userId);
+      conn[seat.userId] = { name: seat.name, disconnects: cs.disconnects, reconnects: cs.reconnects, rttMs: st ? st.lastRttMs : null, rttMin: st ? st.rttMin : null, rttMax: st ? st.rttMax : null };
+    }
+    await svcPatch(`dc_drafts?id=eq.${r.draftId}`, { conn_log: conn });
+  } catch (err) { console.error('persist conn_log', err.message); } // нет колонки conn_log — пропускаем (DDL отдельно)
   // DCC: списываем бай-ины с сыгравших участников (идемпотентно через dc_drafts.charged_at)
   try { await chargeBuyins(r.draftId, rows.map((x) => x.user_id)); } catch (err) { console.error('chargeBuyins', err.message); }
 }
@@ -456,7 +467,7 @@ async function scoreDraft(draftId) {
     await svcPatch(`dc_drafts?id=eq.${draftId}`, { status: 'settled' }); status = 'settled';
     try { await payPrizes(draftId, standings, d); } catch (err) { console.error('payPrizes', err.message); }
   }
-  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, chat: d.chat || null, hasRosters: rosters.length > 0 };
+  return { status, allConfirmed, standings, teams, matches, clubOdds, picks: d.picks || null, events: d.events || null, chat: d.chat || null, connLog: d.conn_log || null, hasRosters: rosters.length > 0 };
 }
 
 // Кэш результатов scoreDraft: один пересчёт на драфт раз в SCORE_TTL, всем клиентам — из кэша.
@@ -1072,7 +1083,7 @@ async function joinAuthed(ws, msg) {
 
 wss.on('connection', (ws) => {
   ws.roomCode = null; ws.seatId = null; ws.user = null; ws.rtcId = ++rtcSeq; ws.name = null;
-  ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; if (ws._pingAt && ws.user) { const s = connStats.get(ws.user.id); if (s) { s.lastRttMs = Date.now() - ws._pingAt; s.lastSeen = Date.now(); } } });   // ответ на протокольный ping heartbeat'а + замер RTT для диагностики
+  ws.isAlive = true; ws.on('pong', () => { ws.isAlive = true; if (ws._pingAt && ws.user) { const s = connStats.get(ws.user.id); if (s) { const rtt = Date.now() - ws._pingAt; s.lastRttMs = rtt; s.rttMin = s.rttMin == null ? rtt : Math.min(s.rttMin, rtt); s.rttMax = s.rttMax == null ? rtt : Math.max(s.rttMax, rtt); s.lastSeen = Date.now(); } } });   // ответ на протокольный ping heartbeat'а + замер RTT (last/min/max) для диагностики
   ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
