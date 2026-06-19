@@ -388,20 +388,34 @@
     </div>
     <!-- АДМИНКА (только для админа) -->
     <div id="secAdmin" class="view">
-      <div class="card2" style="border-left:4px solid #a569bd">
+      <div class="card2" id="admSecBar" style="border-left:4px solid #5dade2;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="mut" style="font-size:12px">Показать разделы:</span>
+        <button class="btn" data-sec="conn" onclick="toggleAdmSec('conn')">Соединение</button>
+        <button class="btn" data-sec="drafts" onclick="toggleAdmSec('drafts')">Драфты</button>
+        <button class="btn" data-sec="dcc" onclick="toggleAdmSec('dcc')">Игроки</button>
+        <button class="btn" data-sec="pron" onclick="toggleAdmSec('pron')">Озвучка</button>
+      </div>
+      <div class="card2" data-sec="conn">
+        <h3>Соединения (диагностика)</h3>
+        <div class="row" style="margin-bottom:8px;align-items:center"><button class="btn" onclick="loadConnStats()">Обновить</button><span id="connStatsMsg" class="mut" style="margin-left:8px"></span></div>
+        <div id="connStatsBox"><div class="empty">нажми «Обновить» — покажет, у кого флапает соединение (реконнекты/обрывы/RTT с момента рестарта сервера)</div></div>
+      </div>
+      <div class="card2" data-sec="drafts" style="border-left:4px solid #a569bd">
         <label><input type="checkbox" id="autoToggle" onchange="toggleAutoplay()"> Разрешить авто-доигрывание драфта (для теста)</label>
         <span id="autoToggleMsg" class="mut" style="margin-left:8px"></span>
         <p class="mut" style="font-size:11px;margin:6px 0 0">В проде держать выключенным: при включении в кокпите появляется кнопка «⚡ Авто-доиграть», мгновенно завершающая аукцион. Нужно, чтобы соло прогнать драфт до итоговой картинки с очками.</p>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="dcc">
         <h2>Начисление DCC</h2>
         <p class="mut" style="font-size:11px;margin:0 0 8px">Начисли баланс игроку (1 USDT = 1 DCC). Можно и со знаком минус (списание/корректировка). Списание бай-инов происходит автоматически при завершении драфта.</p>
         <div id="adminUsers"><span class="mut">загрузка…</span></div>
-        <h2 style="margin-top:18px">Произношение для озвучки</h2>
+      </div>
+      <div class="card2" data-sec="pron">
+        <h2>Произношение для озвучки</h2>
         <p class="mut" style="font-size:11px;margin:0 0 8px">Поля предзаполнены авто-транслитом (это и звучит по умолчанию). ● = сохранён твой ручной вариант. Ударение — знаком + ПЕРЕД ударной гласной (Мар+ез, Диоманд+е). ▶ прослушать, OK сохранить. Список — весь пул активных драфтов + сыгранные.</p>
         <div id="pronBox"><span class="mut">загрузка…</span></div>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="drafts">
         <h2>Создать драфт</h2>
         <div class="row" style="align-items:flex-end">
           <div class="field" style="margin:0"><label>Турнир</label><select id="dTour"></select></div>
@@ -411,7 +425,7 @@
         </div>
         <div id="dMatches" style="margin-top:12px"></div>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="drafts">
         <h3>Лига и экономика</h3>
         <div class="row" style="align-items:flex-end">
           <div class="field" style="margin:0"><label>Лига</label>
@@ -423,28 +437,24 @@
           <div class="field" style="margin:0"><label>2 место</label><input id="dP2" type="number" min="0" style="width:90px"></div>
         </div>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="drafts">
         <h3>Настройки</h3>
-        <div class="row" style="align-items:flex-end">
+        <div class="row" style="align-items:flex-start;flex-wrap:wrap">
           <div class="field" style="margin:0"><label>Слотов (участников)</label><input id="dSlots" type="number" min="2" max="12" value="5" style="width:90px"></div>
           <div class="field" style="margin:0"><label>Лимит игроков из клуба</label><input id="dClubLim" type="number" min="1" max="11" value="5" style="width:90px"></div>
-          <div class="field" style="margin:0"><label>Дата и время <span id="dTzLbl" class="mut"></span></label><input id="dWhen" type="datetime-local"><span id="dNowHint" class="mut" style="font-size:11px"></span></div>
+          <div class="field" style="margin:0;min-width:240px"><label>Время старта <span id="dTzLbl" class="mut"></span> · 1 слот = 1 драфт</label><div id="dWhenSlots"></div><button class="btn" type="button" onclick="addWhenSlot()" style="margin-top:2px;padding:3px 10px">+ ещё слот</button> <span id="dNowHint" class="mut" style="font-size:11px"></span></div>
         </div>
+        <p class="mut" style="font-size:11px;margin:8px 0 0">Несколько слотов → создастся несколько драфтов с одинаковым пулом матчей и настройками, по одному на каждое время.</p>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="drafts">
         <button class="btn p" onclick="createDraft()">Создать драфт</button>
         <div id="dCreateMsg" class="mut" style="margin-top:8px"></div>
         <div id="dPreview" style="margin-top:10px"></div>
       </div>
-      <div class="card2">
+      <div class="card2" data-sec="drafts">
         <h3>Созданные драфты</h3>
         <div id="adminMsg" class="mut" style="margin-bottom:8px"></div>
         <div id="adminDraftsList"><div class="empty">загрузка…</div></div>
-      </div>
-      <div class="card2">
-        <h3>Соединения (диагностика)</h3>
-        <div class="row" style="margin-bottom:8px;align-items:center"><button class="btn" onclick="loadConnStats()">Обновить</button><span id="connStatsMsg" class="mut" style="margin-left:8px"></span></div>
-        <div id="connStatsBox"><div class="empty">нажми «Обновить» — покажет, у кого флапает соединение (реконнекты/обрывы/RTT с момента рестарта сервера)</div></div>
       </div>
     </div>
   </main>
@@ -1027,7 +1037,7 @@ function showSection(sec){
   const map={lobby:'secLobby',all:'secAll',mine:'secMine',profile:'secProfile',admin:'secAdmin'};
   document.getElementById(map[sec]).classList.add('active');
   const b=document.getElementById('backToDraftBtn');if(b)b.style.display=myRoom?'inline-block':'none'; // показываем «← Вернуться в драфт» только если в руме
-  if(sec==='admin'){refreshAdminTime();renderAdminUsers();renderPron();}
+  if(sec==='admin'){applyAdmSecs();refreshAdminTime();renderAdminUsers();renderPron();}
   if(sec==='profile')renderLedger();
   if(sec==='lobby'||sec==='all'||sec==='admin'||sec==='mine')loadDrafts();
 }
@@ -1057,8 +1067,8 @@ async function renderPron(){
     const nicks=(j.nicks||[]).map(u=>row('nick',u.id,u.display_name||u.id.slice(0,8),'',u.suggest)).join('');
     const players=(j.players||[]).map(p=>row('player',p.player_id,p.name,p.club,p.suggest)).join('');
     el.innerHTML=`<input id="pronFilter" placeholder="поиск по списку…" oninput="filterPron()" style="margin-bottom:8px;width:240px">
-      <div style="font-weight:700;margin:6px 0 4px">Участники</div><div style="max-height:200px;overflow:auto"><table style="font-size:13px;width:100%"><tbody id="pronNicks">${nicks||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
-      <div style="font-weight:700;margin:12px 0 4px">Игроки (сыгранные)</div><div style="max-height:380px;overflow:auto"><table style="font-size:13px;width:100%"><tbody id="pronPlayers">${players||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
+      <div style="font-weight:700;margin:6px 0 4px">Участники</div><div style="max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px;margin-bottom:14px"><table style="font-size:13px;width:100%"><tbody id="pronNicks">${nicks||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
+      <div style="font-weight:700;margin:6px 0 4px">Игроки (сыгранные)</div><div style="max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px"><table style="font-size:13px;width:100%"><tbody id="pronPlayers">${players||'<tr><td class="mut">—</td></tr>'}</tbody></table></div>
       <div id="pronMsg" class="mut" style="font-size:12px;margin-top:6px"></div>`;
   }catch(e){el.innerHTML='<span class="err">ошибка: '+e.message+'</span>';}
 }
@@ -1210,7 +1220,21 @@ function tzOffsetMin(date){return offMin(TZ,date);}
 function tzLabel(){return offLabel(TZ,new Date());}
 function tzNowHint(){return 'сейчас: '+new Intl.DateTimeFormat('ru-RU',{timeZone:TZ,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date())+' ('+tzLabel()+')';}
 function tzWallToUTC(wall){if(!wall)return null;const [d,t]=wall.split('T');const [Y,M,D]=d.split('-').map(Number);const [h,mi]=t.split(':').map(Number);const g=Date.UTC(Y,M-1,D,h,mi);const off=tzOffsetMin(new Date(g));return new Date(g-off*60000);}
-function refreshAdminTime(){const w=document.getElementById('dWhen');if(w&&!w.value)w.value=tzWallString(new Date());const h=document.getElementById('dNowHint');if(h)h.textContent=tzNowHint();const l=document.getElementById('dTzLbl');if(l)l.textContent='('+tzLabel()+')';}
+// Тумблеры разделов админки: какие карточки показывать (по data-sec). Выбор персистится в localStorage, по умолчанию всё включено.
+const ADM_SEC_KEYS=['conn','drafts','dcc','pron'];
+function admSecPref(){try{const p=JSON.parse(localStorage.getItem('dcAdmSecs')||'null');if(p&&typeof p==='object')return p;}catch{}return {conn:true,drafts:true,dcc:true,pron:true};}
+function applyAdmSecs(){
+  const p=admSecPref();
+  document.querySelectorAll('#secAdmin > [data-sec]').forEach(el=>{el.style.display=(p[el.dataset.sec]===false)?'none':'';}); // прямые дети = карточки; кнопки тулбара (внутри #admSecBar) не трогаем
+  const bar=document.getElementById('admSecBar');
+  if(bar)bar.querySelectorAll('button[data-sec]').forEach(b=>{const on=p[b.dataset.sec]!==false;b.classList.toggle('p',on);b.style.opacity=on?'1':'.5';});
+}
+function toggleAdmSec(k){const p=admSecPref();p[k]=(p[k]===false);localStorage.setItem('dcAdmSecs',JSON.stringify(p));applyAdmSecs();}
+// Мульти-слоты времени старта: 1 слот = 1 драфт (одинаковый пул матчей/настройки, разное время).
+function whenSlotHtml(val){return `<div class="row dWhenSlotRow" style="gap:4px;margin-bottom:4px;align-items:center"><input type="datetime-local" class="dWhenSlot" value="${escAttr(val||'')}" style="font-size:12px"><button class="btn r" type="button" onclick="rmWhenSlot(this)" title="убрать слот" style="padding:2px 8px">×</button></div>`;}
+function addWhenSlot(val){const box=document.getElementById('dWhenSlots');if(box)box.insertAdjacentHTML('beforeend',whenSlotHtml(typeof val==='string'?val:''));}
+function rmWhenSlot(btn){const box=document.getElementById('dWhenSlots'),row=btn.closest('.dWhenSlotRow');if(row)row.remove();if(box&&!box.querySelector('.dWhenSlot'))addWhenSlot();} // не оставляем 0 слотов
+function refreshAdminTime(){const box=document.getElementById('dWhenSlots');if(box){if(!box.querySelector('.dWhenSlot'))addWhenSlot(tzWallString(new Date()));else{const f=box.querySelector('.dWhenSlot');if(f&&!f.value)f.value=tzWallString(new Date());}}const h=document.getElementById('dNowHint');if(h)h.textContent=tzNowHint();const l=document.getElementById('dTzLbl');if(l)l.textContent='('+tzLabel()+')';}
 function initAdminForm(){
   const sel=document.getElementById('dTour');
   if(sel&&!sel.options.length)sel.innerHTML=TOURNAMENTS.map((t,i)=>`<option value="${i}">${t.label}</option>`).join('');
@@ -1244,18 +1268,20 @@ async function createDraft(){
   const t=TOURNAMENTS[+document.getElementById('dTour').value];
   const chosen=[...document.querySelectorAll('.mch')].filter(c=>c.checked).map(c=>loadedMatches[+c.dataset.i]);
   if(!chosen.length){msg.textContent='загрузи матчи тура и отметь хотя бы один';return;}
-  const utc=tzWallToUTC(document.getElementById('dWhen').value||null);
-  const row={created_by:session.user.id,tournament:t.label,season_id:t.season,round:+document.getElementById('dRound').value,
+  let times=[...document.querySelectorAll('.dWhenSlot')].map(i=>i.value).filter(Boolean).map(v=>tzWallToUTC(v)); // 1 слот = 1 драфт
+  if(!times.length)times=[null];                                                     // ни одного времени → один драфт без времени (как раньше)
+  const base={created_by:session.user.id,tournament:t.label,season_id:t.season,round:+document.getElementById('dRound').value,
     match_ids:chosen.map(m=>m.matchId),league:document.getElementById('dLeague').value,
     buyin:+document.getElementById('dBuyin').value,prize1:+document.getElementById('dP1').value,prize2:+document.getElementById('dP2').value,
-    slots:+document.getElementById('dSlots').value,club_limit:+document.getElementById('dClubLim').value,
-    starts_at:utc?utc.toISOString():null};
+    slots:+document.getElementById('dSlots').value,club_limit:+document.getElementById('dClubLim').value};
+  const rows=times.map(u=>({...base,starts_at:u?u.toISOString():null}));
   msg.textContent='сохраняю…';
-  const {error}=await sb.from('dc_drafts').insert(row);
+  const {error}=await sb.from('dc_drafts').insert(rows);
   if(error){msg.textContent='ошибка: '+error.message;return;}
-  msg.textContent='драфт создан ✓ — см. Лобби и список ниже';
+  msg.textContent=`создано драфтов: ${rows.length} — см. Лобби и список ниже`;
   document.getElementById('dPreview').innerHTML='';
   document.getElementById('dMatches').innerHTML='';loadedMatches=[];document.getElementById('dMatchMsg').textContent='';
+  {const sl=document.getElementById('dWhenSlots');if(sl)sl.innerHTML='';refreshAdminTime();}   // сброс слотов времени к одному
   await loadDrafts();
 }
 // --- драфты: загрузка и рендер ---
@@ -1699,7 +1725,7 @@ function renderLobbyAll(){
   const played=list.filter(d=>d.status==='done');
   const done=list.filter(d=>d.status==='settled'||d.status==='cancelled');
   const html=draftGroup('Запланированные',planned,null,d=>draftRow(d))
-    +draftGroup('Сыгранные',played,null,d=>draftRow(d))
+    +draftGroup('Сыгранные',played,fs?null:'played',d=>draftRow(d))   // сыгранные (done) тоже свёрнуты по умолчанию, как завершённые
     +draftGroup('Завершённые',done,fs?null:'all',d=>draftRow(d)); // завершённые свёрнуты по умолчанию (кроме случая, когда выбран явный статус-фильтр)
   el.innerHTML=html||'<div class="empty">Под фильтр ничего не подходит.</div>';
 }
@@ -1764,7 +1790,7 @@ function renderMine(){                                      // «Мои драф
     else g.done.push([a,d]);} // settled/cancelled
   const bt=(x,y)=>_cmpDraft(x[1],y[1]);g.planned.sort(bt);g.played.sort(bt);g.done.sort(bt);
   const rowFn=([a,d])=>draftRow(d,{app:a});
-  el.innerHTML=(draftGroup('Запланированные',g.planned,null,rowFn)+draftGroup('Сыгранные',g.played,null,rowFn)+draftGroup('Завершённые',g.done,'mine',rowFn))||'<div class="empty">—</div>';
+  el.innerHTML=(draftGroup('Запланированные',g.planned,null,rowFn)+draftGroup('Сыгранные',g.played,'mplayed',rowFn)+draftGroup('Завершённые',g.done,'mine',rowFn))||'<div class="empty">—</div>';
 }
 async function loadFlags(){try{const r=await fetch('/api/flags');const j=await r.json();AUTOPLAY_ON=!!j.autoplay;const c=document.getElementById('autoToggle');if(c)c.checked=AUTOPLAY_ON;}catch{}}
 async function toggleAutoplay(){
