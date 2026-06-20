@@ -1898,12 +1898,14 @@ function renderAdminDrafts(){
   const acard=(d)=>{
     const apps=APPS.filter(a=>a.draft_id===d.id);
     const acc=apps.filter(a=>a.status==='accepted').length;const over=acc>d.slots;
+    const paidN=apps.filter(a=>a.status==='accepted'&&a.paid).length;   // ручная пометка «оплата снята» — счётчик по принятым
     const rows=apps.length?apps.map(a=>{
       const nm=PROFNAMES[a.user_id]||a.user_id.slice(0,8);
       const tag=a.status==='accepted'?'<span class="badge admin">принят</span>':a.status==='rejected'?'<span class="badge">отклонён</span>':'<span class="badge">ожидает</span>';
+      const payBtn=a.status==='accepted'?`<button class="btn" onclick="togglePaid(${a.id},${!!a.paid})" style="${a.paid?'background:#2e7d32;color:#fff;border-color:#2e7d32':''}" title="Снята ли реальная оплата с этого игрока (ручная пометка, пока выплаты не автоматизированы)">${a.paid?'✓ оплачено':'оплата снята'}</button> `:'';
       return `<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0">
         <span>${nm} ${tag}</span>
-        <span><button class="btn p" onclick="setApp(${a.id},'accepted')" ${a.status==='accepted'?'disabled':''}>Принять</button>
+        <span>${payBtn}<button class="btn p" onclick="setApp(${a.id},'accepted')" ${a.status==='accepted'?'disabled':''}>Принять</button>
         <button class="btn r" onclick="setApp(${a.id},'rejected')" ${a.status==='rejected'?'disabled':''}>Отклонить</button></span></div>`;
     }).join(''):'<span class="mut">заявок пока нет</span>';
     const ctrl=d.status==='recruiting'
@@ -1915,11 +1917,11 @@ function renderAdminDrafts(){
           : `<span class="badge">${d.status}</span>`;
     return `<div class="card2" style="margin:0 0 10px">
       <b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> ${seqTag(d)}· ${d.tournament}, тур ${d.round} · <span class="badge">${d.status}</span> · старт ${fmtStart(d.starts_at)}<br>
-      принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}
+      принято <b class="${over?'err':''}">${acc}</b> / слотов ${d.slots} · заявок ${apps.length}${acc?` · оплата снята <b style="color:${paidN>=acc?'var(--acc)':'var(--gold)'}">${paidN}/${acc}</b>`:''}${d.fin_settled?' · <span class="badge" style="background:var(--gold);color:#1b1206">рассчитан</span>':''}
       <div class="row" style="gap:6px;align-items:center;margin:8px 0"><span class="mut" style="font-size:12px">Старт (${tzLabel()}):</span><input id="dwhen-${d.id}" type="datetime-local" value="${d.starts_at?tzWallString(new Date(d.starts_at)):''}" style="font-size:12px"><button class="btn" onclick="saveDraftTime(${d.id})">Сохранить время</button></div>
       ${['recruiting','finalized'].includes(d.status)?`<div class="row" style="gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap"><span class="mut" style="font-size:12px">Бай-ин / приз 1 / приз 2 (DCC):</span><input id="dbuyin-${d.id}" type="number" min="0" value="${d.buyin}" title="бай-ин" style="width:80px;font-size:12px"><input id="dp1-${d.id}" type="number" min="0" value="${d.prize1}" title="приз за 1 место" style="width:80px;font-size:12px"><input id="dp2-${d.id}" type="number" min="0" value="${d.prize2}" title="приз за 2 место" style="width:80px;font-size:12px"><button class="btn" onclick="saveDraftEconomy(${d.id})">Сохранить</button></div>`:''}
       <div style="margin:8px 0">${rows}</div>
-      ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу. Пробелы FanTeam доливаются из sstats.net в фоне.">Кэфы</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
+      ${ctrl} <button class="btn" onclick="refreshDraftOdds(${d.id})" title="Спарсить коэффициенты (Win%/xG/CS) из FanTeam прямо сейчас. Покажет, сколько клубов уже опубликовано; для live-комнаты применит сразу. Пробелы FanTeam доливаются из sstats.net в фоне.">Кэфы</button> <button class="btn" onclick="toggleSettled(${d.id},${!!d.fin_settled})" style="${d.fin_settled?'background:var(--gold);color:#1b1206;border-color:var(--gold)':''}" title="Все финансовые вопросы по драфту закрыты (ручная пометка)">${d.fin_settled?'✓ Драфт рассчитан':'Драфт рассчитан'}</button> <button class="btn r" onclick="deleteDraft(${d.id})">Удалить</button>
       <div id="odds-${d.id}" class="mut" style="font-size:12px;margin-top:6px"></div></div>`;
   };
   const list=DRAFTS.slice().sort(_cmpDraft);
@@ -1967,6 +1969,8 @@ async function toggleAutoplay(){
 }
 async function setApp(appId,status){await sb.from('dc_applications').update({status}).eq('id',appId);await loadDrafts();}
 async function setDraftStatus(id,status){await sb.from('dc_drafts').update({status}).eq('id',id);await loadDrafts();}
+async function togglePaid(appId,val){const m=document.getElementById('adminMsg');const {error}=await sb.from('dc_applications').update({paid:!val}).eq('id',appId);if(error){if(m)m.textContent='не удалось отметить оплату: '+error.message;return;}await loadDrafts();} // ручная пометка «оплата снята» с игрока
+async function toggleSettled(id,val){const m=document.getElementById('adminMsg');const {error}=await sb.from('dc_drafts').update({fin_settled:!val}).eq('id',id);if(error){if(m)m.textContent='не удалось отметить расчёт: '+error.message;return;}await loadDrafts();} // ручная пометка «драфт рассчитан»
 async function saveDraftTime(id){
   const inp=document.getElementById('dwhen-'+id),m=document.getElementById('adminMsg');
   const utc=tzWallToUTC(inp&&inp.value||null);
