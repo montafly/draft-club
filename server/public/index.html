@@ -603,7 +603,8 @@ function onWsMessage(e){const m=JSON.parse(e.data);
   if(m.type==='pong'){clearTimeout(wsPongTimer);wsPongTimer=null;return;} // ответ на keepalive-пинг клиента
   if(m.type==='room')onRoom(m.code);
   else if(m.type==='pool'){POOL=m.units;CLUBODDS=m.clubOdds||[];MATCHES=m.matches||[];renderFixtures();if(S&&S.started){renderClubs();renderBottom();}}
-  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;{const w=document.getElementById('who');if(w)w.textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
+  else if(m.type==='joined'){me=m.you;if(m.rtc!=null)myRtc=m.rtc;if(m.uid)myUid=m.uid;myName=m.name||myName;SEEN_PICKS=null;SEEN_LOT=null; // вход/реконнект → сбрасываем baseline озвучки, следующий стейт засеётся молча (без «сплошняка» пропущенных покупок)
+    {const w=document.getElementById('who');if(w)w.textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
     if(me!=null&&!VOICE&&!RTC.on)setTimeout(()=>{if(!RTC.on)rtcStart();},400);} // мик по умолчанию включён при входе игрока (на iOS первый getUserMedia потребует тапа — поймаем в catch)
   else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
   else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
@@ -907,8 +908,12 @@ function announcePicks(){
   const cur=new Set(),fresh=[];
   for(const m of d.managers)for(const u of (m.roster||[])){if(u.position==='COACH')continue;const k=m.id+':'+u.id;cur.add(k);if(SEEN_PICKS&&!SEEN_PICKS.has(k))fresh.push({m,u});}
   const lotNo=(d.lot&&d.lot.unit)?d.lot.no:null;
-  if(SEEN_PICKS===null){SEEN_PICKS=cur;SEEN_LOT=lotNo;return;}   // первый стейт драфта (вход/реконнект) — засеваем без объявления
-  for(const f of fresh)queuePick(f.m,f.u);                       // покупки (закрытые лоты)
+  // Засеваем baseline БЕЗ объявления, если: нет baseline (вход/реконнект зрителя) ИЛИ это «догоняющий» полный стейт
+  // (ресинк/ping-catchup/вход в идущий драфт с кучей уже купленных). В нормальной игре за один broadcast добавляется
+  // максимум одна покупка и лот сдвигается на +1; больше — значит мы пропустили события и НЕ озвучиваем их пачкой.
+  const catchUp=(SEEN_PICKS===null)||(fresh.length>1)||(lotNo!=null&&SEEN_LOT!=null&&lotNo>SEEN_LOT+1);
+  if(catchUp){SEEN_PICKS=cur;SEEN_LOT=lotNo;return;}
+  for(const f of fresh)queuePick(f.m,f.u);                       // покупка (закрытый лот) — одна, в реальном времени
   SEEN_PICKS=cur;
   if(lotNo!=null&&lotNo!==SEEN_LOT)queueNominate(d.lot.unit);    // новая номинация → «В торгах …»
   SEEN_LOT=lotNo;
