@@ -83,7 +83,9 @@ export class Room {
     const s = this.seats.find((x) => x.id === seatId);
     if (!s) throw new Error('заранее-пас: нет места');
     const set = this._preFoldSeats();
-    if (on) { set.add(seatId); this.logEvent('info', `${s.name} — заранее пас`); }
+    // НЕ логируем пред-пас: запись в общем логе раскрывала бы другим участникам, что человек уже спасовал по лоту (#10).
+    // Сам пас залогируется штатно, когда ход естественно дойдёт до места (_applyPreFold → d.pass).
+    if (on) set.add(seatId);
     else set.delete(seatId);
   }
   // авто-пас всех пред-фолдеров, до которых дошёл ход (вызывается после каждого действия в торгах)
