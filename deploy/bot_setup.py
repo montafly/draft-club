@@ -43,6 +43,10 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect(HOST, username=USER, key_filename=KEY, timeout=20)
 
+# 0) свежий код бота
+c, o, e = run(ssh, "cd /opt/draft-club && git pull --ff-only 2>&1")
+print("[git pull]", o.strip() or e.strip())
+
 # 1) корневой .env через SFTP (600)
 sftp = ssh.open_sftp()
 sftp.put(LOCAL_ENV, REMOTE_ENV)

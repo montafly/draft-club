@@ -15,9 +15,15 @@ import json
 import os
 import re
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+except Exception:  # pragma: no cover
+    ZoneInfo = None
 
 import db
+
+MSK = timezone(timedelta(hours=3))   # дефолт для профилей без выбранной зоны (auto/браузер)
 
 
 def esc(s) -> str:
@@ -283,3 +289,77 @@ def build_user_message(match_id: int, user_id: str, kind: str = "lineup") -> str
     header = f"<b>{esc(home)} — {esc(away)}. {title}</b>\n"
     sep = "\n\n" + "─" * 20 + "\n\n"          # разделитель между драфтами (если их несколько)
     return header + sep.join(blocks)
+
+
+# --------------------------------------------------------------------------- #
+# приветственное сообщение (/start, /status у привязанного)
+# --------------------------------------------------------------------------- #
+def _fmt_dt(iso: str | None, tz: str | None) -> str:
+    """Дата/время старта матча в зоне игрока (tz из профиля; null → UTC+3)."""
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return "—"
+    target = None
+    if tz and ZoneInfo is not None:
+        try:
+            target = ZoneInfo(tz)
+        except Exception:  # noqa: BLE001 — нет такой зоны/нет tzdata → дефолт
+            target = None
+    return dt.astimezone(target or MSK).strftime("%d.%m %H:%M")
+
+
+def build_welcome(user_id: str) -> str | None:
+    """Приветствие привязанному игроку: его драфты в игре (с линками) + ближайшие
+    матчи тура. Время — в зоне профиля (или UTC+3)."""
+    pf = db.select("dc_profiles", f"select=display_name,timezone&id=eq.{user_id}")
+    if not pf:
+        return None
+    name = pf[0].get("display_name") or "игрок"
+    tz = pf[0].get("timezone")
+
+    seq, test_ids = draft_seq()
+    mine = db.select("dc_draft_rosters", f"select=draft_id&user_id=eq.{user_id}")
+    dids = sorted({r["draft_id"] for r in mine})
+    drafts = []
+    if dids:
+        idlist = ",".join(str(x) for x in dids)
+        drafts = [d for d in db.select(
+            "dc_drafts",
+            f"select=id,league,tournament,round,match_ids&id=in.({idlist})&status=in.(finalized,live,done)")
+            if d["id"] not in test_ids]
+        drafts.sort(key=lambda d: seq.get(d["id"], 1e9))
+
+    out = [f"<b>Привет, {esc(name)}!</b>", "", f"<b>Драфтов в игре: {len(drafts)}</b>"]
+    if drafts:
+        out.append("")
+        for d in drafts:
+            emoji = LEAGUE_EMOJI.get(d["league"], "•")
+            no = seq.get(d["id"], d["id"])
+            link = f'<a href="{SITE_URL}/?draft={d["id"]}">линк</a>'
+            out.append(f"{emoji} {d['league']} #{no} · {esc(d['tournament'])}, тур {d['round']}: {link}")
+
+    # ближайшие матчи тура: live/pending из матчей этих драфтов
+    mids = sorted({m for d in drafts for m in (d.get("match_ids") or [])})
+    matches = []
+    if mids:
+        idlist = ",".join(str(x) for x in mids)
+        matches = db.select(
+            "dc_matches",
+            f"select=home_team,away_team,score_home,score_away,start_time,status"
+            f"&match_id=in.({idlist})&status=in.(live,pending)&order=start_time.asc&limit=50")
+    if matches:
+        nh = max(len(m["home_team"] or "") for m in matches)
+        na = max(len(m["away_team"] or "") for m in matches)
+        lines = []
+        for m in matches:
+            sh, sa = m.get("score_home"), m.get("score_away")
+            sc = f"{sh}:{sa}" if sh is not None and sa is not None else "-"
+            live = m["status"] == "live"
+            stat, emo = ("LIVE", "🔥") if live else ("Upcoming", "⏰")
+            lines.append(f"{_fmt_dt(m['start_time'], tz)} {(m['home_team'] or '').ljust(nh)} "
+                         f"{sc:^5} {(m['away_team'] or '').ljust(na)} {stat:<8} {emo}")
+        out.append("")
+        out.append("<b>Ближайшие матчи этого тура:</b>")
+        out.append(_pre(lines))
+    return "\n".join(out)
