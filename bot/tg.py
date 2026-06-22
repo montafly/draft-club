@@ -5,9 +5,23 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
+
+# HTTP(S)-прокси для Telegram (VPS Timeweb режет api.telegram.org по DPI).
+# TG_PROXY в .env, напр. http://user:pass@host:port. Пусто → прямое соединение.
+_OPENER = None
+
+
+def _opener():
+    global _OPENER
+    if _OPENER is None:
+        proxy = os.environ.get("TG_PROXY", "").strip()
+        _OPENER = (urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+                   if proxy else urllib.request.build_opener())
+    return _OPENER
 
 
 def api(token: str, method: str, params: dict | None = None) -> dict:
@@ -17,7 +31,7 @@ def api(token: str, method: str, params: dict | None = None) -> dict:
     url = f"https://api.telegram.org/bot{token}/{method}"
     data = urllib.parse.urlencode(params).encode() if params else None
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=60) as r:
+        with _opener().open(urllib.request.Request(url, data=data), timeout=60) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")

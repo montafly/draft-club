@@ -326,11 +326,14 @@ def build_welcome(user_id: str) -> str | None:
         idlist = ",".join(str(x) for x in dids)
         drafts = [d for d in db.select(
             "dc_drafts",
-            f"select=id,league,tournament,round,match_ids&id=in.({idlist})&status=in.(finalized,live,done)")
+            f"select=id,league,tournament,round,season_id,match_ids&id=in.({idlist})&status=in.(finalized,live,done)")
             if d["id"] not in test_ids]
         drafts.sort(key=lambda d: seq.get(d["id"], 1e9))
 
-    out = [f"<b>Привет, {esc(name)}!</b>", "", f"<b>Драфтов в игре: {len(drafts)}</b>"]
+    lobby = f'<a href="{SITE_URL}/?view=lobby">линк</a>'
+    out = [f"<b>Привет, {esc(name)}!</b>", "",
+           f"✍️ Запись на драфты: {lobby}", "",
+           f"<b>Драфтов в игре: {len(drafts)}</b>"]
     if drafts:
         out.append("")
         for d in drafts:
@@ -339,15 +342,18 @@ def build_welcome(user_id: str) -> str | None:
             link = f'<a href="{SITE_URL}/?draft={d["id"]}">линк</a>'
             out.append(f"{emoji} {d['league']} #{no} · {esc(d['tournament'])}, тур {d['round']}: {link}")
 
-    # ближайшие матчи тура: live/pending из матчей этих драфтов
-    mids = sorted({m for d in drafts for m in (d.get("match_ids") or [])})
-    matches = []
-    if mids:
-        idlist = ",".join(str(x) for x in mids)
-        matches = db.select(
-            "dc_matches",
-            f"select=home_team,away_team,score_home,score_away,start_time,status"
-            f"&match_id=in.({idlist})&status=in.(live,pending)&order=start_time.asc&limit=50")
+    # все несыгранные матчи тура (live/pending) — по season+round драфтов в игре, не только match_ids
+    pairs = {(d.get("season_id"), d.get("round")) for d in drafts}
+    mmap = {}
+    for sid, rnd in pairs:
+        if sid is None or rnd is None:
+            continue
+        for m in db.select(
+                "dc_matches",
+                f"select=match_id,home_team,away_team,score_home,score_away,start_time,status"
+                f"&season_id=eq.{sid}&round=eq.{rnd}&status=in.(live,pending)&limit=100"):
+            mmap[m["match_id"]] = m
+    matches = sorted(mmap.values(), key=lambda m: m.get("start_time") or "")
     if matches:
         nh = max(len(m["home_team"] or "") for m in matches)
         na = max(len(m["away_team"] or "") for m in matches)
