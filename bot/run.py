@@ -169,7 +169,7 @@ def handle_command(token: str, msg: dict) -> None:
 
 def poll_commands(token: str) -> None:
     offset = read_offset()
-    updates = tg.get_updates(token, offset, timeout=0)
+    updates = tg.get_updates(token, offset, timeout=25)   # long-poll: команды ловятся почти мгновенно
     if not updates:
         return
     max_id = offset - 1
@@ -263,14 +263,14 @@ def main() -> None:
         poll_commands(token)
         detect_and_notify(token)
         return
-    print(f"Draft Club bot запущен. Шаг {POLL_SECONDS}с, окно вперёд {LOOKAHEAD_MIN}мин.")
+    print(f"Draft Club bot запущен. Long-poll 25с, окно вперёд {LOOKAHEAD_MIN}мин.")
     while True:
         try:
-            poll_commands(token)
+            poll_commands(token)            # блокируется до 25с (long-poll) → команды почти мгновенно
             detect_and_notify(token)
         except Exception as e:  # noqa: BLE001 — цикл не должен падать
             print(f"[loop] ошибка: {e}")
-        time.sleep(POLL_SECONDS)
+        time.sleep(2)
 
 
 if __name__ == "__main__":

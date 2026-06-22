@@ -353,7 +353,7 @@ def build_welcome(user_id: str) -> str | None:
         seen.add(key)
         sc = draft_score(d["id"])
         for m in (sc or {}).get("matches", []):
-            if m.get("status") in ("live", "pending"):
+            if m.get("status") in ("live", "paused", "pending"):   # paused = перерыв (идёт)
                 mmap[m["matchId"]] = m
     matches = sorted(mmap.values(), key=lambda m: m.get("startTime") or "")
     if matches:
@@ -362,7 +362,7 @@ def build_welcome(user_id: str) -> str | None:
         lines = []
         for m in matches:
             sco = m.get("score") or [0, 0]
-            live = m.get("status") == "live"
+            live = m.get("status") in ("live", "paused")
             stat, emo = ("LIVE", "🔥") if live else ("Upcoming", "⏰")
             lines.append(f"{_fmt_dt(m.get('startTime'), tz)} {(m.get('home') or '').ljust(nh)} "
                          f"{sco[0]}:{sco[1]} {(m.get('away') or '').ljust(na)} {stat:<8} {emo}")
