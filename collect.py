@@ -26,6 +26,9 @@ import db
 
 REQUEST_DELAY = 0.5   # пауза между запросами к FanTeam (вежливый троттлинг)
 MAX_RETRIES = 6       # ретраи на 429 с нарастающим бэкоффом
+# За сколько минут до старта начинать поллить pending-матч в auto-режиме.
+# Составы FanTeam вывешивает за ~60 мин; берём запас, чтобы поймать момент выхода.
+PREMATCH_MINUTES = int(os.environ.get("PREMATCH_MINUTES", "100"))
 
 API = "https://fanteam-game.api.scoutgg.net"
 HEADERS = {
@@ -174,6 +177,10 @@ def player_rows(match_id: int, status: str, detail: dict, now: str) -> list[dict
             "points": compute_points(st, pos),
             "stats": st,
             "status": status,
+            # confirmed = в стартовом составе, bench = на банке. Заполняется
+            # FanTeam уже на pending после выхода составов — основа для бота-уведомлятора.
+            # «Вне заявки» = игрока в ответе нет вовсе (для клубных лиг).
+            "lineup": r.get("lineup"),
             "updated_at": now,
         })
     return rows
@@ -238,7 +245,8 @@ def collect_auto(season_ids: list[int], window_hours: int = 6):
     2) находит активные по сезонам (status=live всегда + pending около старта).
     confirmed/cancelled пропускаем."""
     now = datetime.now(timezone.utc)
-    lo, hi = now - timedelta(hours=window_hours), now + timedelta(minutes=5)
+    # hi = окно вперёд: ловим pending заранее, чтобы поймать выход составов (~T-60).
+    lo, hi = now - timedelta(hours=window_hours), now + timedelta(minutes=PREMATCH_MINUTES)
     iso = now.isoformat()
     # 1) перепроверка незавершённых из нашей БД
     try:

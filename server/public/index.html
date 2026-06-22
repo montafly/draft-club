@@ -362,6 +362,11 @@
           <div class="row"><select id="profTz" style="flex:1"></select><button class="btn p" onclick="saveTz()">Сохранить</button></div>
           <div id="tzMsg" class="mut" style="font-size:12px">«Авто» определяет зону по браузеру. Время старта драфтов всегда дублируется в UTC+3.</div>
         </div>
+        <div class="field" style="max-width:420px">
+          <label>Telegram-уведомления</label>
+          <div class="row"><button class="btn p" onclick="linkTelegram()">Подключить Telegram</button></div>
+          <div id="tgMsg" class="mut" style="font-size:12px">Бот пришлёт составы и итоги по твоим драфтам. Нажми — откроется бот, подтверди в нём.</div>
+        </div>
       </div>
       <div class="card2">
         <h3>Аватар</h3>
@@ -1038,10 +1043,12 @@ async function onAuthed(){
   renderProfileUI();
   initAdminForm();
   showApp(); showSection(viewFromUrl()||'lobby');
-  tick(); loadDrafts(); loadFlags();
+  tick(); const draftsLoaded=loadDrafts(); loadFlags();
   // п.1: при F5 в руме — восстанавливаем комнату (enterRoom→'room'→onRoom покажет драфт поверх). Мёртвая комната → мягкий фолбэк на лобби.
   const params=new URLSearchParams(location.search); const room=params.get('room'); const voice=params.get('voice')==='1';
   if(room){document.getElementById('lcode').value=room; const go=()=>enterRoom(room,voice); if(ws.readyState===1)go(); else ws.addEventListener('open',go,{once:true});} // ждём открытия сокета (F5 может опередить ws.onopen)
+  const draftId=params.get('draft');   // deep-link из уведомлений бота: ?draft=<id> → открыть просмотрщик итогов
+  if(draftId)draftsLoaded.then(()=>{const id=Number(draftId); if(DRAFTS.find(x=>x.id===id))openViewer(id);});
 }
 function renderProfileUI(){
   const isAdmin=PROFILE.role==='admin';
@@ -2087,6 +2094,16 @@ async function doSetNewPassword(){const np=document.getElementById('npass').valu
   if(!authedOnce)onAuthed();}
 async function doLogout(){await sb.auth.signOut(); location.href='/';}
 async function authToken(){const {data}=await sb.auth.getSession(); return data.session&&data.session.access_token;}
+async function linkTelegram(){
+  const m=document.getElementById('tgMsg');
+  try{
+    const t=await authToken(); if(!t){showAuth();return;}
+    const r=await fetch('/api/bot/link',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+t}});
+    const j=await r.json(); if(!r.ok)throw new Error(j.error||r.status);
+    if(m)m.innerHTML='Открываю бота… не открылось — <a href="'+j.url+'" target="_blank" rel="noopener">ссылка</a>. Нажми «Запустить»/Start в боте.';
+    window.open(j.url,'_blank','noopener');
+  }catch(e){if(m)m.textContent='ошибка: '+(e.message||e);}
+}
 async function doCreate(){const t=await authToken(); if(!t){showAuth();return;} send({type:'createRoom',token:t});}
 async function doJoinRoom(){const t=await authToken(); if(!t){showAuth();return;} const code=(document.getElementById('lcode').value||'').trim().toUpperCase(); if(!code){document.getElementById('lerr').textContent='введи код комнаты';return;} send({type:'joinRoom',code,token:t});}
 function onRoom(code){myRoom=code;_chatSeen=null;history.replaceState(null,'','?room='+code+(VOICE?'&voice=1':''));

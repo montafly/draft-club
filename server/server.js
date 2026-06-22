@@ -729,6 +729,23 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (url === '/api/bot/link' && req.method === 'POST') {                 // привязка Telegram: одноразовый код для deep-link бота (t.me/<bot>?start=CODE)
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e4) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        const user = await authUser(token);                              // любой залогиненный
+        const code = crypto.randomBytes(6).toString('hex');              // 12-символьный одноразовый код
+        const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();   // живёт 15 минут
+        await svcPost('dc_bot_links', [{ code, user_id: user.id, expires_at: expires }]);
+        const botUser = process.env.BOT_USERNAME || 'draftclub_bot';
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ url: `https://t.me/${botUser}?start=${code}`, code }));
+      } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    });
+    return;
+  }
   if (url === '/api/draft/refresh-odds' && req.method === 'POST') {       // админ: спарсить кэфы (Win%/xG/CS) из FanTeam сейчас; для live-комнаты применить сразу
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
