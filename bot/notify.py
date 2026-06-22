@@ -124,10 +124,10 @@ def draft_seq() -> tuple[dict, set]:
     return seq, test_ids
 
 
-def draft_score(draft_id: int) -> dict | None:
-    url = f"{SITE_URL}/api/draft/score?draftId={draft_id}"
+def draft_score(draft_id: int, force: bool = False) -> dict | None:
+    url = f"{SITE_URL}/api/draft/score?draftId={draft_id}" + ("&force=1" if force else "")
     try:
-        return json.load(urllib.request.urlopen(url, timeout=60))
+        return json.load(urllib.request.urlopen(url, timeout=90))
     except Exception as e:  # noqa: BLE001
         print(f"[notify] score {draft_id}: {e}")
         return None
@@ -353,7 +353,7 @@ def build_welcome(user_id: str) -> str | None:
         seen.add(key)
         sc = draft_score(d["id"])
         for m in (sc or {}).get("matches", []):
-            if m.get("status") in ("live", "paused", "pending"):   # paused = перерыв (идёт)
+            if m.get("status") in ("live", "paused", "pending"):   # не завершён (confirmed/ended/cancelled исключены)
                 mmap[m["matchId"]] = m
     matches = sorted(mmap.values(), key=lambda m: m.get("startTime") or "")
     if matches:
@@ -362,6 +362,8 @@ def build_welcome(user_id: str) -> str | None:
         lines = []
         for m in matches:
             sco = m.get("score") or [0, 0]
+            # доверяем статусу FanTeam: live/paused(перерыв) = LIVE; pending (не начался
+            # ИЛИ приостановлен, напр. гроза) = Upcoming.
             live = m.get("status") in ("live", "paused")
             stat, emo = ("LIVE", "🔥") if live else ("Upcoming", "⏰")
             lines.append(f"{_fmt_dt(m.get('startTime'), tz)} {(m.get('home') or '').ljust(nh)} "
