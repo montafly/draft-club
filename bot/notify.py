@@ -342,29 +342,30 @@ def build_welcome(user_id: str) -> str | None:
             link = f'<a href="{SITE_URL}/?draft={d["id"]}">линк</a>'
             out.append(f"{emoji} {d['league']} #{no} · {esc(d['tournament'])}, тур {d['round']}: {link}")
 
-    # все несыгранные матчи тура (live/pending) — по season+round драфтов в игре, не только match_ids
-    pairs = {(d.get("season_id"), d.get("round")) for d in drafts}
-    mmap = {}
-    for sid, rnd in pairs:
-        if sid is None or rnd is None:
+    # несыгранные матчи драфта (live/pending) — из фикстур самого драфта: score endpoint
+    # отдаёт полный список match_ids драфта со свежим статусом из FanTeam (dc_matches
+    # неполон — collect тянет только активные). Дедуп по (season,round): драфты тура общие.
+    mmap, seen = {}, set()
+    for d in drafts:
+        key = (d.get("season_id"), d.get("round"))
+        if key in seen:
             continue
-        for m in db.select(
-                "dc_matches",
-                f"select=match_id,home_team,away_team,score_home,score_away,start_time,status"
-                f"&season_id=eq.{sid}&round=eq.{rnd}&status=in.(live,pending)&limit=100"):
-            mmap[m["match_id"]] = m
-    matches = sorted(mmap.values(), key=lambda m: m.get("start_time") or "")
+        seen.add(key)
+        sc = draft_score(d["id"])
+        for m in (sc or {}).get("matches", []):
+            if m.get("status") in ("live", "pending"):
+                mmap[m["matchId"]] = m
+    matches = sorted(mmap.values(), key=lambda m: m.get("startTime") or "")
     if matches:
-        nh = max(len(m["home_team"] or "") for m in matches)
-        na = max(len(m["away_team"] or "") for m in matches)
+        nh = max(len(m.get("home") or "") for m in matches)
+        na = max(len(m.get("away") or "") for m in matches)
         lines = []
         for m in matches:
-            sh, sa = m.get("score_home"), m.get("score_away")
-            sc = f"{sh}:{sa}" if sh is not None and sa is not None else "-"
-            live = m["status"] == "live"
+            sco = m.get("score") or [0, 0]
+            live = m.get("status") == "live"
             stat, emo = ("LIVE", "🔥") if live else ("Upcoming", "⏰")
-            lines.append(f"{_fmt_dt(m['start_time'], tz)} {(m['home_team'] or '').ljust(nh)} "
-                         f"{sc:^5} {(m['away_team'] or '').ljust(na)} {stat:<8} {emo}")
+            lines.append(f"{_fmt_dt(m.get('startTime'), tz)} {(m.get('home') or '').ljust(nh)} "
+                         f"{sco[0]}:{sco[1]} {(m.get('away') or '').ljust(na)} {stat:<8} {emo}")
         out.append("")
         out.append("<b>Ближайшие матчи этого тура:</b>")
         out.append(_pre(lines))
