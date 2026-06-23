@@ -225,6 +225,11 @@
   @media(max-width:1320px){.vteam td.nm,.vteam th.pl{max-width:60px;overflow:hidden;text-overflow:ellipsis}.vteam th,.vteam td{padding:2px 3px}}
   /* легенда статусов — столбиком, в верх страницы (#11) */
   .vlegend{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mut);margin:0 0 10px;line-height:1.5}
+  /* верхняя зона вьювера: слева узкие чат+связь, в центре легенды, справа Live Standing — чтобы не было пустоты и таблицы участников поднимались */
+  .vtop{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+  .vtop-l{flex:1 1 340px;min-width:0;max-width:560px}
+  .vtop-c{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .vtop-r{flex:0 0 auto}
   /* матчи — статистика игроков, блок под участниками с контуром (#6); контур по контенту, прижат влево, не во всю страницу (#14) */
   .vmpanel{display:inline-block;width:fit-content;max-width:100%;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px;margin-top:14px}
   .vmpanel>h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
@@ -1592,7 +1597,10 @@ function renderViewerTeams(){
   const chatBlock=chat.length?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Чат драфта</h3><div style="max-height:160px;overflow-y:auto;font-size:11px;line-height:1.5">${chat.map(c=>{const tm=c.t?new Date(c.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';return `<div style="padding:1px 0"><span class="mut" style="font-size:10px;margin-right:5px">${tm}</span><b style="color:var(--gold)">[${esc(c.name)}]</b> ${esc(c.text)}</div>`;}).join('')}</div></div>`:'';
   const cl=sc.connLog||null;   // диагностика связи per-draft (dc_drafts.conn_log): обрывы/реконнекты + RTT-снапшот
   const connBlock=(cl&&Object.keys(cl).length)?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Связь по участникам</h3><table style="font-size:11px;width:100%"><thead><tr style="text-align:left"><th>Участник</th><th class="right">обрывы</th><th class="right">реконн.</th><th class="right">RTT (мс)</th></tr></thead><tbody>${Object.values(cl).sort((a,b)=>((b.disconnects||0)+(b.reconnects||0))-((a.disconnects||0)+(a.reconnects||0))).map(u=>{const bad=(u.disconnects||0)+(u.reconnects||0);const col=bad>=5?'#e05050':bad>=1?'#e0b050':'var(--mut)';const rtt=u.rttMs==null?'—':(u.rttMs+((u.rttMin!=null&&u.rttMax!=null)?` (${u.rttMin}–${u.rttMax})`:''));return `<tr><td>${esc(u.name||'')}</td><td class="right" style="color:${col};font-weight:700">${u.disconnects||0}</td><td class="right" style="color:${col};font-weight:700">${u.reconnects||0}</td><td class="right">${rtt}</td></tr>`;}).join('')}</tbody></table><p class="mut" style="font-size:10px;margin:4px 0 0">Обрывы/реконнекты — за время этого драфта. RTT — пинг до сервера (последний · диапазон мин–макс), снят на финише. Пусто — драфт сыгран до подключения диагностики.</p></div>`:'';
-  el.innerHTML=chatBlock+connBlock+legend+pbar+`<div class="layout"><div class="left"><div class="vstandcol" style="margin-top:0;margin-bottom:12px">${standTable()}</div><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 auto;min-width:0"></div></div></div><div class="right">${right}</div></div>`;
+  // верхняя зона: слева узкие чат+связь, в центре легенды, справа Live Standing (таблицы участников поднимаются)
+  const leftTop=(chatBlock||connBlock)?`<div class="vtop-l">${chatBlock}${connBlock}</div>`:'';
+  const top=`<div class="vtop">${leftTop}<div class="vtop-c">${legend}</div><div class="vtop-r">${standTable()}</div></div>`;
+  el.innerHTML=top+pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 auto;min-width:0"></div></div></div><div class="right">${right}</div></div>`;
   fetchViewerAvatars();   // дотянуть аватары участников из профилей и проставить в шапки колонок (#4)
   renderViewerMatchesList();   // блок матчей — сразу под участниками, в левой колонке (#14); выбранный матч восстанавливаем из кэша
 }
