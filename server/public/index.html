@@ -1570,7 +1570,12 @@ function renderViewerTeams(){
     let n=0;
     const prow=(p,first,cls)=>{const tid=regTip(playerTipHtml(p));return `<tr class="${cls}" data-tip-id="${tid}" style="cursor:help"><td class="mut">${first}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${vstatGlyph(p)}</td><td class="nm">${p.position==='COACH'?'Coach '+esc(p.code||p.club):esc(p.name)}</td><td>${esc(p.code||p.club)}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td style="${isPlayed(p)?ptsGrad(p.points):''}">${fpts(p)}</td></tr>`;};
     let body=starters.map(p=>{n++;return prow(p,n,rowCls(p));}).join('');
-    if(sub)body+=prow(sub,'S','subr'+(sub.counted?' counted':'')+(()=>{const c=rowCls(sub);return c?' '+c:'';})());
+    if(sub){
+      // зачётный зелёный замене даёт ТОЛЬКО класс .counted (очки идут в зачёт лишь при сработавшей замене).
+      // pdone (отыграл) для замены не вешаем: иначе строка зелёная, будто очки считаются, хотя замена не сработала.
+      const rc=rowCls(sub),sc=rc==='pdone'?'':rc;
+      body+=prow(sub,'S','subr'+(sub.counted?' counted':'')+(sc?' '+sc:''));
+    }
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
