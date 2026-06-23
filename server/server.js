@@ -330,17 +330,20 @@ async function payPrizes(draftId, standings, d) {
 }
 // очки игроков+тренеров по матчам драфта из live-данных FanTeam (lineup, минуты, статы)
 async function draftPoints(ids) {
-  const playerPts = {}, playerMin = {}, coachPts = {}, matchInfo = {}; let confirmed = 0;
+  const playerPts = {}, playerMin = {}, coachPts = {}, matchInfo = {}, playerLineup = {}; let confirmed = 0;
   const playerBreak = {}, playerEvents = {}, coachBreak = {}, nameOf = {};   // разбивка/события для тултипов просмотрщика (#5/#6)
   for (const mid of ids) {
     let det; try { det = await ftDetail(mid); } catch { continue; }
     const rm = det.realMatch || {};
     matchInfo[mid] = { status: rm.status || null, score: Array.isArray(rm.score) ? rm.score.slice(0, 2) : null };
+    // составы опубликованы, если хоть у одного игрока матча проставлен lineup (старт/банк) — для подсветки строк состава
+    matchInfo[mid].lineupReady = (det.realPlayerMatchStats || []).some((r) => r.lineup);
     if (rm.status === 'confirmed') confirmed++;
     for (const m of det.realTeamMemberships || []) { const rp = m.realPlayer || {}; nameOf[m.realPlayerId] = [rp.firstName, rp.lastName].filter(Boolean).join(' ') || String(m.realPlayerId); }
     for (const r of det.realPlayerMatchStats || []) {
       const pid = r.realPlayerId, pos = r.position || '', br = cpBreak(r.stats || {}, pos), pts = Math.round(br.reduce((a, b) => a + b.pts, 0) * 100) / 100, min = r.minutesPlayed || 0;
       playerPts[pid] = (playerPts[pid] || 0) + pts; playerMin[pid] = (playerMin[pid] || 0) + min;
+      if (r.lineup) playerLineup[pid] = r.lineup;          // 'confirmed' (старт) / 'bench' (банк)
       if (br.length) (playerBreak[pid] || (playerBreak[pid] = [])).push(...br);
       if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; if (pts) (coachBreak[ck] || (coachBreak[ck] = [])).push({ label: nameOf[pid] || String(pid), n: 1, pts }); } // тренер = очки вышедших на замену
     }
@@ -351,7 +354,7 @@ async function draftPoints(ids) {
       (playerEvents[pid] || (playerEvents[pid] = [])).push({ t: ev.mainType, minute: ev.minute != null ? ev.minute : null });
     }
   }
-  return { playerPts, playerMin, coachPts, matchInfo, allConfirmed: ids.length > 0 && confirmed === ids.length, playerBreak, playerEvents, coachBreak };
+  return { playerPts, playerMin, coachPts, matchInfo, playerLineup, allConfirmed: ids.length > 0 && confirmed === ids.length, playerBreak, playerEvents, coachBreak };
 }
 // накопленные за турнир очки/минуты по игроку (подсказка в номинации) — сумма по СЫГРАННЫМ матчам сезона до тура uptoRound. Статы сыгранных матчей неизменны → кэш 10 мин.
 const _seasonStatsCache = new Map();                       // `${season}|${upto}` -> {t, map}
@@ -383,15 +386,17 @@ async function scoreDraft(draftId) {
   if (!d) throw new Error('нет драфта');
   const ids = d.match_ids || [];
   const rosters = await svcGet(`dc_draft_rosters?draft_id=eq.${draftId}&select=*`);
-  const { playerPts, playerMin, coachPts, matchInfo, allConfirmed, playerBreak, playerEvents, coachBreak } = await draftPoints(ids);
+  const { playerPts, playerMin, coachPts, matchInfo, playerLineup, allConfirmed, playerBreak, playerEvents, coachBreak } = await draftPoints(ids);
   const brk = (r) => r.position === 'COACH' ? (coachBreak[r.player_id] || []) : mergeBreak(playerBreak[r.player_id] || []);   // разбивка очков игрока/тренера для тултипа (#6)
   const evs = (r) => r.position === 'COACH' ? [] : (playerEvents[r.player_id] || []).slice().sort((a, b) => (a.minute == null ? 1e9 : a.minute) - (b.minute == null ? 1e9 : b.minute));   // таймлайн (#5)
   let clubOdds = [], matches = [];
   try { const ti = await tourInfo(d.season_id, d.round, ids); clubOdds = ti.clubOdds; matches = ti.fixtures.map((f) => ({ ...f, score: (matchInfo[f.matchId] || {}).score || null, status: (matchInfo[f.matchId] || {}).status || f.status })); } catch (e) { console.error('tourInfo', e.message); }
-  const clubStatus = {}, clubCode = {};
-  for (const f of matches) { clubStatus[f.home] = f.status; clubStatus[f.away] = f.status; clubCode[f.home] = f.homeCode; clubCode[f.away] = f.awayCode; }
+  const clubStatus = {}, clubCode = {}, clubLineupReady = {};
+  for (const f of matches) { clubStatus[f.home] = f.status; clubStatus[f.away] = f.status; clubCode[f.home] = f.homeCode; clubCode[f.away] = f.awayCode; const lr = (matchInfo[f.matchId] || {}).lineupReady; clubLineupReady[f.home] = clubLineupReady[f.away] = lr; }
   // статус игрока: сыграл / не вышел (0 минут при завершённом матче) / идёт / ждёт матч; тренер — по статусу матча
   const pstat = (club, min, isCoach) => { const st = clubStatus[club] || 'pending'; if (isCoach) return st === 'confirmed' ? 'final' : st; if (st === 'confirmed') return min > 0 ? 'played' : 'dnp'; return st; };
+  // тег состава для подсветки строки на сайте: старт/банк из FanTeam lineup; если составы вышли, а игрока нет — «вне заявки»; иначе null (ещё не опубликованы). Тренера не красим.
+  const lineupTag = (club, pid, isCoach) => { if (isCoach) return null; const l = playerLineup[pid]; if (l === 'confirmed' || l === 'bench') return l; return clubLineupReady[club] ? 'out' : null; };
   const uids = [...new Set(rosters.map((r) => r.user_id))]; const names = {};
   if (uids.length) { const pf = await svcGet(`dc_profiles?id=in.(${uids.map((u) => '"' + u + '"').join(',')})&select=id,display_name`); for (const p of pf) names[p.id] = p.display_name; }
   const rnd1 = (x) => Math.round(x * 10) / 10;
@@ -407,7 +412,7 @@ async function scoreDraft(draftId) {
     for (const r of starters) {
       const pp = r.position === 'COACH' ? (coachPts[r.player_id] || 0) : (playerPts[r.player_id] || 0);
       total += pp;
-      players.push({ name: r.disp || r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r), breakdown: brk(r), events: evs(r) });
+      players.push({ name: r.disp || r.name, club: r.club, code: clubCode[r.club] || '', position: r.position, points: rnd1(pp), minutes: playerMin[r.player_id] || 0, cost: r.price != null ? r.price : null, mstatus: pstat(r.club, playerMin[r.player_id] || 0, r.position === 'COACH'), lineup: lineupTag(r.club, r.player_id, r.position === 'COACH'), isCoach: r.position === 'COACH', isSub: false, counted: true, draftOrder: dOrd(r), breakdown: brk(r), events: evs(r) });
     }
     // Замена срабатывает, если есть несыгравший стартовый (матч завершён, 0 минут — pending/live НЕ считаем «не вышел», иначе замена
     // зелёная по умолчанию, #15), которого она может закрыть. Проверяем КАЖДОГО несыгравшего отдельно: замена позиции P может закрыть
@@ -431,7 +436,7 @@ async function scoreDraft(draftId) {
         }
       }
       const sp = playerPts[sub.player_id] || 0; if (subUsed) total += sp;
-      players.push({ name: sub.disp || sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub), breakdown: brk(sub), events: evs(sub) });
+      players.push({ name: sub.disp || sub.name, club: sub.club, code: clubCode[sub.club] || '', position: sub.position, points: rnd1(sp), minutes: playerMin[sub.player_id] || 0, cost: sub.price != null ? sub.price : null, mstatus: pstat(sub.club, playerMin[sub.player_id] || 0, false), lineup: lineupTag(sub.club, sub.player_id, false), isCoach: false, isSub: true, counted: subUsed, draftOrder: dOrd(sub), breakdown: brk(sub), events: evs(sub) });
     }
     total = rnd1(total);
     standings.push({ user_id: uid, name: names[uid] || uid.slice(0, 8), total, subUsed });

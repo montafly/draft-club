@@ -214,7 +214,9 @@
   .vteam tfoot td{border-top:1px solid var(--line);font-weight:800;padding-top:4px}
   .vteam tr.subr td{border-top:2px dashed #34495e;padding-top:5px;font-size:11px}
   .vteam tr.subr.counted td{background:#16351f}
-  .vteam tr.plive td{background:rgba(47,129,247,.16)}                 /* игрок сейчас играет — лаконичная синяя подсветка строки (#11) */
+  .vteam tr.plive td{background:rgba(47,129,247,.16)}                 /* в старте (по составу FanTeam) — синяя подсветка строки (#11) */
+  .vteam tr.pbench td{background:rgba(224,176,80,.16)}                /* в запасе (банк) — жёлтая подсветка */
+  .vteam tr.pout td{background:rgba(224,80,80,.16)}                   /* вне заявки (составы вышли, игрока нет) — красная подсветка */
   .vteam tr.sdead td{background:rgba(125,141,160,.14);opacity:.6}     /* несыгравший стартер (dnp) или замена-мертвяк — серая мутная (#12) */
   .vteam tr.sdead.subr td{background:rgba(224,80,80,.14)}             /* + красный оттенок, если это именно замена-«мертвяк» */
   /* тесная раскладка (мобильный viewport=1200 или узкое окно): жмём имя+паддинги, чтобы колонка очков влезла в карточку */
@@ -1522,6 +1524,18 @@ const VSTAT={played:'<span class="vok">✓</span>',final:'<span class="vok">✓<
 // градиент PTS в ростерах: перцентиль по очкам всех сыгравших игроков драфта (зелёный=много / белый=середина / красный=мало) — как Σ в «Матчах»
 function makeGrad(pool){return v=>{if(pool.length<2||v==null)return '';const rank=pool.filter(x=>x<v).length;const pct=rank/(pool.length-1);let r,g,b;if(pct<.5){const t=pct/.5;r=Math.round(224+21*t);g=Math.round(108+137*t);b=Math.round(108+137*t);}else{const t=(pct-.5)/.5;r=Math.round(245-150*t);g=Math.round(245-38*t);b=Math.round(245-118*t);}return `background:rgb(${r},${g},${b});color:#15202b;font-weight:700;border-radius:3px`;};}
 const isPlayed=p=>p.mstatus&&p.mstatus!=='pending'; // матч игрока начался/сыгран → очки определены (включая live и dnp)
+// Класс подсветки строки состава по опубликованному лайн-апу FanTeam (p.lineup):
+//   старт→синий, банк→жёлтый, вне заявки→красный. После матча: сыграл→без тинта (видно по очкам),
+//   0 минут (dnp)→серый (как и все несыгравшие, в т.ч. бывшие «вне заявки»). Тренера красим как «в игре».
+function rowCls(p){
+  if(p.mstatus==='played')return '';
+  if(p.mstatus==='dnp')return 'sdead';
+  if(p.isCoach)return p.mstatus==='live'?'plive':'';
+  if(p.lineup==='confirmed')return 'plive';
+  if(p.lineup==='bench')return 'pbench';
+  if(p.lineup==='out')return 'pout';
+  return '';
+}
 function renderViewerTeams(){
   const el=document.getElementById('vTeams');const sc=VIEW.score;
   document.getElementById('vLive').innerHTML=sc&&sc.status==='live'?'<span class="badge admin">LIVE</span>':(sc&&sc.status==='settled'?'<span class="badge">финал</span>':'');
@@ -1542,8 +1556,8 @@ function renderViewerTeams(){
     const sub=t.players.find(p=>p.isSub);
     let n=0;
     const prow=(p,first,cls)=>{const tid=regTip(playerTipHtml(p));return `<tr class="${cls}" data-tip-id="${tid}" style="cursor:help"><td class="mut">${first}</td><td class="${posClass(p.position)}">${posShort(p.position)}</td><td>${VSTAT[p.mstatus]||''}</td><td class="nm">${p.position==='COACH'?'Coach '+esc(p.code||p.club):esc(p.name)}</td><td>${esc(p.code||p.club)}</td><td>${p.cost!=null?'$'+p.cost:''}</td><td style="${isPlayed(p)?ptsGrad(p.points):''}">${fpts(p)}</td></tr>`;};
-    let body=starters.map(p=>{n++;return prow(p,n,p.mstatus==='live'?'plive':p.mstatus==='dnp'?'sdead':'');}).join('');
-    if(sub)body+=prow(sub,'S','subr'+(sub.counted?' counted':'')+(sub.mstatus==='dnp'?' sdead':''));
+    let body=starters.map(p=>{n++;return prow(p,n,rowCls(p));}).join('');
+    if(sub)body+=prow(sub,'S','subr'+(sub.counted?' counted':'')+(()=>{const c=rowCls(sub);return c?' '+c:'';})());
     const fin=t.finishOrder!=null?` <span class="vbadge">собран #${t.finishOrder}</span>`:'';
     const medal=final?(t.place===1?'🥇 ':(t.place===2?'🥈 ':'')):'';
     const lead=final?(t.place===1?' lead':(t.place===2?' lead2':'')):'';
@@ -1552,7 +1566,9 @@ function renderViewerTeams(){
       <table>${VHEAD}<tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
   const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="position:static;width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
-  const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт матч</span></div>`;
+  const csq='display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:3px';
+  const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт матч</span></div>`
+    +`<div class="vlegend">Состав:<span><span style="${csq};background:rgba(47,129,247,.5)"></span>в старте</span><span><span style="${csq};background:rgba(224,176,80,.6)"></span>в запасе</span><span><span style="${csq};background:rgba(224,80,80,.5)"></span>вне заявки</span></div>`;
   const pbar=`<div class="row" style="margin-bottom:8px;justify-content:flex-end"><button class="btn" onclick="togglePOrder()">Состав: <b>${pOrder==='draft'?'как драфтили':'по позициям'}</b></button></div>`;
   const chat=(sc.chat||[]);   // чат сохранён на финише драфта (dc_drafts.chat) — показываем над участниками
   const chatBlock=chat.length?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Чат драфта</h3><div style="max-height:160px;overflow-y:auto;font-size:11px;line-height:1.5">${chat.map(c=>{const tm=c.t?new Date(c.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';return `<div style="padding:1px 0"><span class="mut" style="font-size:10px;margin-right:5px">${tm}</span><b style="color:var(--gold)">[${esc(c.name)}]</b> ${esc(c.text)}</div>`;}).join('')}</div></div>`:'';
