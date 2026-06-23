@@ -225,10 +225,17 @@
   @media(max-width:1320px){.vteam td.nm,.vteam th.pl{max-width:60px;overflow:hidden;text-overflow:ellipsis}.vteam th,.vteam td{padding:2px 3px}}
   /* легенда статусов — столбиком, в верх страницы (#11) */
   .vlegend{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mut);margin:0 0 10px;line-height:1.5}
-  /* команды наверх; Live Standing справа сверху; ниже — матчи + легенды; чат/связь в самый низ */
-  .vlegwrap{flex:0 0 auto}                                   /* легенды справа от блока «Матчи — статистика игроков» */
+  /* команды наверх; Live Standing справа сверху; ниже — матчи + (матчи тура + легенда); чат/связь в самый низ */
+  .vlegwrap{flex:0 0 auto;display:flex;flex-direction:column;gap:10px}  /* средняя колонка: «Матчи тура» + легенда, справа от лога событий */
   .vbot{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}  /* чат + связь внизу страницы */
   .vbot>*{flex:1 1 360px;min-width:0;margin-bottom:0!important}
+  /* легенда статусов/подсветки — одной табличкой с контуром, иконки в фикс-колонке по центру (без смещений текста) */
+  .vlegpanel{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:8px 12px;font-size:11px;color:var(--mut);width:fit-content}
+  .legtbl{border-collapse:collapse}
+  .legtbl td{padding:2px 6px;vertical-align:middle;white-space:nowrap}
+  .legtbl td.ic{text-align:center;width:24px}
+  .legtbl tr.sec td{padding-top:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:var(--mut)}
+  .legtbl tr.sec:first-child td{padding-top:0}
   /* матчи — статистика игроков, блок под участниками с контуром (#6); контур по контенту, прижат влево, не во всю страницу (#14) */
   .vmpanel{display:inline-block;width:fit-content;max-width:100%;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px;margin-top:14px}
   .vmpanel>h3{margin:0 0 8px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
@@ -1587,10 +1594,9 @@ function renderViewerTeams(){
       <div class="mut" style="font-size:11px;margin:2px 0 6px">осталось сыграть: ${t.toPlay!=null?t.toPlay:'—'}${t.activeMs?` · на часах ${mmss(t.activeMs)}`:''}</div>
       <table>${VHEAD}<tbody>${body}</tbody><tfoot><tr><td colspan="6">Итого</td><td style="${totGrad(t.total)}">${f1(t.total)}</td></tr></tfoot></table></div>`;
   }).join('');
-  const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div><div class="clubs" style="position:static;width:fit-content;max-width:100%;margin:0 auto"><h3 style="text-align:center">Матчи тура</h3>${renderViewerSchedule()}</div>`;
-  const csq='display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:3px';
-  const legend=`<div class="vlegend">Статус:<span><span class="vok">✓</span> сыграл</span><span><span class="vno">✗</span> не вышел (матч прошёл)</span><span><span class="vxi">XI</span> в старте</span><span>🪑 в запасе</span><span>🚫 вне заявки</span><span><span class="vlive">●</span> идёт</span><span>⏳ ждёт</span></div>`
-    +`<div class="vlegend">Подсветка:<span><span style="${csq};background:rgba(46,160,67,.5)"></span>отыграл</span><span><span style="${csq};background:rgba(47,129,247,.5)"></span>в старте</span><span><span style="${csq};background:rgba(224,176,80,.6)"></span>в запасе</span><span><span style="${csq};background:rgba(224,80,80,.5)"></span>вне заявки</span><span><span style="${csq};background:rgba(125,141,160,.5)"></span>не сыграл</span></div>`;
+  const right=`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Клубы · П% · xG · CS</h3>${renderViewerClubs()}</div>`;
+  // «Матчи тура» переезжает в среднюю колонку (между логом событий и кэфами), полными названиями; под ним — легенда
+  const schedBlock=`<div class="clubs" style="position:static;width:fit-content;max-width:100%"><h3>Матчи тура</h3>${renderViewerSchedule()}</div>`;
   const pbar=`<div class="row" style="margin-bottom:8px;justify-content:flex-end"><button class="btn" onclick="togglePOrder()">Состав: <b>${pOrder==='draft'?'как драфтили':'по позициям'}</b></button></div>`;
   const chat=(sc.chat||[]);   // чат сохранён на финише драфта (dc_drafts.chat) — показываем над участниками
   const chatBlock=chat.length?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Чат драфта</h3><div style="max-height:160px;overflow-y:auto;font-size:11px;line-height:1.5">${chat.map(c=>{const tm=c.t?new Date(c.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';return `<div style="padding:1px 0"><span class="mut" style="font-size:10px;margin-right:5px">${tm}</span><b style="color:var(--gold)">[${esc(c.name)}]</b> ${esc(c.text)}</div>`;}).join('')}</div></div>`:'';
@@ -1598,7 +1604,7 @@ function renderViewerTeams(){
   const connBlock=(cl&&Object.keys(cl).length)?`<div class="clubs" style="position:static;margin-bottom:10px"><h3>Связь по участникам</h3><table style="font-size:11px;width:100%"><thead><tr style="text-align:left"><th>Участник</th><th class="right">обрывы</th><th class="right">реконн.</th><th class="right">RTT (мс)</th></tr></thead><tbody>${Object.values(cl).sort((a,b)=>((b.disconnects||0)+(b.reconnects||0))-((a.disconnects||0)+(a.reconnects||0))).map(u=>{const bad=(u.disconnects||0)+(u.reconnects||0);const col=bad>=5?'#e05050':bad>=1?'#e0b050':'var(--mut)';const rtt=u.rttMs==null?'—':(u.rttMs+((u.rttMin!=null&&u.rttMax!=null)?` (${u.rttMin}–${u.rttMax})`:''));return `<tr><td>${esc(u.name||'')}</td><td class="right" style="color:${col};font-weight:700">${u.disconnects||0}</td><td class="right" style="color:${col};font-weight:700">${u.reconnects||0}</td><td class="right">${rtt}</td></tr>`;}).join('')}</tbody></table><p class="mut" style="font-size:10px;margin:4px 0 0">Обрывы/реконнекты — за время этого драфта. RTT — пинг до сервера (последний · диапазон мин–макс), снят на финише. Пусто — драфт сыгран до подключения диагностики.</p></div>`:'';
   // команды наверх; справа сверху — Live Standing, затем клубы/расписание; под командами — «Матчи» + легенды; чат/связь в самый низ
   const bottom=(chatBlock||connBlock)?`<div class="vbot">${chatBlock}${connBlock}</div>`:'';
-  el.innerHTML=pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:0 1 auto;min-width:0"></div><div class="vlegwrap">${legend}</div></div></div><div class="right"><div style="margin-bottom:10px">${standTable()}</div>${right}</div></div>`+bottom;
+  el.innerHTML=pbar+`<div class="layout"><div class="left"><div class="cols">${cols}</div><div class="matchwrap"><div id="vMatches" style="flex:1 1 360px;min-width:0"></div><div class="vlegwrap">${schedBlock}${legendTable()}</div></div></div><div class="right"><div style="margin-bottom:10px">${standTable()}</div>${right}</div></div>`+bottom;
   fetchViewerAvatars();   // дотянуть аватары участников из профилей и проставить в шапки колонок (#4)
   renderViewerMatchesList();   // блок матчей — сразу под участниками, в левой колонке (#14); выбранный матч восстанавливаем из кэша
 }
@@ -1608,7 +1614,7 @@ function renderViewerSchedule(){
   return '<table style="font-size:11px;width:auto;margin:0 auto"><tbody>'+ms.map(m=>{
     const scr=m.score?`${m.score[0]}:${m.score[1]}`:'—';
     const stt=m.status==='confirmed'?'<span class="mut">FT</span>':(m.status==='live'?'<span class="vlive">LIVE</span>':'');
-    return `<tr><td style="text-align:right;padding:1px 4px">${m.homeCode||m.home}</td><td style="padding:1px 6px;font-weight:700;text-align:center">${scr}</td><td style="padding:1px 4px">${m.awayCode||m.away}</td><td style="padding:1px 4px 1px 12px" class="mut">${stt}</td></tr>`;
+    return `<tr><td style="text-align:right;padding:1px 4px;white-space:nowrap">${esc(m.home)}</td><td style="padding:1px 6px;font-weight:700;text-align:center">${scr}</td><td style="padding:1px 4px;white-space:nowrap">${esc(m.away)}</td><td style="padding:1px 4px 1px 12px" class="mut">${stt}</td></tr>`;
   }).join('')+'</tbody></table>';
 }
 function renderViewerClubs(){
@@ -1642,6 +1648,15 @@ function viewerHist(){
   }
   b.innerHTML=parts.length?parts.join(''):'<p class="mut">Нет данных.</p>';
   el.style.zIndex='30';el.style.display='block';
+}
+// легенда статусов/подсветки — одной табличкой с контуром (иконки в фикс-колонке по центру, без смещений текста)
+function legendTable(){
+  const csq='display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:middle';
+  const sw=c=>`<span style="${csq};background:${c}"></span>`;
+  const st=[['<span class="vok">✓</span>','сыграл'],['<span class="vno">✗</span>','не вышел (матч прошёл)'],['<span class="vxi">XI</span>','в старте'],['🪑','в запасе'],['🚫','вне заявки'],['<span class="vlive">●</span>','идёт'],['⏳','ждёт']];
+  const hl=[[sw('rgba(46,160,67,.5)'),'отыграл'],[sw('rgba(47,129,247,.5)'),'в старте'],[sw('rgba(224,176,80,.6)'),'в запасе'],[sw('rgba(224,80,80,.5)'),'вне заявки'],[sw('rgba(125,141,160,.5)'),'не сыграл']];
+  const rows=a=>a.map(r=>`<tr><td class="ic">${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  return `<div class="vlegpanel"><table class="legtbl"><tbody><tr class="sec"><td colspan="2">Статус</td></tr>${rows(st)}<tr class="sec"><td colspan="2">Подсветка</td></tr>${rows(hl)}</tbody></table></div>`;
 }
 // таблица текущей очередности участников (#доп): «1. name 34.8 (сыграло/всего)»; played = стартовые с начавшимся матчем
 function standTable(){
