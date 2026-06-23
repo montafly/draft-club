@@ -158,7 +158,9 @@ def handle_command(token: str, msg: dict) -> None:
         if payload:
             name = bind_code(cid, payload)
             if name:
-                send_welcome(token, cid, bound_uid(cid), prefix=f"Аккаунт привязан: {name}.")
+                uid = bound_uid(cid)
+                send_welcome(token, cid, uid, prefix=f"Аккаунт привязан: {name}.")
+                catch_up_live(token, uid, cid)          # снимок текущих очков по идущим матчам (флоу для late-binder)
             else:
                 tg.send_message(token, cid, "Код привязки неверный или истёк." + BIND_HINT,
                                 parse_mode="HTML", reply_markup=MAIN_KB)
@@ -355,6 +357,29 @@ def detect_and_notify(token: str) -> int:
             elif res.get("error_code") in (403, 400):      # заблокировал бота / чат недоступен
                 upsert_subscriber({"id": chat_id}, active=False)
     return sent_now
+
+
+def catch_up_live(token: str, user_id: str, chat_id: int) -> None:
+    """При привязке посреди тура — снимок ТЕКУЩИХ очков по идущим (live) матчам, где у участника
+    есть игроки, чтобы он сразу понимал за кого/против кого болеть. Антидубль kind='live' (финальные
+    results на confirmed не блокирует). Дубль lineup по этому матчу гасим — снимок информативнее."""
+    hi = quote((now_utc() + timedelta(minutes=LOOKAHEAD_MIN)).isoformat(), safe="")
+    lo = quote((now_utc() - timedelta(hours=8)).isoformat(), safe="")
+    q = f"select=match_id&status=eq.live&start_time=gte.{lo}&start_time=lte.{hi}&limit=50"
+    for m in db.select("dc_matches", q):
+        mid = m["match_id"]
+        if chat_id in sent_chats(mid, "live"):
+            continue
+        text = notify.build_user_message(mid, user_id, kind="live")
+        if not text:                                       # нет его игроков в этом матче
+            continue
+        res = tg.send_message(token, chat_id, text, parse_mode="HTML")
+        if res.get("ok"):
+            mark_sent(chat_id, mid, "live")
+            mark_sent(chat_id, mid, "lineup")              # не дублировать составами — снимок уже показал игроков+очки
+            print(f"[live] снимок матч {mid} -> chat {chat_id} ({user_id[:8]})")
+        elif res.get("error_code") in (403, 400):
+            upsert_subscriber({"id": chat_id}, active=False)
 
 
 # --------------------------------------------------------------------------- #

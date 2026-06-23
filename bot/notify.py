@@ -212,8 +212,8 @@ def build_draft_block(d: dict, score: dict, roster_pids: dict, lineup: dict,
     emoji = LEAGUE_EMOJI.get(d["league"], "•")
     out = [f"{emoji} {d['league']} #{display_no} · {esc(d['tournament'])}, тур {d['round']}", ""]
 
-    results = kind == "results"
-    pstr = lambda p: _tot(points.get(_pid(p), 0))     # очки игрока за матч (для RESULTS)
+    results = kind in ("results", "live")             # формат с очками — и для финала, и для промежуточного
+    pstr = lambda p: _tot(points.get(_pid(p), 0))     # очки игрока за матч (RESULTS/LIVE)
 
     # Ваши игроки — LINE-UPS: имя + эмодзи; RESULTS: имя - очки. Замена в ростере → «Your SUB».
     out.append("<b>Ваши игроки:</b>")
@@ -263,14 +263,15 @@ def build_draft_block(d: dict, score: dict, roster_pids: dict, lineup: dict,
 
 def build_user_message(match_id: int, user_id: str, kind: str = "lineup") -> str | None:
     """Полное сообщение для одного участника по одному матчу (все его драфты с этим матчем).
-    kind: 'lineup' (составы вышли) или 'results' (матч confirmed, очки за матч).
+    kind: 'lineup' (составы вышли) / 'results' (confirmed, финальные очки) / 'live' (промежуточные
+    очки по идущему матчу — снимок при привязке посреди тура).
     None — если у участника нет игроков/ростеров в этом матче."""
     mm = match_meta(match_id)
     if not mm:
         return None
     home, away = mm["home_team"], mm["away_team"]
     lineup = lineup_map(match_id)
-    points = points_map(match_id) if kind == "results" else {}
+    points = points_map(match_id) if kind in ("results", "live") else {}
     seq, test_ids = draft_seq()
     drafts = [d for d in drafts_with_match(match_id) if d["id"] not in test_ids]  # тестовые не шлём
     drafts.sort(key=lambda d: seq.get(d["id"], 1e9))
@@ -292,7 +293,7 @@ def build_user_message(match_id: int, user_id: str, kind: str = "lineup") -> str
             blocks.append(block)
     if not blocks:
         return None
-    title = "RESULTS ✅" if kind == "results" else "LINE-UPS 🔥"
+    title = {"results": "RESULTS ✅", "live": "LIVE ⏱", "lineup": "LINE-UPS 🔥"}.get(kind, "LINE-UPS 🔥")
     header = f"<b>{esc(home)} — {esc(away)}. {title}</b>\n"
     sep = "\n\n" + "─" * 20 + "\n\n"          # разделитель между драфтами (если их несколько)
     return header + sep.join(blocks)
