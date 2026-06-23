@@ -116,8 +116,21 @@ WELCOME = (
     "Будут приходить апдейты по матчам (например, выход стартовых составов).\n\n"
     "/lobby — драфты в наборе и подача заявки, /stop — отписаться, /status — статус."
 )
-BIND_HINT = ("\n\nЧтобы получать ПЕРСОНАЛЬНЫЕ уведомления по своим драфтам, привяжи аккаунт: "
-             "сайт → Профиль → «Подключить Telegram».")
+BIND_HINT = (
+    "\n\nЧтобы получать <b>персональные</b> уведомления по своим драфтам — привяжи аккаунт:\n"
+    f'1. Открой <a href="{notify.SITE_URL}/?view=profile">Профиль на сайте</a>\n'
+    "2. Нажми «Подключить Telegram»\n"
+    "3. Бот откроется с кодом — подтверди привязку.")
+
+# Команды в меню бота (кнопка «/») и постоянная клавиатура — чтобы было понятно, что жать.
+BOT_COMMANDS = [
+    {"command": "lobby", "description": "Драфты в наборе и подача заявки"},
+    {"command": "status", "description": "Мой статус и ближайшие матчи"},
+    {"command": "start", "description": "Подписаться / привязать аккаунт"},
+    {"command": "stop", "description": "Отписаться от уведомлений"},
+]
+MAIN_KB = {"keyboard": [["/lobby"], ["/status", "/stop"]],
+           "resize_keyboard": True}   # липкая клавиатура: ставится один раз, дальше висит
 
 
 def bound_uid(chat_id: int) -> str | None:
@@ -127,9 +140,10 @@ def bound_uid(chat_id: int) -> str | None:
 
 def send_welcome(token: str, chat_id: int, uid: str, prefix: str | None = None) -> None:
     """Шлёт привязанному игроку приветствие (драфты + ближайшие матчи). При сбое сборки
-    — короткий fallback."""
+    — короткий fallback. Вешает постоянную клавиатуру команд."""
     w = notify.build_welcome(uid) or WELCOME
-    tg.send_message(token, chat_id, (prefix + "\n\n" + w) if prefix else w, parse_mode="HTML")
+    tg.send_message(token, chat_id, (prefix + "\n\n" + w) if prefix else w,
+                    parse_mode="HTML", reply_markup=MAIN_KB)
 
 
 def handle_command(token: str, msg: dict) -> None:
@@ -146,29 +160,31 @@ def handle_command(token: str, msg: dict) -> None:
             if name:
                 send_welcome(token, cid, bound_uid(cid), prefix=f"Аккаунт привязан: {name}.")
             else:
-                tg.send_message(token, cid,
-                                "Код привязки неверный или истёк. Сгенерируй новый: "
-                                "сайт → Профиль → «Подключить Telegram».\n\n" + WELCOME)
+                tg.send_message(token, cid, "Код привязки неверный или истёк." + BIND_HINT,
+                                parse_mode="HTML", reply_markup=MAIN_KB)
         else:
             uid = bound_uid(cid)
             if uid:
                 send_welcome(token, cid, uid)
             else:
-                tg.send_message(token, cid, WELCOME + BIND_HINT)
+                tg.send_message(token, cid, WELCOME + BIND_HINT,
+                                parse_mode="HTML", reply_markup=MAIN_KB)
     elif low.startswith("/stop"):
         upsert_subscriber(chat, active=False)
-        tg.send_message(token, cid, "Отписал. Вернуться — /start.")
+        tg.send_message(token, cid, "Отписал. Вернуться — /start.", reply_markup=MAIN_KB)
     elif low.startswith("/status"):
         uid = bound_uid(cid)
         if uid:
             send_welcome(token, cid, uid)
         else:
-            tg.send_message(token, cid, "Подписка есть, но аккаунт не привязан." + BIND_HINT)
+            tg.send_message(token, cid, "Подписка есть, но аккаунт не привязан." + BIND_HINT,
+                            parse_mode="HTML", reply_markup=MAIN_KB)
     elif low.startswith("/lobby"):
         tg.send_message(token, cid, notify.build_lobby(bound_uid(cid)),
                         parse_mode="HTML", reply_markup=lobby_buttons())
     else:
-        tg.send_message(token, cid, "Команды: /start, /lobby, /stop, /status.")
+        tg.send_message(token, cid, "Команды: /start, /lobby, /stop, /status.",
+                        reply_markup=MAIN_KB)
 
 
 # --------------------------------------------------------------------------- #
@@ -411,6 +427,7 @@ def detect_drafts(token: str) -> int:
 # --------------------------------------------------------------------------- #
 def main() -> None:
     token = bot_token()
+    tg.set_my_commands(token, BOT_COMMANDS)   # меню команд бота (идемпотентно)
     once = "--once" in sys.argv[1:]
     if once:
         poll_commands(token)

@@ -91,6 +91,12 @@ def answer_callback(token: str, callback_query_id: str, text: str | None = None)
     return api(token, "answerCallbackQuery", p)
 
 
+def set_my_commands(token: str, commands: list[dict]) -> dict:
+    """Меню команд бота (кнопка «/» и меню рядом с полем ввода).
+    commands: [{'command':'lobby','description':'...'}, ...]"""
+    return api(token, "setMyCommands", {"commands": json.dumps(commands, ensure_ascii=False)})
+
+
 def get_updates(token: str, offset: int, timeout: int = 0) -> list[dict]:
     """Забирает накопленные апдейты начиная с offset (long-poll при timeout>0)."""
     resp = api(token, "getUpdates", {"offset": offset, "timeout": timeout})
