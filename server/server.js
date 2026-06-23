@@ -336,14 +336,15 @@ async function draftPoints(ids) {
     let det; try { det = await ftDetail(mid); } catch { continue; }
     const rm = det.realMatch || {};
     matchInfo[mid] = { status: rm.status || null, score: Array.isArray(rm.score) ? rm.score.slice(0, 2) : null };
-    // составы опубликованы, если хоть у одного игрока матча проставлен lineup (старт/банк) — для подсветки строк состава
-    matchInfo[mid].lineupReady = (det.realPlayerMatchStats || []).some((r) => r.lineup);
+    // составы ОБЪЯВЛЕНЫ, только если есть confirmed/bench (старт/банк). У FanTeam до объявления
+    // lineup = прогноз (expected/possible/unexpected/injured) — это НЕ заявка, по нему не красим.
+    matchInfo[mid].lineupReady = (det.realPlayerMatchStats || []).some((r) => r.lineup === 'confirmed' || r.lineup === 'bench');
     if (rm.status === 'confirmed') confirmed++;
     for (const m of det.realTeamMemberships || []) { const rp = m.realPlayer || {}; nameOf[m.realPlayerId] = [rp.firstName, rp.lastName].filter(Boolean).join(' ') || String(m.realPlayerId); }
     for (const r of det.realPlayerMatchStats || []) {
       const pid = r.realPlayerId, pos = r.position || '', br = cpBreak(r.stats || {}, pos), pts = Math.round(br.reduce((a, b) => a + b.pts, 0) * 100) / 100, min = r.minutesPlayed || 0;
       playerPts[pid] = (playerPts[pid] || 0) + pts; playerMin[pid] = (playerMin[pid] || 0) + min;
-      if (r.lineup) playerLineup[pid] = r.lineup;          // 'confirmed' (старт) / 'bench' (банк)
+      if (r.lineup === 'confirmed' || r.lineup === 'bench') playerLineup[pid] = r.lineup;   // только объявленная заявка (не прогноз)
       if (br.length) (playerBreak[pid] || (playerBreak[pid] = [])).push(...br);
       if (r.lineup === 'bench' && min > 0) { const ck = -Number(r.realTeamId); coachPts[ck] = (coachPts[ck] || 0) + pts; if (pts) (coachBreak[ck] || (coachBreak[ck] = [])).push({ label: nameOf[pid] || String(pid), n: 1, pts }); } // тренер = очки вышедших на замену
     }
