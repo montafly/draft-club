@@ -391,7 +391,7 @@ def build_welcome(user_id: str) -> str | None:
 # --------------------------------------------------------------------------- #
 # лобби (/lobby) и драфт-уведомления (финализация / открытие комнаты)
 # --------------------------------------------------------------------------- #
-APP_STATUS = {"accepted": "✅", "pending": "🔄", "rejected": "❌"}   # статусы заявок (dc_applications)
+APP_STATUS = {"accepted": "✅", "pending": "⏳", "rejected": "❌"}   # статусы заявок (dc_applications)
 _WD = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 _MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
         "августа", "сентября", "октября", "ноября", "декабря"]
@@ -462,28 +462,29 @@ def build_lobby(user_id: str | None = None) -> str:
     if not drafts:
         return ("Сейчас нет открытых драфтов в наборе.\n"
                 f'Загляни позже: <a href="{SITE_URL}/?view=lobby">лобби</a>')
-    out = ["<b>Ближайшие драфты</b>"]
+    blocks = []
     for d in drafts:
         emoji = LEAGUE_EMOJI.get(d["league"], "•")
-        out += ["",
-                _when_human(d.get("starts_at"), tz),
-                f"{esc(d['tournament'])}. Тур {d['round']}",
-                f"<b>{emoji} {d['league']} #{d['seq']}</b>",
-                f"Бай-ин: {d['buyin']} DCC",
-                f"Приз за 1 место: {d['prize1']} DCC",
-                f"Приз за 2 место: {d['prize2']} DCC",
-                f"Слотов: {d['slots']}",
-                "",
-                "<b>Текущие заявки:</b>"]
+        b = [_when_human(d.get("starts_at"), tz),
+             f"{esc(d['tournament'])}. Тур {d['round']}",
+             f"<b>{emoji} {d['league']} #{d['seq']}</b>",
+             f"Бай-ин: {d['buyin']} DCC",
+             f"Приз за 1 место: {d['prize1']} DCC",
+             f"Приз за 2 место: {d['prize2']} DCC",
+             f"Слотов: {d['slots']}",
+             "",
+             "<b>Текущие заявки:</b>"]
         apps = _draft_apps(d["id"])
         if apps:
-            out += [f"{esc(nm)} {APP_STATUS.get(st, '')}" for nm, st in apps]
+            b += [f"{esc(nm)} {APP_STATUS.get(st, '')}" for nm, st in apps]
         else:
-            out.append("— пока никто не подал")
-        out.append(f'Матчи: <a href="{SITE_URL}/?matches={d["id"]}">линк</a>')
-        out.append(f'Оставить заявку: <a href="{SITE_URL}/?view=lobby">на сайте</a> '
-                   "или кнопкой ниже")
-    return "\n".join(out)
+            b.append("— пока никто не подал")
+        b += ["",   # пробел после списка участников
+              f'<b>Матчи:</b> <a href="{SITE_URL}/?matches={d["id"]}">линк</a>',
+              f'<b>Оставить заявку:</b> <a href="{SITE_URL}/?view=lobby">на сайте</a> или кнопкой ниже']
+        blocks.append("\n".join(b))
+    sep = "\n\n" + "─" * 20 + "\n\n"          # разделитель между драфтами
+    return "<b>Ближайшие драфты</b>\n\n" + sep.join(blocks)
 
 
 def _draft_head(draft_id: int):
