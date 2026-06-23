@@ -157,6 +157,13 @@ def _emo(p: dict, lineup: dict) -> str:
     return emo
 
 
+def _sub(p: dict, own: bool) -> str:
+    """Маркер замены в ростере участника (score.isSub): свой → «Your SUB», у соперника → «(SUB)»."""
+    if not p.get("isSub"):
+        return ""
+    return "  Your SUB" if own else " (SUB)"
+
+
 def _tot(v) -> str:
     """Тотал очков с одним знаком после запятой (19.0, 5.0, 33.3)."""
     try:
@@ -208,29 +215,29 @@ def build_draft_block(d: dict, score: dict, roster_pids: dict, lineup: dict,
     results = kind == "results"
     pstr = lambda p: _tot(points.get(_pid(p), 0))     # очки игрока за матч (для RESULTS)
 
-    # Ваши игроки — LINE-UPS: имя + эмодзи; RESULTS: имя - очки
+    # Ваши игроки — LINE-UPS: имя + эмодзи; RESULTS: имя - очки. Замена в ростере → «Your SUB».
     out.append("<b>Ваши игроки:</b>")
     if mine:
         nw = max(len(p.get("name") or "") for p in mine)
         if results:
             pw = max(len(pstr(p)) for p in mine)
-            lines = [f"{(p.get('name') or '').ljust(nw)} | {pstr(p).rjust(pw)}" for p in mine]
+            lines = [f"{(p.get('name') or '').ljust(nw)} | {pstr(p).rjust(pw)}{_sub(p, True)}" for p in mine]
         else:
-            lines = [f"{(p.get('name') or '').ljust(nw)} {_emo(p, lineup)}" for p in mine]
+            lines = [f"{(p.get('name') or '').ljust(nw)} {_emo(p, lineup)}{_sub(p, True)}" for p in mine]
         out.append(_pre(lines))
     else:
         out.append("— нет игроков в этом матче")
 
-    # Игроки соперников — LINE-UPS: имя | ник + эмодзи; RESULTS: имя - очки | ник
+    # Игроки соперников — LINE-UPS: имя | ник + эмодзи; RESULTS: имя - очки | ник. Замена → «(SUB)».
     if opp:
         nw = max(len(p.get("name") or "") for _, p in opp)
         ow = max(len(t["name"] or "") for t, _ in opp)
         if results:
             pw = max(len(pstr(p)) for _, p in opp)
-            lines = [f"{(p.get('name') or '').ljust(nw)} | {pstr(p).rjust(pw)} | {t['name']}"
+            lines = [f"{(p.get('name') or '').ljust(nw)} | {pstr(p).rjust(pw)} | {t['name']}{_sub(p, False)}"
                      for t, p in opp]
         else:
-            lines = [f"{(p.get('name') or '').ljust(nw)} | {(t['name'] or '').ljust(ow)} {_emo(p, lineup)}"
+            lines = [f"{(p.get('name') or '').ljust(nw)} | {(t['name'] or '').ljust(ow)} {_emo(p, lineup)}{_sub(p, False)}"
                      for t, p in opp]
         out.append("")
         out.append("<b>Игроки матча у соперников драфта:</b>")
