@@ -318,7 +318,7 @@ def candidate_matches() -> list[dict]:
     # confirmed приходит сильно позже старта; узкое 8ч-окно такие матчи теряло (France-Iraq).
     lo = quote((now_utc() - timedelta(hours=LOOKBACK_HOURS)).isoformat(), safe="")
     q = ("select=match_id,home_team,away_team,start_time,status"
-         f"&status=in.(pending,live,confirmed)&start_time=gte.{lo}&start_time=lte.{hi}&limit=200")
+         f"&status=in.(pending,live,paused,confirmed)&start_time=gte.{lo}&start_time=lte.{hi}&limit=200")
     return db.select("dc_matches", q)
 
 
@@ -336,6 +336,8 @@ def detect_and_notify(token: str) -> int:
             kind = "lineup"
             if not lineup_ready(mid, stx):                  # состав ещё не готов (см. lineup_ready)
                 continue
+        elif stx == "paused":
+            kind = "half"                                   # перерыв — очки за первый тайм (накопленные на момент паузы)
         elif stx == "confirmed":
             kind = "results"
         else:
