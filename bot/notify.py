@@ -309,6 +309,21 @@ def _fmt_dt(iso: str | None, tz: str | None) -> str:
     return dt.astimezone(target or MSK).strftime("%d.%m %H:%M")
 
 
+def _match_live(m: dict) -> bool:
+    """Матч «в игре»: явный live/paused ИЛИ начался по времени и ещё не завершён
+    (завершённые confirmed/ended/cancelled в список не попадают). По времени — потому что
+    FanTeam в грозу/паузу сбрасывает статус, и матч выглядит как не начавшийся."""
+    if m.get("status") in ("live", "paused"):
+        return True
+    st = m.get("startTime")
+    if not st:
+        return False
+    try:
+        return datetime.fromisoformat(st) <= datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+
 def build_welcome(user_id: str) -> str | None:
     """Приветствие привязанному игроку: его драфты в игре (с линками) + ближайшие
     матчи тура. Время — в зоне профиля (или UTC+3)."""
@@ -353,7 +368,7 @@ def build_welcome(user_id: str) -> str | None:
         seen.add(key)
         sc = draft_score(d["id"])
         for m in (sc or {}).get("matches", []):
-            if m.get("status") in ("live", "paused", "pending"):   # не завершён (confirmed/ended/cancelled исключены)
+            if m.get("status") not in ("confirmed", "ended", "cancelled"):  # любой не завершённый
                 mmap[m["matchId"]] = m
     matches = sorted(mmap.values(), key=lambda m: m.get("startTime") or "")
     if matches:
@@ -362,13 +377,150 @@ def build_welcome(user_id: str) -> str | None:
         lines = []
         for m in matches:
             sco = m.get("score") or [0, 0]
-            # доверяем статусу FanTeam: live/paused(перерыв) = LIVE; pending (не начался
-            # ИЛИ приостановлен, напр. гроза) = Upcoming.
-            live = m.get("status") in ("live", "paused")
-            stat, emo = ("LIVE", "🔥") if live else ("Upcoming", "⏰")
+            # «начался по времени и не завершён» = LIVE (правило Матвея): устойчиво к тому,
+            # что FanTeam в грозу/паузу сбрасывает статус и матч выглядит как не начавшийся.
+            stat, emo = ("LIVE", "🔥") if _match_live(m) else ("Upcoming", "⏰")
             lines.append(f"{_fmt_dt(m.get('startTime'), tz)} {(m.get('home') or '').ljust(nh)} "
                          f"{sco[0]}:{sco[1]} {(m.get('away') or '').ljust(na)} {stat:<8} {emo}")
         out.append("")
         out.append("<b>Ближайшие матчи этого тура:</b>")
         out.append(_pre(lines))
     return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# лобби (/lobby) и драфт-уведомления (финализация / открытие комнаты)
+# --------------------------------------------------------------------------- #
+APP_STATUS = {"accepted": "✅", "pending": "🔄", "rejected": "❌"}   # статусы заявок (dc_applications)
+_WD = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+_MON = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+        "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def _names(uids: list[str]) -> dict:
+    """user_id -> display_name (батчами по 100, как в draft_seq)."""
+    names: dict = {}
+    uids = list({u for u in uids if u})
+    for i in range(0, len(uids), 100):
+        chunk = ",".join('"' + u + '"' for u in uids[i:i + 100])
+        for p in db.select("dc_profiles", f"select=id,display_name&id=in.({chunk})"):
+            names[p["id"]] = p["display_name"]
+    return names
+
+
+def _tz(user_id: str | None):
+    """Зона профиля (объект ZoneInfo) или None → дефолт UTC+3."""
+    if not user_id:
+        return None
+    pf = db.select("dc_profiles", f"select=timezone&id=eq.{user_id}")
+    return pf[0].get("timezone") if pf else None
+
+
+def _when_human(iso: str | None, tz: str | None) -> str:
+    """«Вторник, 23 июня, 22:00 (UTC+3)» — в зоне профиля (tz из dc_profiles), иначе UTC+3."""
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return "—"
+    target = MSK
+    if tz and ZoneInfo is not None:
+        try:
+            target = ZoneInfo(tz)
+        except Exception:  # noqa: BLE001
+            target = MSK
+    dt = dt.astimezone(target)
+    off = dt.utcoffset()
+    h = int(off.total_seconds() // 3600) if off else 0
+    label = f"UTC{'+' if h >= 0 else '-'}{abs(h)}"
+    return f"{_WD[dt.weekday()]}, {dt.day} {_MON[dt.month - 1]}, {dt:%H:%M} ({label})"
+
+
+def _draft_apps(draft_id: int) -> list[tuple]:
+    """Заявки драфта [(имя, статус)] в порядке подачи."""
+    apps = db.select("dc_applications",
+                     f"select=user_id,status,created_at&draft_id=eq.{draft_id}&order=created_at.asc")
+    names = _names([a["user_id"] for a in apps])
+    return [(names.get(a["user_id"], (a["user_id"] or "")[:8]), a.get("status")) for a in apps]
+
+
+def recruiting_drafts() -> list[dict]:
+    """Драфты в наборе (recruiting), без тестовых, в порядке старта. С полем seq (#N)."""
+    seq, test_ids = draft_seq()
+    ds = db.select("dc_drafts",
+                   "select=id,league,tournament,round,buyin,prize1,prize2,slots,starts_at"
+                   "&status=eq.recruiting&order=starts_at.asc")
+    out = [d for d in ds if d["id"] not in test_ids]
+    for d in out:
+        d["seq"] = seq.get(d["id"], d["id"])
+    return out
+
+
+def build_lobby(user_id: str | None = None) -> str:
+    """Сообщение /lobby: драфты в наборе с бай-ином, призами, слотами и заявками."""
+    tz = _tz(user_id)
+    drafts = recruiting_drafts()
+    if not drafts:
+        return ("Сейчас нет открытых драфтов в наборе.\n"
+                f'Загляни позже: <a href="{SITE_URL}/?view=lobby">лобби</a>')
+    out = ["<b>Ближайшие драфты</b>"]
+    for d in drafts:
+        emoji = LEAGUE_EMOJI.get(d["league"], "•")
+        out += ["",
+                _when_human(d.get("starts_at"), tz),
+                f"{esc(d['tournament'])}. Тур {d['round']}",
+                f"<b>{emoji} {d['league']} #{d['seq']}</b>",
+                f"Бай-ин: {d['buyin']} DCC",
+                f"Приз за 1 место: {d['prize1']} DCC",
+                f"Приз за 2 место: {d['prize2']} DCC",
+                f"Слотов: {d['slots']}",
+                "",
+                "<b>Текущие заявки:</b>"]
+        apps = _draft_apps(d["id"])
+        if apps:
+            out += [f"{esc(nm)} {APP_STATUS.get(st, '')}" for nm, st in apps]
+        else:
+            out.append("— пока никто не подал")
+        out.append(f'Матчи: <a href="{SITE_URL}/?matches={d["id"]}">линк</a>')
+        out.append(f'Оставить заявку: <a href="{SITE_URL}/?view=lobby">на сайте</a> '
+                   "или кнопкой ниже")
+    return "\n".join(out)
+
+
+def _draft_head(draft_id: int):
+    d = db.select("dc_drafts",
+                  "select=id,league,tournament,round,starts_at,room_code,status"
+                  f"&id=eq.{draft_id}")
+    return d[0] if d else None
+
+
+def build_finalized(draft_id: int, user_id: str) -> str | None:
+    """Уведомление принятому участнику: драфт финализирован, дата/время старта + ссылка."""
+    d = _draft_head(draft_id)
+    if not d:
+        return None
+    seq, _ = draft_seq()
+    no = seq.get(draft_id, draft_id)
+    emoji = LEAGUE_EMOJI.get(d["league"], "•")
+    link = f'<a href="{SITE_URL}/?draft={draft_id}">подробности</a>'
+    return "\n".join([
+        f"<b>{emoji} {d['league']} #{no} — драфт финализирован</b>",
+        f"{esc(d['tournament'])}. Тур {d['round']}",
+        f"Старт: {_when_human(d.get('starts_at'), _tz(user_id))}",
+        f"Комнату пришлю ссылкой, когда откроется. {link}",
+    ])
+
+
+def build_room_open(draft_id: int, user_id: str | None = None) -> str | None:
+    """Уведомление: комната открыта, ссылка на вход (?room=<code> = автовход)."""
+    d = _draft_head(draft_id)
+    if not d or not d.get("room_code"):
+        return None
+    seq, _ = draft_seq()
+    no = seq.get(draft_id, draft_id)
+    emoji = LEAGUE_EMOJI.get(d["league"], "•")
+    link = f'<a href="{SITE_URL}/?room={esc(d["room_code"])}">войти в комнату</a>'
+    return "\n".join([
+        f"<b>{emoji} {d['league']} #{no} — комната открыта</b>",
+        f"{esc(d['tournament'])}. Тур {d['round']}",
+        f"Заходи: {link}",
+    ])

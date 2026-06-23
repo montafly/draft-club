@@ -59,3 +59,18 @@ create table dc_bot_sent (
   primary key (chat_id, match_id, kind)
 );
 grant select, insert, update, delete on public.dc_bot_sent to service_role;
+
+-- ========================================================================= --
+-- v3 (драфт-уведомления): /lobby, заявка через бота, финализация/комната.
+-- ========================================================================= --
+
+-- 8) Антидубль драфт-уведомлений per (подписчик, драфт, тип).
+--    Отдельно от dc_bot_sent (та — по матчам). kind: 'finalized', 'room_open'.
+create table if not exists dc_bot_draft_sent (
+  chat_id   bigint      not null,
+  draft_id  bigint      not null,
+  kind      text        not null,
+  sent_at   timestamptz not null default now(),
+  primary key (chat_id, draft_id, kind)
+);
+grant select, insert, update, delete on public.dc_bot_draft_sent to service_role;

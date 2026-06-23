@@ -64,18 +64,31 @@ def _chunks(text: str, limit: int = 4000) -> list[str]:
     return parts
 
 
-def send_message(token: str, chat_id: int | str, text: str, parse_mode: str | None = None) -> dict:
+def send_message(token: str, chat_id: int | str, text: str, parse_mode: str | None = None,
+                 reply_markup: dict | None = None) -> dict:
     """Отправка текста в чат. Длинный текст бьётся по границам блоков (см. _chunks).
-    parse_mode='HTML' — для уведомлений с <pre> (моноширинный standing)."""
+    parse_mode='HTML' — для уведомлений с <pre> (моноширинный standing).
+    reply_markup (inline_keyboard) вешается на ПОСЛЕДНИЙ кусок."""
     out: dict = {"ok": True}
-    for chunk in _chunks(text or " "):
+    chunks = _chunks(text or " ")
+    for i, chunk in enumerate(chunks):
         params = {"chat_id": chat_id, "text": chunk}
         if parse_mode:
             params["parse_mode"] = parse_mode
+        if reply_markup is not None and i == len(chunks) - 1:
+            params["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
         out = api(token, "sendMessage", params)
         if not out.get("ok"):
             break
     return out
+
+
+def answer_callback(token: str, callback_query_id: str, text: str | None = None) -> dict:
+    """Закрыть «часики» на нажатой inline-кнопке (опц. короткий тост text)."""
+    p = {"callback_query_id": callback_query_id}
+    if text:
+        p["text"] = text
+    return api(token, "answerCallbackQuery", p)
 
 
 def get_updates(token: str, offset: int, timeout: int = 0) -> list[dict]:

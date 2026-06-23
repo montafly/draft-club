@@ -1049,6 +1049,8 @@ async function onAuthed(){
   if(room){document.getElementById('lcode').value=room; const go=()=>enterRoom(room,voice); if(ws.readyState===1)go(); else ws.addEventListener('open',go,{once:true});} // ждём открытия сокета (F5 может опередить ws.onopen)
   const draftId=params.get('draft');   // deep-link из уведомлений бота: ?draft=<id> → открыть просмотрщик итогов
   if(draftId)draftsLoaded.then(()=>{const id=Number(draftId); if(DRAFTS.find(x=>x.id===id))openViewer(id);});
+  const matchesId=params.get('matches');   // deep-link из /lobby бота: ?matches=<id> → окно матчей драфта
+  if(matchesId)draftsLoaded.then(()=>{const id=Number(matchesId); if(DRAFTS.find(x=>x.id===id))openDraftMatches(id);});
 }
 function renderProfileUI(){
   const isAdmin=PROFILE.role==='admin';
