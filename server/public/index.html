@@ -2291,9 +2291,25 @@ function sfx(name){if(!SND.enabled)return;const f=SFX[name];if(!f)return;const c
   setTimeout(()=>{try{bus.disconnect();}catch(e){}},5000);}
 const SND_LABELS={master:'Общая',ambient:'Эмбиент (пока твой ход выставлять)',turnNominate:'Твоя очередь выставлять',turnBid:'Твоя очередь делать бид',bidUp:'Повышение ставки',pass:'Пас',roundFinal:'Молоток (лот закрыт)',teamDone:'Собрал команду',draftDone:'Драфт завершён',chatMsg:'Сообщение в чате'};
 function onSvol(k,v){setSvol(k,v);const s=document.getElementById('svv_'+k);if(s)s.textContent=Math.round(v*100)+'%';}
+// --- ВРЕМЕННО: подбор звука «твоя очередь делать бид». Послушать варианты в панели звуков, выбрать номер — зашить в SFX.turnBid и удалить эти леса. ---
+const TURNBID_CAND=[
+  {id:1,label:'Бип-бип-вниз (текущий в проде)',fn:()=>{tone({f:1319,dur:0.09,type:'square',vol:0.26,at:0,attack:0.002});tone({f:1319,dur:0.09,type:'square',vol:0.26,at:0.13,attack:0.002});tone({f:784,dur:0.20,type:'triangle',vol:0.30,at:0.26,attack:0.002});}},
+  {id:2,label:'Динь-дон (нисходящий звонок)',fn:()=>{tone({f:1245,dur:0.14,type:'triangle',vol:0.32,at:0,attack:0.003});tone({f:831,dur:0.24,type:'triangle',vol:0.32,at:0.15,attack:0.003});}},
+  {id:3,label:'Варбл (тревожный, вверх-вниз)',fn:()=>{tone({f:1047,dur:0.08,type:'square',vol:0.24,at:0,attack:0.002});tone({f:1397,dur:0.08,type:'square',vol:0.24,at:0.10,attack:0.002});tone({f:1047,dur:0.14,type:'square',vol:0.26,at:0.20,attack:0.002});}},
+  {id:4,label:'Маримба ×3 (деревянные плаки, вниз)',fn:()=>{tone({f:1397,dur:0.08,type:'triangle',vol:0.30,at:0,attack:0.002});tone({f:1047,dur:0.08,type:'triangle',vol:0.30,at:0.11,attack:0.002});tone({f:784,dur:0.12,type:'triangle',vol:0.32,at:0.22,attack:0.002});}},
+  {id:5,label:'Свуп-глайд (сирена туда-сюда)',fn:()=>{tone({f:700,f2:1500,dur:0.14,type:'sawtooth',vol:0.20,at:0,attack:0.004});tone({f:1500,f2:700,dur:0.18,type:'sawtooth',vol:0.20,at:0.14,attack:0.004});}},
+  {id:6,label:'Стук+пинг (низ-низ-верх)',fn:()=>{tone({f:440,dur:0.10,type:'square',vol:0.26,at:0,attack:0.002});tone({f:440,dur:0.10,type:'square',vol:0.26,at:0.13,attack:0.002});tone({f:1319,dur:0.18,type:'triangle',vol:0.30,at:0.26,attack:0.002});}},
+  {id:7,label:'Колокольчик-эхо (высокий пинг ×2)',fn:()=>{tone({f:1760,dur:0.10,type:'triangle',vol:0.30,at:0,attack:0.002});tone({f:1760,dur:0.26,type:'sine',vol:0.20,at:0.13,attack:0.002});}},
+  {id:8,label:'Кварта вверх-удержание (зов)',fn:()=>{tone({f:932,dur:0.10,type:'square',vol:0.24,at:0,attack:0.002});tone({f:1245,dur:0.28,type:'triangle',vol:0.32,at:0.10,attack:0.002});}},
+];
+function previewTurnBid(i){if(!SND.enabled){alert('Звук выключен — включи кнопкой «Звук: вкл»');return;}const c=sndCtx();if(!c)return;sndPreload();const v=TURNBID_CAND[i];if(!v)return;
+  const bus=c.createGain();bus.gain.value=(SVOL.turnBid==null?1:SVOL.turnBid);bus.connect(SND.master);const prev=SND.bus;SND.bus=bus;try{v.fn();}catch(e){}SND.bus=prev;setTimeout(()=>{try{bus.disconnect();}catch(e){}},5000);}
 function buildSoundPanel(){const el=document.getElementById('soundVolPanel');if(!el)return;
-  el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="${k==='ambient'?'ambientPreview()':`sndCtx();sndPreload();sfx('${k}')`}">▶</button>`;
-    return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:210px;font-size:12.5px">${SND_LABELS[k]}</span><input type="range" min="0" max="1.5" step="0.05" value="${cur}" oninput="onSvol('${k}',this.value)" style="width:180px"><span class="mut" id="svv_${k}" style="width:42px;font-size:12px">${Math.round(cur*100)}%</span>${test}</div>`;}).join('');}
+  const rows=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="${k==='ambient'?'ambientPreview()':`sndCtx();sndPreload();sfx('${k}')`}">▶</button>`;
+    return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:210px;font-size:12.5px">${SND_LABELS[k]}</span><input type="range" min="0" max="1.5" step="0.05" value="${cur}" oninput="onSvol('${k}',this.value)" style="width:180px"><span class="mut" id="svv_${k}" style="width:42px;font-size:12px">${Math.round(cur*100)}%</span>${test}</div>`;}).join('');
+  const audition=`<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line)"><div style="font-size:12px;color:var(--gold);margin-bottom:6px">Подбор «Твоя очередь делать бид» — послушай, скажи номер (громкость берётся из ползунка выше):</div>`+
+    TURNBID_CAND.map((v,i)=>`<div style="display:flex;align-items:center;gap:10px;margin:4px 0"><span style="width:30px;font-size:12px;color:var(--mut)">№${v.id}</span><span style="width:250px;font-size:12.5px">${v.label}</span><button class="btn" style="padding:3px 9px" onclick="previewTurnBid(${i})">▶</button></div>`).join('')+`</div>`;
+  el.innerHTML=rows+audition;}
 function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b)b.textContent='Звук: '+(SND.enabled?'вкл':'выкл');}
 function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sndPreload();sfx('turnBid');}else ambientStop();if(typeof S!=='undefined'&&S)updateAmbient(S);}
 window.addEventListener('pointerdown',()=>{if(SND.enabled){sndCtx();sndPreload();}},{once:true}); // праймим контекст + предзагрузка сэмплов на первом клике (автоплей-политика)
