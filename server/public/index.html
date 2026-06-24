@@ -1916,13 +1916,14 @@ function draftRow(d,ctx){                                   // одна карт
   const enter=(live&&isAcc)?`<button class="btn p" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
   const spectate=(live&&!isAcc)?`<button class="btn" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`:'';
   const watch=scoring?`<button class="btn" style="margin:8px 6px 0 0" onclick="openViewer(${d.id})">Смотреть</button>`:'';
+  const cancelApp=(ctx.app&&d.status==='recruiting')?`<button class="btn" style="margin:8px 6px 0 0" onclick="event.stopPropagation();unapplyFromDraft(${d.id})">Отменить заявку</button>`:''; // в «Мои драфты» отмена заявки для рядового участника — пока идёт запись
   let detail;
   if(scoring){const sc=SCORES[d.id];detail=scoreLines(d,sc)+draftRemaining(d,sc);}
   else{const acc=acceptedNames(d.id);const an=applicantNames(d.id);                        // recruiting → заявки, finalized/live → утверждённый состав
     detail=(d.status==='recruiting')
       ?`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`
       :`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`;}
-  return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}<div class="ddet">${detail}<br>${enter}${spectate}${watch}</div></div>`;
+  return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}<div class="ddet">${detail}<br>${enter}${spectate}${watch}${cancelApp}</div></div>`;
 }
 const STORDER=['recruiting','finalized','live','done','settled','cancelled'];
 function fillSel(id,opts){const s=document.getElementById(id);if(!s)return;const cur=s.value;
@@ -1933,7 +1934,7 @@ function populateAllFilters(){                              // опции фил
   fillSel('fStatus',[...new Set(DRAFTS.map(d=>d.status))].filter(Boolean).sort((a,b)=>STORDER.indexOf(a)-STORDER.indexOf(b)).map(s=>({v:s,t:STATUS_SHORT[s]||s})));
 }
 // группировка драфтов по типу + сортировка по таймингу турнира; завершённые сворачиваются
-let _grpOpen={}; // ключ группы -> раскрыта ли (по умолчанию false = свёрнуто)
+let _grpOpen={played:true,mplayed:true,aplayed:true}; // ключ группы -> раскрыта ли; «Сыгранные» (played/mplayed/aplayed) раскрыты по умолчанию, «Завершённые» (all/mine/adone) свёрнуты
 function toggleGrp(k){_grpOpen[k]=!_grpOpen[k];renderLobbyAll();renderMine();renderAdminDrafts();}
 const _dtkey=d=>d.starts_at?Date.parse(d.starts_at):(d.created_at?Date.parse(d.created_at):0);
 const _cmpDraft=(a,b)=>(b.round||0)-(a.round||0)||_dtkey(b)-_dtkey(a)||b.id-a.id; // тур↓ (тур 2 выше тура 1), затем тайминг↓ (позже сыгранный выше), затем id↓
@@ -1957,7 +1958,7 @@ function renderLobbyAll(){
   const played=list.filter(d=>d.status==='done');
   const done=list.filter(d=>d.status==='settled'||d.status==='cancelled');
   const html=draftGroup('Запланированные',planned,null,d=>draftRow(d))
-    +draftGroup('Сыгранные',played,fs?null:'played',d=>draftRow(d))   // сыгранные (done) тоже свёрнуты по умолчанию, как завершённые
+    +draftGroup('Сыгранные',played,fs?null:'played',d=>draftRow(d))   // сыгранные (done) раскрыты по умолчанию
     +draftGroup('Завершённые',done,fs?null:'all',d=>draftRow(d)); // завершённые свёрнуты по умолчанию (кроме случая, когда выбран явный статус-фильтр)
   el.innerHTML=html||'<div class="empty">Под фильтр ничего не подходит.</div>';
 }
@@ -1995,7 +1996,7 @@ function renderAdminDrafts(){
   };
   const list=DRAFTS.slice().sort(_cmpDraft);
   el.innerHTML=draftGroup('Активные',list.filter(d=>['recruiting','finalized','live'].includes(d.status)),null,acard)
-    +draftGroup('Сыгранные',list.filter(d=>d.status==='done'),'aplayed',acard)            // сыгранные (done) — свёрнуты по умолчанию
+    +draftGroup('Сыгранные',list.filter(d=>d.status==='done'),'aplayed',acard)            // сыгранные (done) — раскрыты по умолчанию
     +draftGroup('Завершённые',list.filter(d=>d.status==='settled'||d.status==='cancelled'),'adone',acard); // settled/cancelled — свёрнуты
 }
 async function refreshDraftOdds(id){
@@ -2121,7 +2122,7 @@ async function unapplyFromDraft(id){
     const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
     if(le)le.textContent='';
     await loadDrafts();
-  }catch(e){if(le)le.textContent='не удалось отменить заявку: '+e.message;}
+  }catch(e){const msg='не удалось отменить заявку: '+e.message;if(le)le.textContent=msg;else alert(msg);} // в «Мои драфты» элемента lerr нет — показываем ошибку через alert
 }
 async function saveNick(){
   const nn=document.getElementById('profNick').value.trim();
