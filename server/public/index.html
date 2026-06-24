@@ -1902,11 +1902,14 @@ function draftRow(d,ctx){                                   // одна карт
   if(ctx.app){const as=ctx.app.status;
     if(as==='pending')extra='<span class="dpill" style="background:#3a3320;color:var(--gold)">заявка</span>';
     else if(as==='rejected')extra='<span class="dpill" style="background:#3a2424;color:#e08a8a">не прошёл</span>';}
+  // в «Мои драфты» (ctx.app) отмена заявки — прямо в строке, чтобы не раскрывать драфт; только пока идёт запись. stopPropagation, иначе клик свернёт/развернёт карточку
+  const rowCancel=(ctx.app&&d.status==='recruiting')?`<button class="btn" style="margin-left:auto;padding:3px 10px;font-size:12px" onclick="event.stopPropagation();unapplyFromDraft(${d.id})">Отменить заявку</button>`:'';
   const row=`<div class="drow" onclick="toggleDraftRow(${d.id})">
     <span class="dpill p-${d.status}">${STATUS_SHORT[d.status]||d.status}</span>${extra}
     <span class="dmain"><b>${LEAGUE_ICON[d.league]||''} ${d.league}</b> ${seqTag(d)}· ${d.tournament}, тур ${d.round}</span>
     <span class="dmeta mut">слотов ${d.slots} · матчей ${n}</span>
     ${draftWhoChips(d)}
+    ${rowCancel}
     <span class="dtime mut">${draftTiming(d)}</span>
     <span class="dchev">${exp?'▲':'▼'}</span></div>`;
   if(!exp)return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}</div>`;
@@ -1916,14 +1919,13 @@ function draftRow(d,ctx){                                   // одна карт
   const enter=(live&&isAcc)?`<button class="btn p" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Войти</button>`:'';
   const spectate=(live&&!isAcc)?`<button class="btn" style="margin:8px 6px 0 0" onclick="enterRoom('${d.room_code||''}')">Смотреть онлайн</button>`:'';
   const watch=scoring?`<button class="btn" style="margin:8px 6px 0 0" onclick="openViewer(${d.id})">Смотреть</button>`:'';
-  const cancelApp=(ctx.app&&d.status==='recruiting')?`<button class="btn" style="margin:8px 6px 0 0" onclick="event.stopPropagation();unapplyFromDraft(${d.id})">Отменить заявку</button>`:''; // в «Мои драфты» отмена заявки для рядового участника — пока идёт запись
   let detail;
   if(scoring){const sc=SCORES[d.id];detail=scoreLines(d,sc)+draftRemaining(d,sc);}
   else{const acc=acceptedNames(d.id);const an=applicantNames(d.id);                        // recruiting → заявки, finalized/live → утверждённый состав
     detail=(d.status==='recruiting')
       ?`<div class="mut" style="margin:6px 0 2px">заявки (${an.length}):</div><div class="applist">${namesCol(an)}</div>`
       :`<div class="mut" style="margin:6px 0 2px">состав (${acc.length}):</div><div class="applist">${namesCol(acc)}</div>`;}
-  return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}<div class="ddet">${detail}<br>${enter}${spectate}${watch}${cancelApp}</div></div>`;
+  return `<div class="dcard st-${d.status}" style="margin:0 0 8px;padding:0;overflow:hidden">${row}<div class="ddet">${detail}<br>${enter}${spectate}${watch}</div></div>`;
 }
 const STORDER=['recruiting','finalized','live','done','settled','cancelled'];
 function fillSel(id,opts){const s=document.getElementById(id);if(!s)return;const cur=s.value;
