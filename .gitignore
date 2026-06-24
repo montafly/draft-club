@@ -5,3 +5,5 @@ node_modules/
 .srv.log
 .srv.err
 bot/state/
+bot/bot.txt
+bot/root.txt

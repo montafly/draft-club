@@ -91,6 +91,12 @@ def answer_callback(token: str, callback_query_id: str, text: str | None = None)
     return api(token, "answerCallbackQuery", p)
 
 
+def send_chat_action(token: str, chat_id: int | str, action: str = "typing") -> dict:
+    """Индикатор действия в чате (напр. 'typing'), пока готовится ответ — сборка LIVE-снимка
+    дёргает /api/draft/score и занимает 1-2с."""
+    return api(token, "sendChatAction", {"chat_id": chat_id, "action": action})
+
+
 def set_my_commands(token: str, commands: list[dict]) -> dict:
     """Меню команд бота (кнопка «/» и меню рядом с полем ввода).
     commands: [{'command':'lobby','description':'...'}, ...]"""
