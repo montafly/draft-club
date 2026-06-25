@@ -572,6 +572,26 @@ const WARM_MS = 10 * 60 * 1000;
 setTimeout(warmUpcomingOdds, 15000);     // ~через 15с после старта/деплоя — прогреть ближайшие туры
 setInterval(warmUpcomingOdds, WARM_MS);  // и периодически держать кэш тёплым
 
+// Авто-уборка несобравшихся драфтов: если назначено время старта, а через час после него состав так и не
+// финализирован (драфт завис в recruiting) — удаляем его (жёстко, как ручная кнопка «Удалить»; заявки уходят
+// каскадом on delete cascade). finalized/live/done и драфты без starts_at не трогаем.
+const STALE_DRAFT_GRACE_MS = 60 * 60 * 1000;   // 1 час после starts_at
+async function sweepStaleDrafts() {
+  try {
+    const cutoff = new Date(Date.now() - STALE_DRAFT_GRACE_MS).toISOString();   // starts_at раньше этого момента = просрочен на >1ч
+    const rows = await svcGet(`dc_drafts?status=eq.recruiting&starts_at=lt.${cutoff}&select=id,league,round,starts_at`);
+    for (const d of rows || []) {
+      try {
+        await svcDelete(`dc_drafts?id=eq.${d.id}`);
+        console.log(`sweepStaleDrafts: удалён несобравшийся драфт #${d.id} (${d.league}, тур ${d.round}, старт ${d.starts_at})`);
+      } catch (e) { console.error('sweepStaleDrafts del', d.id, e.message); }
+    }
+  } catch (err) { console.error('sweepStaleDrafts', err.message); }
+}
+const STALE_SWEEP_MS = 10 * 60 * 1000;   // проверяем каждые 10 минут
+setTimeout(sweepStaleDrafts, 20000);     // ~через 20с после старта/деплоя
+setInterval(sweepStaleDrafts, STALE_SWEEP_MS);
+
 // Пул игроков драфта для предпросмотра в лобби (как пул аукциона). Тяжёлый (per-match membership) → кэш 10 мин: предматчевые составы стабильны.
 const poolCache = new Map(); // draftId -> { t, data }
 async function poolForDraftCached(draftId) {
