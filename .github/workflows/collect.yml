@@ -2,9 +2,12 @@
 name: Draft Club collector
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"   # каждые 10 минут (публичный репо — Actions безлимит)
-  workflow_dispatch: {}       # ручной запуск из вкладки Actions
+  # Расписание ОТКЛЮЧЕНО 2026-06-27: сбор дублировал VPS-cron (*/2 мин, season 1995) на Timeweb.
+  # Боевой сбор живёт в VPS-cron (см. crontab на 147.45.158.66). Здесь оставлен только ручной запуск
+  # для бэкфилла. Когда стартует EPL 26/27 (август) — его НОВЫЙ season_id добавить в VPS-cron SEASON_IDS.
+  #  schedule:
+  #    - cron: "*/10 * * * *"
+  workflow_dispatch: {}       # ручной запуск из вкладки Actions (бэкфилл)
 
 jobs:
   collect:
@@ -18,5 +21,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          SEASON_IDS: "1995,1900,1990"   # World Cup + PL + Friendly International (live-тест)
+          SEASON_IDS: "1995"   # World Cup 2026 (активен). 1900=EPL 25/26 и 1990=Friendly — отыграны, убраны. Для бэкфилла иного сезона — поправь здесь.
         run: python collect.py auto
