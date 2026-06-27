@@ -859,6 +859,8 @@ const server = http.createServer((req, res) => {
     let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        await authUser(token);                         // синтез платный (Yandex) — только аутентифицированным, не анонимам
         const { playerId, playerName, buyerUserId, buyerName, price } = JSON.parse(body || '{}');
         const pron = {};
         try {
@@ -879,6 +881,8 @@ const server = http.createServer((req, res) => {
     let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        await authUser(token);                         // синтез платный (Yandex) — только аутентифицированным
         const { playerId, playerName } = JSON.parse(body || '{}');
         let say = null;
         try { const rows = await svcGet(`dc_pronunciations?kind=eq.player&ref=eq.${encodeURIComponent(String(playerId))}&select=say`); if (rows[0]) say = rows[0].say; } catch (e) {}
@@ -1189,7 +1193,12 @@ wss.on('connection', (ws) => {
         const code = String(msg.code || '').toUpperCase();
         if (!rooms.has(code)) return sendErr(ws, 'Комната не найдена');
         attach(ws, code);
-        await joinAuthed(ws, msg);
+        try { await joinAuthed(ws, msg); }
+        catch (err) {                                   // невалидный токен → не оставляем неавторизованный сокет в комнате (иначе resync/state сольют стейт зрителю по перебору кода)
+          const e = rooms.get(code); if (e) e.clients.delete(ws);
+          ws.roomCode = null; ws.seatId = null;
+          throw err;                                     // вниз в catch → sendErr клиенту
+        }
       } else {
         const e = rooms.get(ws.roomCode);
         if (!e) return sendErr(ws, 'Сначала создай или войди в комнату');
@@ -1215,7 +1224,7 @@ wss.on('connection', (ws) => {
           return;
         }
         if (msg.type === 'ready') { if (ws.seatId) e.room.setReady(ws.seatId, msg.ready !== false); }
-        else if (msg.type === 'start') { e.room.start(); refreshOdds(e, { sstats: true }).catch(() => {}); }
+        else if (msg.type === 'start') { if (!ws.seatId) throw new Error('вы зритель'); e.room.start(); refreshOdds(e, { sstats: true }).catch(() => {}); }
         else if (msg.type === 'draw') {
           if (!ws.seatId) throw new Error('вы зритель');
           const code = ws.roomCode;

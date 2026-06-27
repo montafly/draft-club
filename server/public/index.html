@@ -953,7 +953,8 @@ async function pumpTts(){
   if(ttsPlaying||!TTSQ.length||TTS_MUTE)return;ttsPlaying=true;
   const b=TTSQ.shift();
   try{
-    const r=await fetch("/api/tts/"+(b.ep||"pick"),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)});
+    const t=await authToken(); if(!t){ttsPlaying=false;return;}   // синтез TTS платный (Yandex) — шлём токен, сервер пускает только залогиненных
+    const r=await fetch("/api/tts/"+(b.ep||"pick"),{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+t},body:JSON.stringify(b)});
     if(r.ok){const url=URL.createObjectURL(await r.blob());const a=new Audio(url);const done=()=>{try{URL.revokeObjectURL(url);}catch(e){}ttsPlaying=false;pumpTts();};a.onended=done;a.onerror=done;a.play().catch(done);return;}
   }catch(e){}
   ttsPlaying=false;pumpTts();
@@ -1463,8 +1464,8 @@ function computeDraftSeq(){
 function seqTag(d){const n=d&&DRAFT_SEQ[d.id];return n?`#${n} `:'';}
 async function loadDrafts(){
   try{
-    const {data:dr}=await sb.from('dc_drafts').select('*').order('created_at',{ascending:false});DRAFTS=dr||[];
-    const {data:ap}=await sb.from('dc_applications').select('*');APPS=ap||[];
+    const {data:dr}=await sb.from('dc_drafts').select('id,created_by,tournament,season_id,round,match_ids,league,buyin,prize1,prize2,slots,club_limit,starts_at,status,created_at,charged_at,paid_at,fin_settled,room_code').order('created_at',{ascending:false});DRAFTS=dr||[];   // только лёгкие колонки: тяжёлые jsonb (events/picks/chat/seat_ms/conn_log) клиент тут не использует (берёт из /api/draft/score), а select('*') тянул их каждые 12с и жёг egress
+    const {data:ap}=await sb.from('dc_applications').select('id,draft_id,user_id,status,paid,created_at');APPS=ap||[];
     MYAPPS=new Set(APPS.filter(a=>a.user_id===session.user.id).map(a=>a.draft_id));
     const ids=[...new Set(APPS.map(a=>a.user_id))];
     if(ids.length){const {data:pf}=await sb.from('dc_profiles').select('id,display_name').in('id',ids);(pf||[]).forEach(p=>PROFNAMES[p.id]=p.display_name);}
