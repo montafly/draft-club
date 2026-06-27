@@ -1520,7 +1520,7 @@ async function openViewer(id){
   viewerUpdTick=setInterval(renderUpd,20000);   // тикаем «обновлено X назад» между опросами
 }
 async function loadViewer(id,initial,force){
-  try{const r=await fetch('/api/draft/score?draftId='+id+(force?'&force=1':''));VIEW.score=await r.json();}catch{VIEW.score={error:true};}
+  try{const _t=await authToken();const r=await fetch('/api/draft/score?draftId='+id+(force?'&force=1':''),_t?{headers:{authorization:'Bearer '+_t}}:{});VIEW.score=await r.json();}catch{VIEW.score={error:true};}
   VIEW.fixtures=(VIEW.score&&VIEW.score.matches)||[];
   renderViewerTeams();renderUpd();
   if(VIEW.openMatch!=null&&!initial)refreshOpenMatch();   // на поллинге тихо обновляем статы/лог открытого матча (live), без мигания

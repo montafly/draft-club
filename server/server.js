@@ -204,6 +204,9 @@ async function svcUpsert(path, rows) {
   const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { method: 'POST', headers: { apikey: process.env.SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_KEY, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
   if (!r.ok) throw new Error('db upsert ' + r.status + ' ' + (await r.text()));
 }
+// Валидаторы id из пользовательского ввода перед интерполяцией в PostgREST-путь (svc*) — против инъекции фильтра.
+function intId(v, name = 'id') { const s = String(v == null ? '' : v).trim(); if (!/^\d+$/.test(s)) throw new Error('некорректный ' + name); return s; }
+function uuidId(v, name = 'id') { const s = String(v == null ? '' : v).trim(); if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(s)) throw new Error('некорректный ' + name); return s; }
 // --- Озвучка покупок (Yandex SpeakKit): синтез mp3 + кэш в памяти процесса ---
 const _ttsCache = new Map();                              // hash(text) -> Buffer
 function _hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return String(h); }
@@ -700,16 +703,31 @@ const server = http.createServer((req, res) => {
   if (url === '/api/draft/score') {
     const q = new URLSearchParams((req.url.split('?')[1] || ''));
     const draftId = q.get('draftId');
-    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
-    scoreDraftCached(draftId, q.get('force') === '1')
-      .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
-      .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
+    if (!draftId || !/^\d+$/.test(draftId)) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    (async () => {
+      try {
+        const r = await scoreDraftCached(draftId, q.get('force') === '1');
+        // chat и connLog (диагностика связи per-user) — только участнику драфта или админу; публичный/посторонний просмотр
+        // итогов их не получает (перебор draftId не сольёт чужой чат/диагностику). Кэш не мутируем — отдаём копию.
+        let allowed = false;
+        const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+        if (token) {
+          try {
+            const u = await authUser(token);
+            allowed = Array.isArray(r.standings) && r.standings.some((s) => s.user_id === u.id);
+            if (!allowed) { const prof = await getProfile(u.id); allowed = !!(prof && prof.role === 'admin'); }
+          } catch (e) { /* невалидный токен → как посторонний */ }
+        }
+        const out = allowed ? r : { ...r, chat: null, connLog: null };
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(out));
+      } catch (e) { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); }
+    })();
     return;
   }
   if (url === '/api/draft/tour') {
     const q = new URLSearchParams((req.url.split('?')[1] || ''));
     const draftId = q.get('draftId');
-    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    if (!draftId || !/^\d+$/.test(draftId)) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
     tourForDraftCached(draftId)
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
@@ -718,7 +736,7 @@ const server = http.createServer((req, res) => {
   if (url === '/api/draft/pool') {
     const q = new URLSearchParams((req.url.split('?')[1] || ''));
     const draftId = q.get('draftId');
-    if (!draftId) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
+    if (!draftId || !/^\d+$/.test(draftId)) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'нужен draftId' })); }
     poolForDraftCached(draftId)
       .then((r) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(r)); })
       .catch((e) => { res.writeHead(502, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e.message || e) })); });
@@ -729,7 +747,7 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         let sid = q.get('season'), rnd = q.get('round'); const draftId = q.get('draftId');
-        if ((!sid || !rnd) && draftId) { const d = (await svcGet(`dc_drafts?id=eq.${draftId}&select=season_id,round`))[0]; if (d) { sid = d.season_id; rnd = d.round; } }
+        if ((!sid || !rnd) && draftId) { const d = (await svcGet(`dc_drafts?id=eq.${intId(draftId, 'draftId')}&select=season_id,round`))[0]; if (d) { sid = d.season_id; rnd = d.round; } }
         if (!sid || !rnd) throw new Error('нужны season+round или draftId');
         const map = await seasonStats(+sid, +rnd);
         const out = {}; for (const k in map) out[k] = [map[k].pts, map[k].min];   // компактно: [pts, min]
@@ -743,7 +761,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { draftId } = JSON.parse(body || '{}');
+        const { draftId } = JSON.parse(body || '{}'); intId(draftId, 'draftId');
         const token = (req.headers.authorization || '').replace(/^Bearer /, '');
         const user = await authUser(token);
         const prof = await getProfile(user.id);
@@ -759,7 +777,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { draftId } = JSON.parse(body || '{}');
+        const { draftId } = JSON.parse(body || '{}'); intId(draftId, 'draftId');
         const token = (req.headers.authorization || '').replace(/^Bearer /, '');
         const user = await authUser(token);
         const drows = await svcGet(`dc_drafts?id=eq.${draftId}&select=status`); const d = drows[0];
@@ -793,7 +811,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { draftId } = JSON.parse(body || '{}');
+        const { draftId } = JSON.parse(body || '{}'); intId(draftId, 'draftId');
         const token = (req.headers.authorization || '').replace(/^Bearer /, '');
         const user = await authUser(token);
         const prof = await getProfile(user.id);
@@ -822,7 +840,7 @@ const server = http.createServer((req, res) => {
     req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { draftId } = JSON.parse(body || '{}');
+        const { draftId } = JSON.parse(body || '{}'); intId(draftId, 'draftId');
         const token = (req.headers.authorization || '').replace(/^Bearer /, '');
         const user = await authUser(token);
         const prof = await getProfile(user.id);
@@ -864,7 +882,7 @@ const server = http.createServer((req, res) => {
         const { playerId, playerName, buyerUserId, buyerName, price } = JSON.parse(body || '{}');
         const pron = {};
         try {
-          const refs = [playerId, buyerUserId].filter((x) => x != null).map((x) => '"' + x + '"').join(',');
+          const refs = [playerId, buyerUserId].filter((x) => x != null).map((x) => '"' + encodeURIComponent(String(x)) + '"').join(',');
           if (refs) { const rows = await svcGet(`dc_pronunciations?ref=in.(${refs})&select=kind,ref,say`); for (const r of rows) pron[r.kind + ':' + r.ref] = r.say; }
         } catch (e) { /* нет таблицы/оверрайдов — берём фолбэк-имена */ }
         const psay = pron['player:' + playerId] || translitRu(playerName) || 'игрок';
@@ -971,7 +989,7 @@ const server = http.createServer((req, res) => {
     let body = ''; req.on('data', (c) => { body += c; if (body.length > 1e5) req.destroy(); });
     req.on('end', async () => {
       try {
-        const { userId, amount, note } = JSON.parse(body || '{}');
+        const { userId, amount, note } = JSON.parse(body || '{}'); uuidId(userId, 'userId');
         const token = (req.headers.authorization || '').replace(/^Bearer /, '');
         const user = await authUser(token); const prof = await getProfile(user.id);
         if (!prof || prof.role !== 'admin') throw new Error('только админ');
