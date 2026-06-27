@@ -229,13 +229,18 @@ function translitRu(s) {
     return out;
   }).join('');
 }
+const _ttsDir = path.join(__dirname, '.ttscache');         // дисковый кэш синтеза — переживает рестарт/деплой (имена игроков — ограниченный набор), не пересинтезируем зря (экономия Yandex)
+try { fs.mkdirSync(_ttsDir, { recursive: true }); } catch (e) { /* нет прав/диска — работаем только на памяти */ }
 async function ttsSynth(text) {
   const key = _hash(text); if (_ttsCache.has(key)) return _ttsCache.get(key);
+  const file = path.join(_ttsDir, key + '.mp3');
+  try { const b = fs.readFileSync(file); _ttsCache.set(key, b); return b; } catch (e) { /* нет на диске — синтезируем */ }
   const body = new URLSearchParams({ text, lang: 'ru-RU', voice: 'alena', emotion: 'good', format: 'mp3', folderId: process.env.YANDEX_FOLDER_ID || '' });
   const r = await fetch('https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize', { method: 'POST', headers: { authorization: 'Api-Key ' + (process.env.YANDEX_TTS_API_KEY || ''), 'content-type': 'application/x-www-form-urlencoded' }, body });
   if (!r.ok) throw new Error('tts ' + r.status + ' ' + (await r.text()).slice(0, 150));
   const buf = Buffer.from(await r.arrayBuffer());
-  if (_ttsCache.size > 500) _ttsCache.clear();             // простой бэкстоп от роста памяти
+  try { fs.writeFileSync(file, buf); } catch (e) { /* диск недоступен — остаёмся на памяти */ }
+  if (_ttsCache.size > 500) _ttsCache.clear();             // простой бэкстоп от роста памяти (диск остаётся)
   _ttsCache.set(key, buf); return buf;
 }
 async function launchDraft(draftId) {
