@@ -37,6 +37,13 @@ LOOKBACK_HOURS = int(os.environ.get("BOT_LOOKBACK_HOURS", "36"))  # назад: 
 LIVE_COOLDOWN_SEC = int(os.environ.get("BOT_LIVE_COOLDOWN", "12"))  # /live: антидабл-тап (данные и так раз в ~2 мин)
 STATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state")
 
+# --- снижение egress в Supabase: не перечитываем одно и то же каждый проход цикла ---
+CM_CACHE_SEC = 60                       # статус матчей меняется медленно — кэшируем candidate_matches
+_cm_cache: dict = {"at": 0.0, "rows": []}
+_neg_notify: set = set()                # (match_id, kind, chat_id): у подписчика нет игроков в матче — слать нечего, не перечитываем ростеры/статы
+DRAFTS_EVERY_SEC = 60                   # detect_drafts не нужен на каждом проходе (драфты создаются редко)
+_drafts_last = 0.0
+
 _live_cooldown: dict[int, float] = {}   # chat_id -> ts последнего /live (in-memory, сбрасывается рестартом)
 
 
@@ -324,9 +331,15 @@ def candidate_matches() -> list[dict]:
     # назад смотрим широко: матч мог затянуться (гроза/пауза) или бот — простоять, тогда
     # confirmed приходит сильно позже старта; узкое 8ч-окно такие матчи теряло (France-Iraq).
     lo = quote((now_utc() - timedelta(hours=LOOKBACK_HOURS)).isoformat(), safe="")
+    now = time.time()
+    if now - _cm_cache["at"] < CM_CACHE_SEC:                 # свежий кэш — не дёргаем dc_matches каждый проход
+        return _cm_cache["rows"]
     q = ("select=match_id,home_team,away_team,start_time,status"
          f"&status=in.(pending,live,paused,confirmed)&start_time=gte.{lo}&start_time=lte.{hi}&limit=200")
-    return db.select("dc_matches", q)
+    rows = db.select("dc_matches", q)
+    _cm_cache["at"] = now
+    _cm_cache["rows"] = rows
+    return rows
 
 
 def detect_and_notify(token: str) -> int:
@@ -341,22 +354,26 @@ def detect_and_notify(token: str) -> int:
         mid, stx = m["match_id"], m["status"]
         if stx in ("pending", "live"):
             kind = "lineup"
-            if not lineup_ready(mid, stx):                  # состав ещё не готов (см. lineup_ready)
-                continue
         elif stx == "paused":
             kind = "half"                                   # перерыв — очки за первый тайм (накопленные на момент паузы)
         elif stx == "confirmed":
             kind = "results"
         else:
             continue
+        # антидубль (done) и негативный кэш (_neg_notify) — ДО любого чтения player_match/rosters,
+        # чтобы по уже разосланным / «нечего слать» матчам не дёргать Supabase каждый проход (главная утечка egress)
         done = sent_chats(mid, kind)
-        targets = [s for s in subs if s["chat_id"] not in done]
-        if not targets:                                    # все привязанные уже получили — пропускаем матч
+        targets = [s for s in subs
+                   if s["chat_id"] not in done and (mid, kind, s["chat_id"]) not in _neg_notify]
+        if not targets:                                    # всем разослано или слать нечего — ни одного чтения по матчу
+            continue
+        if kind == "lineup" and not lineup_ready(mid, stx):  # состав ещё не готов — читаем dc_player_match только когда есть кому слать
             continue
         for s in targets:
             chat_id = s["chat_id"]
             text = notify.build_user_message(mid, s["user_id"], kind=kind)
-            if not text:                                   # нет игроков/ростеров в матче
+            if not text:                                   # нет игроков/ростеров в матче — запоминаем, чтобы не перечитывать ростер каждый цикл
+                _neg_notify.add((mid, kind, chat_id))
                 continue
             res = tg.send_message(token, chat_id, text, parse_mode="HTML")
             if res.get("ok"):
@@ -525,11 +542,15 @@ def main() -> None:
         detect_drafts(token)
         return
     print(f"Draft Club bot запущен. Long-poll 25с, окно вперёд {LOOKAHEAD_MIN}мин.")
+    global _drafts_last
     while True:
         try:
             poll_commands(token)            # блокируется до 25с (long-poll) → команды почти мгновенно
             detect_and_notify(token)
-            detect_drafts(token)
+            now = time.time()
+            if now - _drafts_last >= DRAFTS_EVERY_SEC:   # драфты создаются редко — не дёргаем dc_drafts/applications каждый проход
+                detect_drafts(token)
+                _drafts_last = now
         except Exception as e:  # noqa: BLE001 — цикл не должен падать
             print(f"[loop] ошибка: {e}")
         time.sleep(2)
