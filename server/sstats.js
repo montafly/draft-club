@@ -80,7 +80,9 @@ async function ssGamesForDates(dates, { throttle = 700 } = {}) {
   const seen = new Set();
   for (const date of dates) {
     let d;
-    try { d = await ssGet(`Games/list?Date=${date}&timezone=0`); } catch (e) { continue; }
+    // без &timezone=0: sstats.net регрессанул и отдаёт на timezone=0 HTTP 500; дефолтный бакет по дате
+    // нам подходит — matchFixture фильтрует по dateUtc (unix, tz-независимо) в окне ±36ч (тянем Date-1/Date/Date+1)
+    try { d = await ssGet(`Games/list?Date=${date}`); } catch (e) { continue; }
     for (const g of d.data || []) {
       if (seen.has(g.id)) continue; seen.add(g.id);
       const lg = ((g.season || {}).league || {}).name || '';
