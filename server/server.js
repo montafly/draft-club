@@ -131,17 +131,40 @@ async function buildDraftPool(seasonId, round, matchIds) {
     clubOdds.push(sanOdds({ club: teams[ids[0]], win: wh, xg: xh, cs: xa != null ? Math.round(Math.exp(-xa) * 100) : null }));
     clubOdds.push(sanOdds({ club: teams[ids[1]], win: wa, xg: xa, cs: xh != null ? Math.round(Math.exp(-xh) * 100) : null }));
   }
-  const units = [], seen = new Set(), involved = new Set();
+  const units = [], seen = new Set(), involved = new Set(), ftCount = {};
   for (const m of sel) {
     const det = await ftGet(`real_matches/${m.id}`);
     for (const mem of det.realTeamMemberships || []) {
       const pid = mem.realPlayerId; if (seen.has(pid)) continue;
       const pos = POSMAP[mem.position]; if (!pos) continue;
       seen.add(pid);
-      const p = mem.realPlayer || {}; const tid = mem.realTeamId; involved.add(tid);
+      const p = mem.realPlayer || {}; const tid = mem.realTeamId; involved.add(tid); ftCount[tid] = (ftCount[tid] || 0) + 1;
       units.push({ id: pid, name: p.lastName || p.firstName || String(pid), first: (p.lastName && p.firstName) ? p.firstName : '', club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
     }
     await sleep(250); // вежливый троттлинг FanTeam
+  }
+  // Фолбэк составов: если FanTeam не вывесил (или недодал) состав команды выбранного матча —
+  // добираем игроков сборной из уже собранных данных (dc_player_match, групповой этап). Состав
+  // сборной на турнире фиксирован (группа→плей-офф), поэтому драфт не должен зависеть от того,
+  // успел ли FanTeam залить lineup к утру. Срабатывает ТОЛЬКО при дефиците (норм. состав ~23-26,
+  // не трогаем при ftCount>=MIN_ROSTER — нормальный кейс байт-в-байт прежний). Дедуп по player_id
+  // (тот же id-space, что у FanTeam) → добор не плодит дублей даже при частичной синхронизации.
+  const MIN_ROSTER = 15;
+  const expected = new Set();
+  for (const m of sel) for (const tid of (m.realTeamIds || [])) if (tid != null) expected.add(Number(tid));
+  for (const tid of expected) {
+    if ((ftCount[tid] || 0) >= MIN_ROSTER) continue;
+    let rows;
+    try { rows = await svcGet(`dc_player_match?team_id=eq.${intId(tid, 'team_id')}&select=player_id,player_name,position`); }
+    catch (e) { console.error('buildDraftPool: фолбэк состава team_id=' + tid + ' —', e.message); continue; }
+    let added = 0;
+    for (const r of rows) {
+      const pid = r.player_id; if (pid == null || seen.has(pid)) continue;
+      const pos = POSMAP[r.position]; if (!pos) continue;
+      seen.add(pid); involved.add(tid); added++;
+      units.push({ id: pid, name: r.player_name || String(pid), first: '', club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
+    }
+    if (added) console.log(`buildDraftPool: фолбэк состава ${teams[tid] || tid} — добрано ${added} игроков из dc_player_match (FanTeam отдал ${ftCount[tid] || 0})`);
   }
   for (const tid of involved) units.push({ id: -Number(tid), name: 'Coach ' + (abbr[tid] || teams[tid] || tid), club: teams[tid] || String(tid), code: abbr[tid] || '', position: 'COACH' });
   // дизамбигуация: если в одном клубе 2+ игрока с одинаковой фамилией → показываем инициал имени (J. David); если инициалы тоже совпали — полное имя
