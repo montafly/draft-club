@@ -276,6 +276,7 @@ async function launchDraft(draftId) {
   if (!pool.units.length) throw new Error('не собрался пул игроков по матчам');
   const code = (d.room_code && !rooms.has(d.room_code)) ? d.room_code : makeCode();
   const room = new Room(undefined, d.slots, pool.units, pool.clubOdds, pool.matches);
+  { const cl = +d.club_limit; if (cl >= 1) room.config = { ...room.config, teamLimit: cl }; }  // лимит игроков из клуба из настроек драфта (иначе дефолт config.teamLimit=5). Копия, а не мутация общего DEFAULT_CONFIG
   room.draftMeta = { seasonId: d.season_id, round: d.round, matchIds: d.match_ids }; // для refreshOdds: коэф снапшотятся на launch, обновляем при старте аукциона
   room.allowedUserIds = new Set(acc.map((a) => a.user_id));
   room.draftId = draftId;
@@ -1221,6 +1222,7 @@ wss.on('connection', (ws) => {
         if (!pool.units.length) return sendErr(ws, 'пул игроков не собрался');
         const code = makeCode();
         const room = new Room(undefined, seats, pool.units, pool.clubOdds, pool.matches);
+        { const cl = +msg.clubLimit; if (cl >= 1) room.config = { ...room.config, teamLimit: cl }; }  // лимит клуба из настроек (тест-рум) — иначе дефолт 5
         room.draftMeta = { seasonId: msg.seasonId, round: +msg.round, matchIds };
         room.allowedUserIds = null;                            // тест-рум (isTest)
         const myName = (prof.display_name) || (user.email || 'Admin').split('@')[0];

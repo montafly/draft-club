@@ -1420,7 +1420,7 @@ async function createTestRoom(){ // соло-тест: рум с ботами н
   const seats=Math.max(2,Math.min(12,+document.getElementById('dSlots').value||5));
   const token=await authToken();if(!token){showAuth();return;}
   if(msg)msg.textContent='собираю пул игроков и создаю тестовый рум… (до ~10с)';
-  send({type:'createTestRoom',token,seasonId:t.season,round:+document.getElementById('dRound').value,matchIds:chosen.map(m=>m.matchId),seats});
+  send({type:'createTestRoom',token,seasonId:t.season,round:+document.getElementById('dRound').value,matchIds:chosen.map(m=>m.matchId),seats,clubLimit:+document.getElementById('dClubLim').value});
 }
 async function createDraft(){
   const msg=document.getElementById('dCreateMsg');
