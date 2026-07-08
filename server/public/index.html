@@ -2780,7 +2780,7 @@ function clientCanAdd(m,unit,clubCounts){
   if(m.finished||m.size>=12)return false;
   const c={...m.counts};
   if((c[unit.position]||0)+1>LIM[unit.position][1])return false;
-  if((clubCounts[unit.club]||0)>=5)return false;
+  if((clubCounts[unit.club]||0)>=((S.draft&&S.draft.teamLimit)||5))return false;
   c[unit.position]=(c[unit.position]||0)+1;
   const remaining=12-(m.size+1);let needMin=0,cap=0;
   for(const p of POSORD){needMin+=Math.max(0,LIM[p][0]-(c[p]||0));cap+=LIM[p][1]-(c[p]||0);}
