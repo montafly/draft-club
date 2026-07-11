@@ -1231,12 +1231,27 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     document.getElementById("clublim").innerHTML=clubRows.map(({c,u})=>{ const rem=5-u,t=rem/5,col=heat(t);
       return `<div class="crow"><span class="cc">${c}</span><div class="cbar"><i style="width:${t*100}%;background:${col}"></i></div><span class="cn" style="color:${col}">${rem}/5</span></div>`; }).join("");
   };
+  // сохраняем живой стейт → рефреш вкладки репорта НЕ теряет драфт (можно катать правки по ходу, не перепрогоняя)
+  function saveLive(){ try{
+    if(window.DC_POOL)localStorage.setItem('dc_pool',JSON.stringify(window.DC_POOL));
+    if(window.DC_YOU!=null)localStorage.setItem('dc_you',JSON.stringify(window.DC_YOU));
+    if(window.DC_ME!=null)localStorage.setItem('dc_me_name',String(window.DC_ME));
+    if(window.DC_STATE)localStorage.setItem('dc_state',JSON.stringify(window.DC_STATE));
+  }catch(_){} }
   try{ const ch=new BroadcastChannel('dc_live');
     ch.onmessage=e=>{ const m=e.data||{};
-      if(m.type==='joined'){ if(m.you!=null)window.DC_YOU=m.you; if(m.name)window.DC_ME=m.name; }
-      if(m.type==='pool'&&m.units)window.DC_POOL=m.units;
-      if(m.type==='state'&&m.state)applyState(m.state); };
+      if(m.type==='joined'){ if(m.you!=null)window.DC_YOU=m.you; if(m.name)window.DC_ME=m.name; saveLive(); }
+      if(m.type==='pool'&&m.units){ window.DC_POOL=m.units; saveLive(); }
+      if(m.type==='state'&&m.state){ window.DC_STATE=m.state; applyState(m.state); saveLive(); } };
   }catch(_){}
+  // рехидрация при загрузке: сразу показать последний известный стейт (до прихода нового кадра), уже с новым кодом
+  if(!location.search.includes('mock')){ try{
+    const sp=localStorage.getItem('dc_pool'); if(sp)window.DC_POOL=JSON.parse(sp);
+    const sy=localStorage.getItem('dc_you'); if(sy)window.DC_YOU=JSON.parse(sy);
+    const sm=localStorage.getItem('dc_me_name'); if(sm)window.DC_ME=sm;
+    const ss=localStorage.getItem('dc_state'); if(ss){ const st=JSON.parse(ss); window.DC_STATE=st; applyState(st); }
+  }catch(_){} }
+  window.DC_clearLive=function(){ ['dc_pool','dc_you','dc_me_name','dc_state'].forEach(k=>{try{localStorage.removeItem(k)}catch(_){}}); };  // сброс сохранёнки (новый драфт с нуля)
   if(location.search.includes('mock')){ const s=document.createElement('script'); s.src='../live/mock_state.js';
     s.onload=()=>{ if(window.MOCK_STATE){window.DC_POOL=MOCK_STATE.pool; applyState(MOCK_STATE.state);} }; document.body.appendChild(s); }
   window.DC_applyState=applyState;
