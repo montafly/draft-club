@@ -406,7 +406,7 @@
         <div class="dim" id="livepanel-empty" style="padding:8px 0;color:var(--tx3)">нет активного лота — ждём живой стейт драфта (в режиме подготовки панель пустая; открой с ?mock для примера)</div>
       </div>
     </div>
-    <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (зелёная полная = 5/5 свободно, красная короткая = мало). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДАВИ ЦЕНУ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
+    <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (лимит ≤5 из клуба ОБЩИЙ на весь драфт, по всем участникам: 5/5 = никто ещё не брал, красная короткая = почти закрыт). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДАВИ ЦЕНУ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
   </section>
 </div>
 
@@ -1053,7 +1053,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       newR[seat]=(m.roster||[]).map(u=>{ const nm=ID2NAME[u.id]||u.name; if(u.price!=null)price[nm]=u.price; return nm; }); });
     MYSEAT=seatByName[me0]||1; ROSTERS=newR; MYTEAM=ROSTERS[MYSEAT]||[]; LIVEPRICE=price; viewSeat=MYSEAT;
     const me=mgrs.find(m=>m.name===me0)||{};
-    const cu={}; (me.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;}); CLUBUSED=cu;
+    const cu={}; mgrs.forEach(m=>(m.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;})); CLUBUSED=cu;  // ГЛОБАЛЬНЫЙ счётчик клубов — лимит ≤5 на весь драфт (все менеджеры), не на меня
     window.DYN=computeDyn(d);   // Dyn мкт — рыночная цена под живой остаток пота
     window.DYNOUR=computeDynOur(d,me);   // Dyn наш — наш стадийный потолок
     updateBudget(me); updateBar(d,mgrs,me0);
@@ -1086,7 +1086,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const cand=[];
     pool.forEach(u=>{ if(taken.has(u.id))return; const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
       if(!p||p.pos==='Тренер')return;
-      if(!canTake(me.roster,p.pos)||clubCnt(me.roster,p.club)>=5)return;
+      if(!canTake(me.roster,p.pos)||(CLUBUSED[p.club]||0)>=5)return;
       cand.push(Math.max(1,p.value||1)); });
     cand.sort((a,b)=>b-a);
     let need=0; for(let i=0;i<Math.min(mySlots,cand.length);i++)need+=cand[i]; need=need||1;
@@ -1149,7 +1149,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
   function clubCnt(roster,code){ return (roster||[]).filter(u=>u.code===code).length; }
   // сколько СОПЕРНИКОВ реально может бидовать за игрока позиции pos клуба code
   function competition(mgrs,me0,pos,code,high){
-    return mgrs.filter(m=>m.name!==me0 && canTake(m.roster,pos) && (m.budget||0)>high && clubCnt(m.roster,code)<5).length;
+    if((CLUBUSED[code]||0)>=5)return 0;   // клуб глобально закрыт — его никто не возьмёт
+    return mgrs.filter(m=>m.name!==me0 && canTake(m.roster,pos) && (m.budget||0)>high).length;
   }
   function updateBar(d,mgrs,me0){
     const b=bar(), taken=new Set(d.taken||[]);
@@ -1164,7 +1165,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       const ourCap=Math.min(ourCapRaw,cap);   // наш потолок, ограничен макс-бидом
       let vshort,vcol,flag='';
       if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; }
-      else if(clubCnt(me.roster,u.code)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; }
+      else if((CLUBUSED[u.code]||0)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; }
       else if(high<=ourCap){ vshort='БЕРИ'; vcol='#3ddc84'; if(mkt>ourCap+1)flag='рынок ценит выше (~'+mkt+') — вероятно уйдёт дороже'; }  // ставка в пределах нашего потолка
       else if(comp>=1 && !mustTake(me.roster,u.position)){
         const dc=Math.max(1,mkt-1);
@@ -1194,7 +1195,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     // --- ТАРГЕТЫ + подсказка хода ---
     const favs=PLAYERS.filter(p=>FAV.has(p.name)&&p.id!=null&&!taken.has(p.id));
     const favTxt=favs.slice(0,6).map(p=>{ const dyn=(window.DYN&&window.DYN[p.name])??p.price;
-      const ok=canTake(me.roster,p.pos)&&clubCnt(me.roster,p.club)<5&&dyn<=cap;
+      const ok=canTake(me.roster,p.pos)&&(CLUBUSED[p.club]||0)<5&&dyn<=cap;
       return `${p.name}<span style="color:${ok?'#3ddc84':'#ff6b6b'}"> ${dyn}${ok?'':'✕'}</span>`; }).join(' · ')||'<span style="color:#8aa0b2">нет (★ на борде)</span>';
     let hint='';
     if(myTurn && d.phase!=='bidding'){
