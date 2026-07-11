@@ -109,6 +109,17 @@ export class Room {
     return true;
   }
 
+  // тест-рум: задать порядок выбора вручную (вместо жеребьёвки). order — перестановка id всех мест; start() потом берёт его из drawOrder
+  setDrawOrder(order) {
+    if (this.draft) throw new Error('драфт уже идёт');
+    const ids = this.seats.map((s) => s.id);
+    const ok = Array.isArray(order) && order.length === ids.length
+      && new Set(order).size === order.length && order.every((x) => ids.includes(x));
+    if (!ok) throw new Error('неверный порядок мест');
+    this.drawOrder = order.slice();
+    this.drawAt = Date.now();
+  }
+
   // отнести прошедшее время тому, кого ждали (onClock), и сдвинуть точку отсчёта на now
   _tickClock(now) {
     if (this.onClock != null && this.clockSince != null) {

@@ -1287,6 +1287,12 @@ wss.on('connection', (ws) => {
             }, drawMs);
           }
         }
+        else if (msg.type === 'startOrder') {                     // тест-рум: старт в порядке, заданном админом вручную (без жеребьёвки)
+          if (!ws.seatId) throw new Error('вы зритель');
+          if (e.room.allowedUserIds) throw new Error('ручной порядок — только в тест-руме');
+          e.room.setDrawOrder((msg.order || []).map(Number));
+          e.room.start(); refreshOdds(e, { sstats: true }).catch(() => {});
+        }
         else if (msg.type === 'undo') { if (!ws.seatId) throw new Error('вы зритель'); e.room.undo(ws.seatId); }
         else if (msg.type === 'delegateTurn') { if (!ws.seatId) throw new Error('вы зритель'); e.room.delegateTurn(ws.seatId, msg.toSeatId); }
         else if (msg.type === 'reclaimTurn') { if (!ws.seatId) throw new Error('вы зритель'); e.room.reclaimTurn(ws.seatId); }

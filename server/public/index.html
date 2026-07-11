@@ -1417,6 +1417,7 @@ async function createTestRoom(){ // соло-тест: рум с ботами н
   const t=TOURNAMENTS[+document.getElementById('dTour').value];
   const chosen=[...document.querySelectorAll('.mch')].filter(c=>c.checked).map(c=>loadedMatches[+c.dataset.i]);
   if(!chosen.length){if(msg)msg.textContent='загрузи матчи тура и отметь хотя бы один (бай-ины не нужны)';return;}
+  TESTORDER=[];   // сбрасываем ручную очередь ходов от прошлого тест-рума
   const seats=Math.max(2,Math.min(12,+document.getElementById('dSlots').value||5));
   const token=await authToken();if(!token){showAuth();return;}
   if(msg)msg.textContent='собираю пул игроков и создаю тестовый рум… (до ~10с)';
@@ -2630,6 +2631,23 @@ function preFoldBox(d){
   const on=(d.preFold||[]).includes(me);
   return `<div style="margin-top:8px"><button class="btn ${on?'p':''}" style="width:100%" onclick='send({type:"preFold",on:${!on}})'>${on?'✓ Заранее пас — отменить':'Пас заранее (FOLD)'}</button><div class="mut" style="font-size:11px;margin-top:3px">${on?'Как дойдёт ход — пас применится автоматически.':'Применится автоматически, когда ход дойдёт до вас.'}</div></div>`;
 }
+// соло-тест: собрать очередь ходов вручную (клики по местам) вместо жеребьёвки
+let TESTORDER=[];   // id мест в выбранном порядке
+function toPick(id){const i=TESTORDER.indexOf(id);if(i>=0)TESTORDER.splice(i,1);else TESTORDER.push(id);renderBottom();}
+function toReset(){TESTORDER=[];renderBottom();}
+function toStart(){const n=(S.lobby.seats||[]).length;if(TESTORDER.length!==n)return;send({type:'startOrder',order:TESTORDER.slice()});}
+function testOrderPanel(){
+  const seats=S.lobby.seats||[];
+  const chips=seats.map(s=>{const pos=TESTORDER.indexOf(s.id);return `<button class="btn ${pos>=0?'p':''}" style="font-size:11px" onclick='toPick(${s.id})'>${pos>=0?(pos+1)+'. ':''}${esc(s.name)}</button>`;}).join(' ');
+  const full=seats.length>0&&TESTORDER.length===seats.length;
+  return `<div style="margin-top:10px;border-top:1px solid #333;padding-top:8px">
+    <p class="mut" style="font-size:11px;margin:0 0 6px">Своя очередь ходов: жми по местам в нужном порядке (первый клик — кто выбирает первым, повторный по месту — убрать). Или «Жеребьёвка» / «Старт (тест)» для случайного порядка.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div>
+    <div style="margin-top:6px">
+      <button class="btn p" onclick='toStart()' ${full&&S.lobby.startable?'':'disabled'}>Старт в этом порядке</button>
+      <button class="btn" onclick='toReset()' ${TESTORDER.length?'':'disabled'}>Сбросить</button>
+    </div></div>`;
+}
 function renderBottom(){
   const el=document.getElementById('bottom');const d=S.draft;
   if(!S.started){
@@ -2639,7 +2657,7 @@ function renderBottom(){
     el.innerHTML=`<div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
       (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
       <button class="btn p" onclick='send({type:"draw"})' ${S.lobby.startable?'':'disabled'}>Жеребьёвка</button>`+
-      (S.isTest?` <button class="btn" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт (тест)</button>`:'')
+      (S.isTest?` <button class="btn" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт (тест)</button>`+testOrderPanel():'')
       :'<span class="mut">Ты зритель</span>')+`</div>`;
     updateRtcBtns(); // контролы мик/камера доступны и в предруме (#: лобби)
     return;
