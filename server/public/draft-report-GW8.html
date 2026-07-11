@@ -405,7 +405,7 @@
         <div class="dim" id="livepanel-empty" style="padding:8px 0;color:var(--tx3)">нет активного лота — ждём живой стейт драфта (в режиме подготовки панель пустая; открой с ?mock для примера)</div>
       </div>
     </div>
-    <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (зелёная полная = 5/5 свободно, красная короткая = мало). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДРЕНАЖ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
+    <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (зелёная полная = 5/5 свободно, красная короткая = мало). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДАВИ ЦЕНУ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
   </section>
 </div>
 
@@ -1137,7 +1137,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; sug='—'; }
       else if(clubCnt(me.roster,u.code)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; sug='—'; }
       else if(our>=dyn){ vshort='БЕРИ'; vcol='#3ddc84'; sug=Math.min(our,cap); }
-      else if(comp>=1 && !mustTake(me.roster,u.position)){ vshort='ДРЕНАЖ'; vcol='#f0c05a'; sug=Math.max(high,dyn-1); }
+      else if(comp>=1 && !mustTake(me.roster,u.position)){ vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; sug=Math.max(high,dyn-1); }
       else { vshort='ПАС'; vcol='#ff6b6b'; sug='—'; }
       const poscode=u.position==='COACH'?'COA':u.position;
       const nm=(p.name||u.name), nmEsc=String(nm).replace(/'/g,"\\'");
@@ -1167,7 +1167,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       const avail=PLAYERS.filter(p=>p.id!=null&&!taken.has(p.id)&&p.pos!=='Тренер');
       const mine=avail.filter(p=>FAV.has(p.name)&&canTake(me.roster,p.pos)).map(p=>({p,c:competition(mgrs,me0,p.pos,p.club,0)})).sort((a,b)=>a.c-b.c||b.p.value-a.p.value)[0];
       const drain=avail.filter(p=>!FAV.has(p.name)).map(p=>({p,c:competition(mgrs,me0,p.pos,p.club,0)})).sort((a,b)=>b.c-a.c||b.p.value-a.p.value)[0];
-      const parts=[]; if(mine)parts.push(`выставь <b>${mine.p.name}</b> (конкур. ${mine.c})`); if(drain&&drain.c>=2)parts.push(`впарь <b>${drain.p.name}</b> — дренаж ${drain.c}`);
+      const parts=[]; if(mine)parts.push(`выставь <b>${mine.p.name}</b> (конкур. ${mine.c})`); if(drain&&drain.c>=2)parts.push(`впарь <b>${drain.p.name}</b> — дави цену ${drain.c}`);
       if(parts.length) hint=`<b style="color:#e8c372">ТВОЙ ХОД:</b> ${parts.join(' · ')}`;
     }
     // --- ОЧЕРЁДНОСТЬ (порядок мест + кто на часах) ---
