@@ -1051,7 +1051,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     MYSEAT=seatByName[me0]||1; ROSTERS=newR; MYTEAM=ROSTERS[MYSEAT]||[]; LIVEPRICE=price; viewSeat=MYSEAT;
     const me=mgrs.find(m=>m.name===me0)||{};
     const cu={}; (me.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;}); CLUBUSED=cu;
-    window.DYN=computeDyn(d);   // динам.цены под живой остаток пота
+    window.DYN=computeDyn(d);   // Dyn мкт — рыночная цена под живой остаток пота
+    window.DYNOUR=computeDynOur(d,me);   // Dyn наш — наш стадийный потолок
     updateBudget(me); updateBar(d,mgrs,me0);
     renderSeatBtns(); render(); renderLive();
   }
@@ -1071,6 +1072,26 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const prog=Math.min(1,(d.taken?d.taken.length:0)/(Math.max(1,mgrs.length)*12));
     const DYN={}; rem.forEach(r=>{ const dyn=r.w*B/denom; DYN[r.name]=Math.max(1,Math.round(r.w*(1-prog)+dyn*prog)); });
     return DYN;
+  }
+  // Dyn наш = наш стадийный потолок. Ценность (Our$), поднятая профицитом бюджета над стоимостью
+  // моих оставшихся нужд. need = сумма Our$ по топ-мои-слоты доступным мне игрокам (позиция нужна, клуб не полон).
+  // factor = мой бюджет / need. Рано (нужд много) factor≤1 → потолок = ценность; поздно (профицит) factor>1 → потолок растёт.
+  function computeDynOur(d, me){
+    const pool=window.DC_POOL||[], taken=new Set(d.taken||[]);
+    const myBudget=me.budget!=null?me.budget:100;
+    const mySlots=Math.max(1, 12-((me.roster||[]).length));
+    const cand=[];
+    pool.forEach(u=>{ if(taken.has(u.id))return; const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
+      if(!p||p.pos==='Тренер')return;
+      if(!canTake(me.roster,p.pos)||clubCnt(me.roster,p.club)>=5)return;
+      cand.push(Math.max(1,p.value||1)); });
+    cand.sort((a,b)=>b-a);
+    let need=0; for(let i=0;i<Math.min(mySlots,cand.length);i++)need+=cand[i]; need=need||1;
+    const factor=cand.length?myBudget/need:1;
+    const OUR={}, seen=new Set();
+    pool.forEach(u=>{ const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id); if(!p||seen.has(p.name))return; seen.add(p.name);
+      const v=Math.max(1,p.value||1); OUR[p.name]=Math.max(v, Math.round(v*factor)); });   // не ниже самой ценности
+    return OUR;
   }
   function updateBudget(me){
     const r=me.roster||[], spent=r.reduce((s,u)=>s+(u.price||0),0);
@@ -1134,29 +1155,28 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     // --- КАРТОЧКА ЛОТА (стиль платформы + наша аналитика) ---
     let card='<div style="padding:6px;color:#8aa0b2">нет активного лота</div>';
     if(d.lot&&d.lot.unit){ const u=d.lot.unit, p=PLAYERS.find(x=>x.id!=null&&x.id===u.id)||{};
-      const dyn=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;
+      const mkt=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;              // Dyn мкт — рыночная
+      const ourCapRaw=(window.DYNOUR&&window.DYNOUR[p.name]!=null)?window.DYNOUR[p.name]:p.value; // Dyn наш — сырой
       const our=p.value, high=d.lot.highBid, comp=competition(mgrs,me0,u.position,u.code,high);
-      const myCeil=Math.min(our,cap);   // максимум, за сколько готов ВЗЯТЬ игрока (cap = мой макс-бид)
-      let vshort,vcol,sug;
-      if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; sug='—'; }
-      else if(clubCnt(me.roster,u.code)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; sug='—'; }
-      else if(our>=dyn){
-        if(high>=myCeil){ vshort='ПАС'; vcol='#ff6b6b'; sug=myCeil; }   // цена ушла за твой потолок — стоп
-        else { vshort='БЕРИ'; vcol='#3ddc84'; sug=myCeil; }
-      }
+      const ourCap=Math.min(ourCapRaw,cap);   // наш потолок, ограничен макс-бидом
+      let vshort,vcol,flag='';
+      if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; }
+      else if(clubCnt(me.roster,u.code)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; }
+      else if(high<=ourCap){ vshort='БЕРИ'; vcol='#3ddc84'; if(mkt>ourCap+1)flag='рынок ценит выше (~'+mkt+') — вероятно уйдёт дороже'; }  // ставка в пределах нашего потолка
       else if(comp>=1 && !mustTake(me.roster,u.position)){
-        const dc=Math.max(1,dyn-1);
-        if(high>=dc){ vshort='ПАС'; vcol='#ff6b6b'; sug='—'; }   // дренажить уже нечем — ставка доехала до динам.цены
-        else { vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; sug=dc; }
+        const dc=Math.max(1,mkt-1);
+        if(high>=dc){ vshort='ПАС'; vcol='#ff6b6b'; }              // ставка доехала до рынка — дренажить нечем
+        else { vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; flag='гони до ~'+dc+' (рынок), сам не бери — позиция не обязательна'; }
       }
-      else { vshort='ПАС'; vcol='#ff6b6b'; sug='—'; }
+      else { vshort='ПАС'; vcol='#ff6b6b'; }                       // выше нашего потолка, дренаж нельзя
       const poscode=u.position==='COACH'?'COA':u.position;
       const nm=(p.name||u.name), nmEsc=String(nm).replace(/'/g,"\\'");
       card=`<div class="lotcard ${u.position.toLowerCase()}" ${p.name?`onclick="openCard('${nmEsc}')" style="cursor:pointer" title="открыть карточку игрока"`:''}>
         <div class="lc-top"><div class="lc-pos">${poscode}</div>
           <div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club||u.code}${p.opp&&p.opp!=='—'?' · vs '+p.opp:''}</div></div>
           <div class="lc-verdict" style="color:${vcol}">${vshort}</div></div>
-        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>Dyn $<b>${dyn??'—'}</b></span><span>ставка<b>${high}</b></span><span>потолок<b>${sug}</b></span><span>конкур<b>${comp}</b></span></div>
+        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>Dyn мкт<b>${mkt??'—'}</b></span><span>Dyn наш<b>${ourCap??'—'}</b></span><span>ставка<b>${high}</b></span><span>конкур<b>${comp}</b></span></div>
+        ${flag?`<div style="font-size:11px;opacity:.85;margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,0,0,.15)">${flag}</div>`:''}
       </div>`;
     }
     // --- БИДЕРЫ (стиль платформы: лидер/ходит/в торгах + бюджет) ---
