@@ -312,7 +312,7 @@
         </div>
         <div class="seatrow">конфликты участника: <span id="seatbtns"></span> <span class="dim">клик — показать только игроков, которых участник N сейчас не может пикать; повторный клик — все игроки</span></div>
     <table id="board">
-      <colgroup><col style="width:38px"><col style="width:36px"><col style="width:104px"><col style="width:44px"><col style="width:46px"><col style="width:40px"><col style="width:88px"><col style="width:48px"><col style="width:124px"><col style="width:134px"><col style="width:134px"><col style="width:40px"><col style="width:96px"><col style="width:46px"><col style="width:46px"><col style="width:46px"><col style="width:48px"><col style="width:56px"><col style="width:36px"><col style="width:104px"></colgroup>
+      <colgroup><col style="width:38px"><col style="width:36px"><col style="width:104px"><col style="width:44px"><col style="width:46px"><col style="width:40px"><col style="width:88px"><col style="width:48px"><col style="width:124px"><col style="width:134px"><col style="width:134px"><col style="width:40px"><col style="width:96px"><col style="width:46px"><col style="width:46px"><col style="width:44px"><col style="width:44px"><col style="width:48px"><col style="width:56px"><col style="width:36px"><col style="width:104px"></colgroup>
       <thead><tr>
         <th onclick="sortBy('pos')">Поз</th>
         <th onclick="sortBy('tier')">Тир</th>
@@ -329,7 +329,8 @@
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
-        <th onclick="sortBy('dyn')" title="динамическая цена под текущий остаток пота">Dyn $</th>
+        <th onclick="sortBy('dyn')" title="Dyn мкт — рыночная динам.цена: сколько за игрока заплатит поле под текущий остаток пота">мкт</th>
+        <th onclick="sortBy('dynour')" title="Dyn наш — наш стадийный потолок: сколько платить нам, чтобы остаться в value (растёт к концу при профиците бюджета)">наш</th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
         <th>!</th>
@@ -936,6 +937,7 @@ function render(){
     case"ceil":va=a.p90;vb=b.p90;break;case"tags":va=a.tags.join();vb=b.tags.join();break;
     case"picks":va=clubRem(a.club);vb=clubRem(b.club);break;
     case"dyn":va=(window.DYN&&window.DYN[a.name])??a.price;vb=(window.DYN&&window.DYN[b.name])??b.price;break;
+    case"dynour":va=(window.DYNOUR&&window.DYNOUR[a.name])??a.value;vb=(window.DYNOUR&&window.DYNOUR[b.name])??b.value;break;
     default:va=a[sortKey];vb=b[sortKey];}
     if(va<vb)return -1*sortDir;if(va>vb)return 1*sortDir;return 0;});
   document.getElementById("rows").innerHTML=list.map(p=>{const tm=TEAMBY[p.club];
@@ -957,12 +959,13 @@ function render(){
       <td>${haulCell(p)}</td>
       <td class="ctr">${p.value}</td>
       <td class="ctr">${p.price}</td>
-      <td class="ctr" title="динамическая под текущий остаток пота (live)">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="Dyn мкт — рыночная динам.цена (live)">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="Dyn наш — наш стадийный потолок (live)">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
       <td class="num startcell"><span class="${p.start<85?'bad':''}">${p.start}%</span></td>
       <td>${pkRow(p.club)}</td>
       <td class="ctr">${markCell(p)}</td>
       <td>${tagHtml(p.tags)}</td>
-    </tr>`;}).join("")||`<tr><td colspan="20" class="sub" style="padding:16px">нет игроков под фильтр</td></tr>`;
+    </tr>`;}).join("")||`<tr><td colspan="21" class="sub" style="padding:16px">нет игроков под фильтр</td></tr>`;
 }
 
 // ---------- PLAYER CARD ----------
