@@ -1066,7 +1066,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       if(!p||p.pos==='Тренер')return; rem.push({name:p.name,w:Math.max(1,p.price||1)}); });
     rem.sort((a,b)=>b.w-a.w);
     let denom=0; for(let i=0;i<Math.min(N,rem.length);i++)denom+=rem[i].w; denom=denom||1;
-    const DYN={}; rem.forEach(r=>{ DYN[r.name]=Math.max(1,Math.round(r.w*B/denom)); });
+    // ранняя динамика занижает топов (пот делится по топ-N, а в жизни часть уходит на филлеров) →
+    // якорим к статике Exp$ на старте и плавно переходим к чистой динамике по ходу драфта (вес = доля сделанных пиков)
+    const prog=Math.min(1,(d.taken?d.taken.length:0)/(Math.max(1,mgrs.length)*12));
+    const DYN={}; rem.forEach(r=>{ const dyn=r.w*B/denom; DYN[r.name]=Math.max(1,Math.round(r.w*(1-prog)+dyn*prog)); });
     return DYN;
   }
   function updateBudget(me){
@@ -1133,11 +1136,19 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     if(d.lot&&d.lot.unit){ const u=d.lot.unit, p=PLAYERS.find(x=>x.id!=null&&x.id===u.id)||{};
       const dyn=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;
       const our=p.value, high=d.lot.highBid, comp=competition(mgrs,me0,u.position,u.code,high);
+      const myCeil=Math.min(our,cap);   // максимум, за сколько готов ВЗЯТЬ игрока (cap = мой макс-бид)
       let vshort,vcol,sug;
       if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; sug='—'; }
       else if(clubCnt(me.roster,u.code)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; sug='—'; }
-      else if(our>=dyn){ vshort='БЕРИ'; vcol='#3ddc84'; sug=Math.min(our,cap); }
-      else if(comp>=1 && !mustTake(me.roster,u.position)){ vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; sug=Math.max(high,dyn-1); }
+      else if(our>=dyn){
+        if(high>=myCeil){ vshort='ПАС'; vcol='#ff6b6b'; sug=myCeil; }   // цена ушла за твой потолок — стоп
+        else { vshort='БЕРИ'; vcol='#3ddc84'; sug=myCeil; }
+      }
+      else if(comp>=1 && !mustTake(me.roster,u.position)){
+        const dc=Math.max(1,dyn-1);
+        if(high>=dc){ vshort='ПАС'; vcol='#ff6b6b'; sug='—'; }   // дренажить уже нечем — ставка доехала до динам.цены
+        else { vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; sug=dc; }
+      }
       else { vshort='ПАС'; vcol='#ff6b6b'; sug='—'; }
       const poscode=u.position==='COACH'?'COA':u.position;
       const nm=(p.name||u.name), nmEsc=String(nm).replace(/'/g,"\\'");
