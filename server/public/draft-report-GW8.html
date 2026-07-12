@@ -321,7 +321,7 @@
         <th onclick="sortBy('match')">Матч</th>
         <th onclick="sortBy('book')">xG</th>
         <th onclick="sortBy('goal')">Our xG</th>
-        <th>CS%</th>
+        <th onclick="sortBy('cs')">CS%</th>
         <th onclick="sortBy('xp')">xP</th>
         <th>Форма</th>
         <th id="minshdr">Минуты</th>
@@ -933,6 +933,7 @@ function render(){
       if(va===vb){va=-a.xp;vb=-b.xp;}break;
     case"book":va=(TEAMBY[a.club]||{}).goalsBook||0;vb=(TEAMBY[b.club]||{}).goalsBook||0;break;
     case"goal":va=(TEAMBY[a.club]||{}).ourMid||0;vb=(TEAMBY[b.club]||{}).ourMid||0;break;
+    case"cs":va=(TEAMBY[a.club]||{}).cs||0;vb=(TEAMBY[b.club]||{}).cs||0;break;
     case"name":va=a.name;vb=b.name;break;case"match":va=a.opp;vb=b.opp;break;
     case"ceil":va=a.p90;vb=b.p90;break;case"tags":va=a.tags.join();vb=b.tags.join();break;
     case"picks":va=clubRem(a.club);vb=clubRem(b.club);break;
