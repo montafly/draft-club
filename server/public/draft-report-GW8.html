@@ -419,7 +419,7 @@
   <section class="view" id="view-live">
     <div class="live">
       <div class="lbox">
-        <div class="muted">Мой состав — 12 слотов</div>
+        <div class="muted">Мой состав — 12 слотов · Σ xP <b id="slots-total" style="color:#7ec8ff"></b></div>
         <div class="vlist" id="slots"></div>
       </div>
       <div class="lbox">
@@ -434,6 +434,10 @@
     <div class="lbox" style="margin-top:10px">
       <div class="muted">Прогноз по участникам: <b>xP</b> — Σ ожидаемых очков состава · <b>вэлью</b> — xP на $1 траты (эффективность, зелёный = лучший) · пики · остаток бюджета. Кого опасаться / топить и как я собрал относительно других. Сортировка по xP.</div>
       <div id="standings" style="margin-top:6px"></div>
+    </div>
+    <div class="lbox" style="margin-top:10px">
+      <div class="muted">Составы участников — игроки и их xP по каждому (COA = тренер). Σ xP команды справа от ника.</div>
+      <div id="allteams" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px"></div>
     </div>
     <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (лимит ≤5 из клуба ОБЩИЙ на весь драфт, по всем участникам: 5/5 = никто ещё не брал, красная короткая = почти закрыт). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДАВИ ЦЕНУ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
   </section>
@@ -763,6 +767,20 @@ function renderStandings(){
       <span style="width:44px;text-align:right;color:var(--tx3);font-size:12px">${r.n} пик</span>
       ${r.bud!=null?`<span style="width:36px;text-align:right;color:var(--t0)">$${r.bud}</span>`:''}
     </div>`;}).join('')||'<div class="dim" style="padding:6px 0">нет участников — ждём живой стейт</div>';
+}
+const POSORD={GK:0,DEF:1,MID:2,FWD:3,'Тренер':4};
+function renderAllTeams(){
+  const el=document.getElementById('allteams'); if(!el)return;
+  const seats=Object.keys(ROSTERS).map(Number);
+  el.innerHTML=seats.map(s=>{const info=SEATINFO[s]||{};const me=s===MYSEAT;
+    const players=(ROSTERS[s]||[]).map(nm=>PLAYERS.find(x=>x.name===nm)).filter(Boolean).sort((a,b)=>(POSORD[a.pos]??5)-(POSORD[b.pos]??5));
+    const tot=players.reduce((t,p)=>t+(p.xp||0),0);
+    const rows=players.map(p=>`<div style="display:flex;gap:6px;font-size:12px;padding:1px 0"><span style="width:26px;color:var(--tx3)">${p.pos==='Тренер'?'COA':p.pos}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span><span style="color:#7ec8ff;font-weight:600">${p.xp!=null?p.xp:''}</span></div>`).join('')||'<div class="dim" style="font-size:12px">— пусто —</div>';
+    return `<div style="border:1px solid var(--line);border-radius:8px;padding:8px;${me?'background:rgba(122,90,248,.1)':''}">
+      <div style="display:flex;justify-content:space-between;font-weight:${me?700:600};color:${me?'#c7b6e8':'var(--t0)'};margin-bottom:4px;gap:6px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${info.nick||('Участник '+s)}${me?' · я':''}</span>
+        <span style="color:#7ec8ff;white-space:nowrap" title="Σ xP состава">${tot?tot.toFixed(1):'0'}</span></div>
+      ${rows}</div>`;}).join('');
 }
 function ownerOf(name){for(const s in ROSTERS){if(+s!==MYSEAT&&ROSTERS[s].includes(name))return +s;}return null;}
 let CLUBUSED={};
@@ -1128,7 +1146,7 @@ function renderLive(){
     const rem=5-u, t=rem/5, col=heat(t);
     return `<div class="crow"><span class="cc">${c}</span><div class="cbar"><i style="width:${t*100}%;background:${col}"></i></div><span class="cn" style="color:${col}">${rem}/5</span></div>`;
   }).join("");
-  renderStandings();
+  renderStandings(); renderAllTeams();
 }
 
 // init
@@ -1152,7 +1170,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const seatInfo={};
     mgrs.forEach((m,i)=>{ const seat=i+1; SEATNAME[seat]=m.name; seatByName[m.name]=seat;
       seatInfo[seat]={nick:m.name,bud:(m.budget!=null?m.budget:null),spent:(m.roster||[]).reduce((s,u)=>s+(u.price||0),0)};
-      newR[seat]=(m.roster||[]).map(u=>{ const nm=ID2NAME[u.id]||u.name; if(u.price!=null)price[nm]=u.price; return nm; }); });
+      newR[seat]=(m.roster||[]).map(u=>{ const nm=ID2NAME[u.id]||(u.position==='COACH'?'Тренер '+(u.code||u.club):u.name); if(u.price!=null)price[nm]=u.price; return nm; }); });
     MYSEAT=seatByName[me0]||1; ROSTERS=newR; MYTEAM=ROSTERS[MYSEAT]||[]; LIVEPRICE=price; viewSeat=MYSEAT; SEATINFO=seatInfo;
     const me=mgrs.find(m=>m.name===me0)||{};
     const cu={}; mgrs.forEach(m=>(m.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;})); CLUBUSED=cu;  // ГЛОБАЛЬНЫЙ счётчик клубов — лимит ≤5 на весь драфт (все менеджеры), не на меня
@@ -1321,7 +1339,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     // --- ЛЕНТА ПОСЛЕДНИХ ПИКОВ ---
     const feed=(d.picks||[]).slice(-9).reverse().map(pk=>{ const to=pk.winnerName||'—', isMe=to===me0;
       const no=pk.no!=null?('#'+pk.no):'зам', pr=pk.price!=null?pk.price:'';
-      return `<div class="pk"><span class="pk-no">${no}</span><span class="pk-nm">${pk.unitName||''}</span><span class="pk-cl">${pk.code||pk.club||''}</span><span class="pk-to ${isMe?'me':''}">→ ${to}</span><span class="pk-pr">${pr}</span></div>`;
+      let pl=PLAYERS.find(x=>x.name===pk.unitName); if(!pl&&(pk.code||pk.club))pl=PLAYERS.find(x=>x.pos==='Тренер'&&x.club===(pk.code||pk.club));  // коуч по клубу
+      const xp=pl&&pl.xp!=null?pl.xp:'';
+      return `<div class="pk"><span class="pk-no">${no}</span><span class="pk-nm">${pk.unitName||''}</span><span class="pk-cl">${pk.code||pk.club||''}</span><span style="color:#7ec8ff;font-variant-numeric:tabular-nums;min-width:30px;text-align:right;font-weight:600" title="ожид. очки xP">${xp}</span><span class="pk-to ${isMe?'me':''}">→ ${to}</span><span class="pk-pr">${pr}</span></div>`;
     }).join('')||'<div style="padding:6px 0;color:#8aa0b2">пиков ещё нет</div>';
     b.innerHTML=card
       +`<div class="dc-bids">${bids}</div>`
@@ -1333,15 +1353,17 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
   renderLive=function(){ if(!live) return _renderLive();
     const posMap={GK:'GK',DEF:'DEF',MID:'MID',FWD:'FWD','Тренер':'Трен'};
     const filled={GK:[],DEF:[],MID:[],FWD:[],"Трен":[]};
-    (MYTEAM||[]).forEach(nm=>{ const p=PLAYERS.find(x=>x.name===nm); if(!p)return; (filled[posMap[p.pos]||'MID']).push({n:nm,c:p.club,pr:LIVEPRICE[nm]??''}); });
+    (MYTEAM||[]).forEach(nm=>{ const p=PLAYERS.find(x=>x.name===nm); if(!p)return; (filled[posMap[p.pos]||'MID']).push({n:nm,c:p.club,pr:LIVEPRICE[nm]??'',xp:p.xp}); });
     const maxSlots={GK:1,DEF:5,MID:5,FWD:3,"Трен":1}; let html='';
     ["GK","DEF","MID","FWD","Трен"].forEach(pos=>{ for(let i=0;i<maxSlots[pos];i++){ const f=(filled[pos]||[])[i];
-      html+=`<div class="rrow ${f?'':'empty'}"><span class="rpos">${pos==='Трен'?'COA':pos}</span><span class="rnm">${f?f.n:'— свободно —'}</span><span class="rclub">${f?f.c:''}</span><span class="rpr">${f?f.pr:''}</span></div>`; } });
+      html+=`<div class="rrow ${f?'':'empty'}"><span class="rpos">${pos==='Трен'?'COA':pos}</span><span class="rnm">${f?f.n:'— свободно —'}</span><span class="rclub">${f?f.c:''}</span><span style="color:#7ec8ff;font-variant-numeric:tabular-nums;min-width:26px;text-align:right;font-weight:600" title="ожидаемые очки xP">${f&&f.xp!=null?f.xp:''}</span><span class="rpr">${f?f.pr:''}</span></div>`; } });
     document.getElementById("slots").innerHTML=html;
+    const myXpTot=(MYTEAM||[]).reduce((s,nm)=>{const p=PLAYERS.find(x=>x.name===nm);return s+(p&&p.xp?p.xp:0);},0);
+    const sh=document.getElementById('slots-total'); if(sh)sh.textContent=myXpTot?myXpTot.toFixed(1):'';
     const clubRows=TEAMS.map(t=>({c:t.code,u:CLUBUSED[t.code]||0})).sort((a,b)=> b.u-a.u || (a.c<b.c?-1:1));
     document.getElementById("clublim").innerHTML=clubRows.map(({c,u})=>{ const rem=5-u,t=rem/5,col=heat(t);
       return `<div class="crow"><span class="cc">${c}</span><div class="cbar"><i style="width:${t*100}%;background:${col}"></i></div><span class="cn" style="color:${col}">${rem}/5</span></div>`; }).join("");
-    renderStandings();
+    renderStandings(); renderAllTeams();
   };
   // сохраняем живой стейт → рефреш вкладки репорта НЕ теряет драфт (можно катать правки по ходу, не перепрогоняя)
   function saveLive(){ try{
