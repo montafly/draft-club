@@ -354,7 +354,7 @@
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
-        <th onclick="sortBy('dynour')" title="our (live) — мой потолок на этого игрока = value × (мой бюджет-на-слот ÷ средняя цена за пик по полю). > Our$ = профицит, могу платить премию и добрать по вэлью потом; < Our$ = дефицит, экономь; = Our$ = иду по пейсу. Живая версия Our$.">our<span class="livedot"></span></th>
+        <th onclick="sortBy('dynour')" title="our (live) — мой потолок = value × бюджет-фактор × дефицит. Бюджет-фактор = мой бюджет-на-слот ÷ средняя цена за пик по полю (профицит>1, дефицит<1). Дефицит = премия, если реальный реплейсмент по позиции сильно ниже (последний T0 → плати; глубокий пул → без премии). > Our$ = стоит платить выше старта, < Our$ = экономь.">our<span class="livedot"></span></th>
         <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="livedot"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
@@ -1200,24 +1200,35 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const DYN={}; rem.forEach(r=>{ const dyn=r.w*B/denom; DYN[r.name]=Math.max(1,Math.round(r.w*(1-prog)+dyn*prog)); });
     return DYN;
   }
-  // Dyn наш = наш стадийный потолок. Ценность (Our$), поднятая профицитом бюджета над стоимостью
-  // моих оставшихся нужд. need = сумма Our$ по топ-мои-слоты доступным мне игрокам (позиция нужна, клуб не полон).
-  // Dyn наш = мой стадийный потолок = value × factor, где factor = (мой бюджет на слот) / (средняя цена за пик по полю).
-  // Идея: не «сумма топ-ценностей» (она вдвое > бюджета → залипало на Our$), а РЕАЛЬНАЯ трата на пик по всему полю.
-  // На старте все на пейсе → factor≈1 → our=Our$. Если у меня профицит бюджета на слот (набрал вэлью дёшево) →
-  // factor>1 → our>Our$ (могу платить премию за этого игрока и потом добрать по вэлью). Дефицит → factor<1 → our<Our$ (экономь).
+  // Dyn наш (our) = мой стадийный потолок = value × budget_factor × scarcity.
+  //  budget_factor = (мой бюджет/слот) / (средняя цена за пик по полю) — профицит>1 (могу премию), дефицит<1 (экономь).
+  //  scarcity = 1 + W·max(0, 1 − replValue/value), где replValue = ценность РЕАЛЬНОГО реплейсмента (игрок, к-рого возьму
+  //  вместо этого = (nComp)-й доступный по позиции после конкурентов). Реплейсмент много ниже (последний T0) → премия;
+  //  глубокий пул (replValue≈value) → scarcity=1, без премии. Критерий дефицита = исчерпание ЦЕННОСТИ, не слотов.
   function computeDynOur(d, me){
-    const mgrs=d.managers||[];
+    const mgrs=d.managers||[], taken=new Set(d.taken||[]);
     const myBudget=me.budget!=null?me.budget:100;
     const mySlots=Math.max(1, 12-((me.roster||[]).length));
-    const potLeft=mgrs.reduce((s,m)=>s+(m.budget||0),0)||myBudget;                         // остаток пота всего поля
-    const picksLeft=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0)); // оставшиеся пики всего поля
-    const avgPerPick=potLeft/picksLeft;                                                     // средняя цена за оставшийся пик
-    const factor=avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;                              // мой бюджет-на-слот vs поле
-    const myMaxBid=(me.maxBid!=null)?me.maxBid:Math.max(1, myBudget-(mySlots-1));           // потолок реального бида (резерв $1/слот)
+    const potLeft=mgrs.reduce((s,m)=>s+(m.budget||0),0)||myBudget;
+    const picksLeft=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0));
+    const avgPerPick=potLeft/picksLeft;
+    const factor=avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;
+    const myMaxBid=(me.maxBid!=null)?me.maxBid:Math.max(1, myBudget-(mySlots-1));
+    const SCARCITY_W=0.4;
+    // доступный пул по позициям (не взят, клуб не полон), по убыв. ценности; + конкуренты, кому нужна позиция
+    const availByPos={}, seenA=new Set();
+    (window.DC_POOL||[]).forEach(u=>{ if(taken.has(u.id))return; const p=matchUnit(u); if(!p||seenA.has(p.name))return; seenA.add(p.name);
+      if((CLUBUSED[p.club]||0)>=5)return; (availByPos[p.pos]=availByPos[p.pos]||[]).push({name:p.name,v:Math.max(1,p.value||1)}); });
+    Object.keys(availByPos).forEach(k=>availByPos[k].sort((a,b)=>b.v-a.v));
+    const nComp={}; Object.keys(availByPos).forEach(pos=>{ nComp[pos]=mgrs.filter(m=>m.name!==me.name&&canTake(m.roster,pos)).length; });
     const OUR={}, seen=new Set();
     (window.DC_POOL||[]).forEach(u=>{ const p=matchUnit(u); if(!p||seen.has(p.name))return; seen.add(p.name);
-      const v=Math.max(1,p.value||1); OUR[p.name]=Math.max(1, Math.min(myMaxBid, Math.round(v*factor))); });  // не выше макс-бида; может быть НИЖЕ value (сигнал «экономь»)
+      const v=Math.max(1,p.value||1);
+      const arr=(availByPos[p.pos]||[]).filter(x=>x.name!==p.name);
+      const replV=arr.length?arr[Math.min(nComp[p.pos]||0, arr.length-1)].v:1;   // реальный реплейсмент после конкурентов
+      const scarcity=1+SCARCITY_W*Math.max(0, 1-replV/v);                         // дефицит ценности → премия
+      OUR[p.name]=Math.max(1, Math.min(myMaxBid, Math.round(v*factor*scarcity)));
+    });
     return OUR;
   }
   function updateBudget(me){
