@@ -19,6 +19,8 @@
   header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
   header.top h1{font-size:18px;margin:0;font-weight:650}
   .muted{color:var(--tx2)} .dim{color:var(--tx3)}
+  .live{display:inline-block;width:5px;height:5px;border-radius:50%;background:#ff5c5c;margin-left:3px;vertical-align:middle;box-shadow:0 0 4px #ff5c5c;animation:livep 1.4s ease-in-out infinite}
+  @keyframes livep{0%,100%{opacity:.3}50%{opacity:1}}
   .pill{background:var(--bg3);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--tx2)}
   .budget{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
   .budget b{color:var(--t0)}
@@ -352,8 +354,8 @@
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
-        <th onclick="sortBy('dyn')" title="Dyn мкт — рыночная динам.цена: сколько за игрока заплатит поле под текущий остаток пота">мкт</th>
-        <th onclick="sortBy('dynour')" title="Dyn наш — наш стадийный потолок: сколько платить нам, чтобы остаться в value (растёт к концу при профиците бюджета)">наш</th>
+        <th onclick="sortBy('dynour')" title="our (live) — наш живой потолок: сколько платить нам, чтобы остаться в value (растёт к концу при профиците бюджета). Живая версия Our$.">our<span class="live"></span></th>
+        <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="live"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
         <th>!</th>
@@ -1053,8 +1055,8 @@ function render(){
       <td>${haulCell(p)}</td>
       <td class="ctr">${p.value}</td>
       <td class="ctr">${p.price}</td>
-      <td class="ctr" title="Dyn мкт — рыночная динам.цена (live)">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
-      <td class="ctr" title="Dyn наш — наш стадийный потолок (live)">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="our (live) — наш живой потолок">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="exp (live) — живая рыночная цена">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
       <td class="num startcell"><span class="${p.start<85?'bad':''}">${p.start}%</span></td>
       <td>${pkRow(p.club)}</td>
       <td class="ctr">${markCell(p)}</td>
