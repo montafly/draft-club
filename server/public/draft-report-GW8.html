@@ -354,7 +354,7 @@
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
-        <th onclick="sortBy('dynour')" title="our (live) — наш живой потолок: сколько платить нам, чтобы остаться в value (растёт к концу при профиците бюджета). Живая версия Our$.">our<span class="livedot"></span></th>
+        <th onclick="sortBy('dynour')" title="our (live) — мой потолок на этого игрока = value × (мой бюджет-на-слот ÷ средняя цена за пик по полю). > Our$ = профицит, могу платить премию и добрать по вэлью потом; < Our$ = дефицит, экономь; = Our$ = иду по пейсу. Живая версия Our$.">our<span class="livedot"></span></th>
         <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="livedot"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
@@ -1198,22 +1198,22 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
   }
   // Dyn наш = наш стадийный потолок. Ценность (Our$), поднятая профицитом бюджета над стоимостью
   // моих оставшихся нужд. need = сумма Our$ по топ-мои-слоты доступным мне игрокам (позиция нужна, клуб не полон).
-  // factor = мой бюджет / need. Рано (нужд много) factor≤1 → потолок = ценность; поздно (профицит) factor>1 → потолок растёт.
+  // Dyn наш = мой стадийный потолок = value × factor, где factor = (мой бюджет на слот) / (средняя цена за пик по полю).
+  // Идея: не «сумма топ-ценностей» (она вдвое > бюджета → залипало на Our$), а РЕАЛЬНАЯ трата на пик по всему полю.
+  // На старте все на пейсе → factor≈1 → our=Our$. Если у меня профицит бюджета на слот (набрал вэлью дёшево) →
+  // factor>1 → our>Our$ (могу платить премию за этого игрока и потом добрать по вэлью). Дефицит → factor<1 → our<Our$ (экономь).
   function computeDynOur(d, me){
-    const pool=window.DC_POOL||[], taken=new Set(d.taken||[]);
+    const mgrs=d.managers||[];
     const myBudget=me.budget!=null?me.budget:100;
     const mySlots=Math.max(1, 12-((me.roster||[]).length));
-    const cand=[];
-    pool.forEach(u=>{ if(taken.has(u.id))return; const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
-      if(!p||p.pos==='Тренер')return;
-      if(!canTake(me.roster,p.pos)||(CLUBUSED[p.club]||0)>=5)return;
-      cand.push(Math.max(1,p.value||1)); });
-    cand.sort((a,b)=>b-a);
-    let need=0; for(let i=0;i<Math.min(mySlots,cand.length);i++)need+=cand[i]; need=need||1;
-    const factor=cand.length?myBudget/need:1;
+    const potLeft=mgrs.reduce((s,m)=>s+(m.budget||0),0)||myBudget;                         // остаток пота всего поля
+    const picksLeft=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0)); // оставшиеся пики всего поля
+    const avgPerPick=potLeft/picksLeft;                                                     // средняя цена за оставшийся пик
+    const factor=avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;                              // мой бюджет-на-слот vs поле
+    const myMaxBid=(me.maxBid!=null)?me.maxBid:Math.max(1, myBudget-(mySlots-1));           // потолок реального бида (резерв $1/слот)
     const OUR={}, seen=new Set();
-    pool.forEach(u=>{ const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id); if(!p||seen.has(p.name))return; seen.add(p.name);
-      const v=Math.max(1,p.value||1); OUR[p.name]=Math.max(v, Math.round(v*factor)); });   // не ниже самой ценности
+    (window.DC_POOL||[]).forEach(u=>{ const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id); if(!p||seen.has(p.name))return; seen.add(p.name);
+      const v=Math.max(1,p.value||1); OUR[p.name]=Math.max(1, Math.min(myMaxBid, Math.round(v*factor))); });  // не выше макс-бида; может быть НИЖЕ value (сигнал «экономь»)
     return OUR;
   }
   function updateBudget(me){
@@ -1304,7 +1304,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
         <div class="lc-top"><div class="lc-pos">${poscode}</div>
           <div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club||u.code}${p.opp&&p.opp!=='—'?' · vs '+p.opp:''}</div></div>
           <div class="lc-verdict" style="color:${vcol}">${vshort}</div></div>
-        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>Dyn мкт<b>${mkt??'—'}</b></span><span>Dyn наш<b>${ourCap??'—'}</b></span><span>ставка<b>${high}</b></span><span>конкур<b>${comp}</b></span></div>
+        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>exp<b>${mkt??'—'}</b></span><span>our<b>${ourCap??'—'}</b></span><span>ставка<b>${high}</b></span><span>конкур<b>${comp}</b></span></div>
         ${flag?`<div style="font-size:11px;opacity:.85;margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,0,0,.15)">${flag}</div>`:''}
       </div>`;
     }
