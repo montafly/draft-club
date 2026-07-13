@@ -1330,6 +1330,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const clubRows=TEAMS.map(t=>({c:t.code,u:CLUBUSED[t.code]||0})).sort((a,b)=> b.u-a.u || (a.c<b.c?-1:1));
     document.getElementById("clublim").innerHTML=clubRows.map(({c,u})=>{ const rem=5-u,t=rem/5,col=heat(t);
       return `<div class="crow"><span class="cc">${c}</span><div class="cbar"><i style="width:${t*100}%;background:${col}"></i></div><span class="cn" style="color:${col}">${rem}/5</span></div>`; }).join("");
+    renderStandings();
   };
   // сохраняем живой стейт → рефреш вкладки репорта НЕ теряет драфт (можно катать правки по ходу, не перепрогоняя)
   function saveLive(){ try{
