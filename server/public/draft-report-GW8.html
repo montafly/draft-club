@@ -1260,13 +1260,18 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const myLiveId=me.id, myTurn=(d.actor===myLiveId);
     // --- КАРТОЧКА ЛОТА (стиль платформы + наша аналитика) ---
     let card='<div style="padding:6px;color:#8aa0b2">нет активного лота</div>';
-    if(d.lot&&d.lot.unit){ const u=d.lot.unit, p=PLAYERS.find(x=>x.id!=null&&x.id===u.id)||{};
+    if(d.lot&&d.lot.unit){ const u=d.lot.unit;
+      let p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
+      if(!p&&u.position==='COACH') p=PLAYERS.find(x=>x.pos==='Тренер'&&x.club===(u.code||u.club));  // коуч: id живого юнита не матчится → фолбэк по клубу (Тренер CLUB), у нас есть value/xp/цена
+      p=p||{};
       const mkt=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;              // Dyn мкт — рыночная
       const ourCapRaw=(window.DYNOUR&&window.DYNOUR[p.name]!=null)?window.DYNOUR[p.name]:p.value; // Dyn наш — сырой
       const our=p.value, high=d.lot.highBid, comp=competition(mgrs,me0,u.position,u.code,high);
-      const ourCap=Math.min(ourCapRaw,cap);   // наш потолок, ограничен макс-бидом
+      let ourCap=null;   // наш потолок, ограничен макс-бидом; null у коуча/несматченного (мы их не оцениваем) → «—», без NaN
+      if(ourCapRaw!=null&&isFinite(ourCapRaw)) ourCap=(cap!=null&&isFinite(cap))?Math.min(ourCapRaw,cap):ourCapRaw;
       let vshort,vcol,flag='';
-      if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; }
+      if(our==null){ vshort='—'; vcol='#8aa0b2'; flag='юнит не смэтчился с нашими данными'; }  // безопасный фолбэк для несматченного юнита (коучи матчатся по клубу выше)
+      else if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; }
       else if((CLUBUSED[u.code]||0)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; }
       else if(high<=ourCap){ vshort='БЕРИ'; vcol='#3ddc84'; if(mkt>ourCap+1)flag='рынок ценит выше (~'+mkt+') — вероятно уйдёт дороже'; }  // ставка в пределах нашего потолка
       else if(comp>=1 && !mustTake(me.roster,u.position)){
