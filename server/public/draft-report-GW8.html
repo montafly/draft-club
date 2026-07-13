@@ -432,7 +432,7 @@
       </div>
     </div>
     <div class="lbox" style="margin-top:10px">
-      <div class="muted">Прогноз по участникам — Σ ожидаемых очков (xP) состава. Кого опасаться / кого топить; и как я собрал команду относительно других по нашей системе. Сортировка по убыванию.</div>
+      <div class="muted">Прогноз по участникам: <b>xP</b> — Σ ожидаемых очков состава · <b>вэлью</b> — xP на $1 траты (эффективность, зелёный = лучший) · пики · остаток бюджета. Кого опасаться / топить и как я собрал относительно других. Сортировка по xP.</div>
       <div id="standings" style="margin-top:6px"></div>
     </div>
     <p class="note">Слева — мой состав по максимуму позиций (GK 1 · DEF 5 · MID 5 · FWD 3 · Тренер 1), видно сколько добрать; итог 12 юнитов. Центр — доступность клубов (лимит ≤5 из клуба ОБЩИЙ на весь драфт, по всем участникам: 5/5 = никто ещё не брал, красная короткая = почти закрыт). Справа — живая панель лота: карточка текущего лота с вердиктом (БЕРИ/ДАВИ ЦЕНУ/ПАС), бидеры соперников с бюджетами, таргеты, очерёдность мест и лента последних пиков — оживает по ходу драфта от живого стейта.</p>
@@ -748,17 +748,20 @@ let SEATINFO={};  // {seat:{nick,bud}} — из живого стейта (apply
 function teamXp(seat){return (ROSTERS[seat]||[]).reduce((s,nm)=>{const p=PLAYERS.find(x=>x.name===nm);return s+(p&&p.xp?p.xp:0);},0);}
 function renderStandings(){
   const seats=Object.keys(ROSTERS).map(Number);
-  const rows=seats.map(s=>({s,nick:(SEATINFO[s]&&SEATINFO[s].nick)||('Участник '+s),xp:teamXp(s),n:(ROSTERS[s]||[]).length,bud:SEATINFO[s]?SEATINFO[s].bud:null}))
+  const rows=seats.map(s=>{const info=SEATINFO[s]||{};const xp=teamXp(s);const sp=info.spent;const val=(sp!=null&&sp>0)?xp/sp:null;
+    return {s,nick:info.nick||('Участник '+s),xp,n:(ROSTERS[s]||[]).length,bud:info.bud!=null?info.bud:null,val};})
     .sort((a,b)=>b.xp-a.xp);
   const mx=Math.max(1,...rows.map(r=>r.xp));
-  document.getElementById('standings').innerHTML=rows.map((r,i)=>{const me=r.s===MYSEAT;return `
+  const mxv=Math.max(0.01,...rows.map(r=>r.val||0));  // для подсветки лучшего вэлью
+  document.getElementById('standings').innerHTML=rows.map((r,i)=>{const me=r.s===MYSEAT;const best=r.val!=null&&r.val>=mxv-1e-9;return `
     <div style="display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;${me?'background:rgba(122,90,248,.15)':''}">
       <span style="width:16px;color:var(--tx3);text-align:right;font-size:12px">${i+1}</span>
-      <span style="flex:0 0 128px;font-weight:${me?700:500};color:${me?'#c7b6e8':'var(--t0)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nick}${me?' · я':''}</span>
-      <span style="flex:1;height:8px;min-width:40px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${(r.xp/mx*100).toFixed(0)}%;background:#7a5af8"></i></span>
+      <span style="flex:0 0 118px;font-weight:${me?700:500};color:${me?'#c7b6e8':'var(--t0)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nick}${me?' · я':''}</span>
+      <span style="flex:1;height:8px;min-width:30px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${(r.xp/mx*100).toFixed(0)}%;background:#7a5af8"></i></span>
       <span style="width:42px;text-align:right;font-weight:600" title="сумма ожидаемых очков (xP) состава">${r.xp.toFixed(1)}</span>
-      <span style="width:46px;text-align:right;color:var(--tx3);font-size:12px">${r.n} пик</span>
-      ${r.bud!=null?`<span style="width:38px;text-align:right;color:var(--t0)">$${r.bud}</span>`:''}
+      <span style="width:52px;text-align:right;font-weight:600;color:${r.val==null?'var(--tx3)':best?'#3ddc84':'#8ea0c4'}" title="вэлью: xP на $1 траты (эффективность). Зелёный = лучший в драфте">${r.val!=null?r.val.toFixed(2):'—'}</span>
+      <span style="width:44px;text-align:right;color:var(--tx3);font-size:12px">${r.n} пик</span>
+      ${r.bud!=null?`<span style="width:36px;text-align:right;color:var(--t0)">$${r.bud}</span>`:''}
     </div>`;}).join('')||'<div class="dim" style="padding:6px 0">нет участников — ждём живой стейт</div>';
 }
 function ownerOf(name){for(const s in ROSTERS){if(+s!==MYSEAT&&ROSTERS[s].includes(name))return +s;}return null;}
@@ -1147,7 +1150,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     me0=me0||meName()||mgrs[0].name;
     const newR={}, price={}, seatByName={};
     const seatInfo={};
-    mgrs.forEach((m,i)=>{ const seat=i+1; SEATNAME[seat]=m.name; seatByName[m.name]=seat; seatInfo[seat]={nick:m.name,bud:(m.budget!=null?m.budget:null)};
+    mgrs.forEach((m,i)=>{ const seat=i+1; SEATNAME[seat]=m.name; seatByName[m.name]=seat;
+      seatInfo[seat]={nick:m.name,bud:(m.budget!=null?m.budget:null),spent:(m.roster||[]).reduce((s,u)=>s+(u.price||0),0)};
       newR[seat]=(m.roster||[]).map(u=>{ const nm=ID2NAME[u.id]||u.name; if(u.price!=null)price[nm]=u.price; return nm; }); });
     MYSEAT=seatByName[me0]||1; ROSTERS=newR; MYTEAM=ROSTERS[MYSEAT]||[]; LIVEPRICE=price; viewSeat=MYSEAT; SEATINFO=seatInfo;
     const me=mgrs.find(m=>m.name===me0)||{};
