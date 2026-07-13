@@ -306,15 +306,16 @@
   <section class="view" id="view-gksaves">
     <div class="demo-banner">Как складывается ожидание по сейвам у каждого вратаря. <b>Ожидаемые удары в створ</b> = (сколько бьёт соперник) × (сколько допускает наша команда) ÷ средняя лига. <b>Ожидаемые сейвы</b> = удары × доля отражённых (save%, подтянут к среднему лиги тем сильнее, чем меньше личная выборка). <b>Очки за сейвы</b> = 0.5 × сейвы. ▲ выше среднего лиги, ▼ ниже, • около среднего. Клик по строке — карточка. * = промо-команда без данных 24/25, взято среднее лиги.</div>
     <table id="gksaves-table">
-      <colgroup><col style="width:220px"><col style="width:130px"><col style="width:130px"><col style="width:110px"><col style="width:130px"><col style="width:110px"><col style="width:70px"><col></colgroup>
+      <colgroup><col style="width:220px"><col style="width:126px"><col style="width:126px"><col style="width:104px"><col style="width:124px"><col style="width:104px"><col style="width:66px"><col style="width:92px"><col></colgroup>
       <thead><tr>
-        <th class="left">Вратарь</th>
-        <th title="Удары в створ соперника за игру (сезон 24/25)">Соперник бьёт</th>
-        <th title="Удары в створ, что допускает наша команда за игру (24/25)">Мы допускаем</th>
-        <th title="Ожидаемые удары в створ по нашим воротам в этом матче = бьёт × допускаем ÷ лига">Ожид. удары</th>
-        <th title="Доля отражённых ударов. Шринк к среднему лиги (0.68) по объёму личной выборки">save%</th>
-        <th title="Ожидаемые сейвы = ожид. удары × save%">Ожид. сейвы</th>
-        <th title="Очки за сейвы = 0.5 × ожид. сейвы">Очки</th>
+        <th class="left" onclick="sortGk('name')" style="cursor:pointer">Вратарь</th>
+        <th onclick="sortGk('oatt')" style="cursor:pointer" title="Удары в створ соперника за игру (сезон 24/25)">Соперник бьёт</th>
+        <th onclick="sortGk('ddef')" style="cursor:pointer" title="Удары в створ, что допускает наша команда за игру (24/25)">Мы допускаем</th>
+        <th onclick="sortGk('esot')" style="cursor:pointer" title="Ожидаемые удары в створ по нашим воротам в этом матче = бьёт × допускаем ÷ лига">Ожид. удары</th>
+        <th onclick="sortGk('pct')" style="cursor:pointer" title="Доля отражённых ударов. Шринк к среднему лиги (0.68) по объёму личной выборки">save%</th>
+        <th onclick="sortGk('esaves')" style="cursor:pointer" title="Ожидаемые сейвы = ожид. удары × save%">Ожид. сейвы</th>
+        <th onclick="sortGk('pts')" style="cursor:pointer" title="Очки за сейвы = 0.5 × ожид. сейвы">Очки</th>
+        <th onclick="sortGk('cs')" style="cursor:pointer" title="Вероятность клиншита команды в этом матче — отдельный путь очков вратаря (обратно к объёму сейвов)">Клиншит %</th>
         <th class="left">Главное</th>
       </tr></thead>
       <tbody id="gksaves-body"></tbody>
@@ -868,9 +869,14 @@ function gkchip(text,kind){
   const bd=kind==='main'?`border:1px solid ${c};`:'border:1px solid transparent;';
   return `<span style="display:inline-block;padding:1px 8px;margin:1px 4px 1px 0;border-radius:9px;font-size:11px;background:rgba(255,255,255,.05);color:${c};${bd}">${text}</span>`;
 }
+let gkSort='esot', gkSortDir=-1;
+function gkCS(p){return (TEAMBY[p.club]||{}).cs||0;}
+function sortGk(k){ if(gkSort===k)gkSortDir*=-1; else{gkSort=k; gkSortDir=(k==='name')?1:-1;} renderGksaves(); }
 function renderGksaves(){
-  const gks=PLAYERS.filter(p=>p.pos==='GK'&&p.sv).sort((a,b)=>b.sv.esot-a.sv.esot);
-  if(!gks.length){document.getElementById('gksaves-body').innerHTML='<tr><td colspan="8" class="sub" style="padding:16px">нет данных по вратарям</td></tr>';return;}
+  const gks=PLAYERS.filter(p=>p.pos==='GK'&&p.sv);
+  if(!gks.length){document.getElementById('gksaves-body').innerHTML='<tr><td colspan="9" class="sub" style="padding:16px">нет данных по вратарям</td></tr>';return;}
+  const keyOf=(p)=> gkSort==='name'?p.name : gkSort==='cs'?gkCS(p) : p.sv[gkSort];
+  gks.sort((a,b)=>{const va=keyOf(a),vb=keyOf(b); if(va<vb)return -1*gkSortDir; if(va>vb)return 1*gkSortDir; return 0;});
   const lg=gks[0].sv.lg;
   const arrow=(v)=>{const r=v/lg; if(r>=1.12)return '<span style="color:#ff7676">▲</span>'; if(r<=0.88)return '<span style="color:#5ad19a">▼</span>'; return '<span style="color:#7b8595">•</span>';};
   const fb=(f)=>f?'<span title="нет данных 24/25 (промо) — взято среднее лиги" style="color:#7b8595">*</span>':'';
@@ -895,6 +901,7 @@ function renderGksaves(){
       <td class="ctr">${Math.round(s.pct*100)}%${(s.pctraw!=null&&!s.nc)?`<span class="sub"> · сыро ${Math.round(s.pctraw*100)}</span>`:''}</td>
       <td class="ctr"><b>${s.esaves.toFixed(2)}</b></td>
       <td class="ctr"><b style="color:#3ddc84">${s.pts.toFixed(2)}</b></td>
+      <td class="ctr"><span style="color:${heat(gkCS(p)/60)};font-weight:600">${gkCS(p)}%</span></td>
       <td>${chips}</td>
     </tr>`;
   }).join('');
