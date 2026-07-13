@@ -1157,6 +1157,10 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
 // Демо-фолбэк: пока не пришёл живой стейт — репорт работает как обычно (демо/подготовка).
 (function(){
   const ID2NAME={}; PLAYERS.forEach(p=>{ if(p.id!=null) ID2NAME[p.id]=p.name; });
+  // матчинг живого юнита к нашим данным: по id; коуч — фолбэк по клубу (его живой id не совпадает с нашим)
+  function matchUnit(u){ let p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
+    if(!p&&(u.position==='COACH'||u.pos==='COACH')) p=PLAYERS.find(x=>x.pos==='Тренер'&&x.club===(u.code||u.club));
+    return p; }
   let LIVEPRICE={}, SEATNAME={}, live=false;
   const meName=()=>window.DC_ME||localStorage.getItem('dc_me')||null;
 
@@ -1186,8 +1190,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const B=mgrs.reduce((s,m)=>s+(m.budget||0),0);
     const N=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0));
     const rem=[];
-    pool.forEach(u=>{ if(taken.has(u.id))return; const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
-      if(!p||p.pos==='Тренер')return; rem.push({name:p.name,w:Math.max(1,p.price||1)}); });
+    pool.forEach(u=>{ if(taken.has(u.id))return; const p=matchUnit(u);
+      if(!p)return; rem.push({name:p.name,w:Math.max(1,p.price||1)}); });   // коучи включены (у них есть price/value)
     rem.sort((a,b)=>b.w-a.w);
     let denom=0; for(let i=0;i<Math.min(N,rem.length);i++)denom+=rem[i].w; denom=denom||1;
     // ранняя динамика занижает топов (пот делится по топ-N, а в жизни часть уходит на филлеров) →
@@ -1212,7 +1216,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const factor=avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;                              // мой бюджет-на-слот vs поле
     const myMaxBid=(me.maxBid!=null)?me.maxBid:Math.max(1, myBudget-(mySlots-1));           // потолок реального бида (резерв $1/слот)
     const OUR={}, seen=new Set();
-    (window.DC_POOL||[]).forEach(u=>{ const p=PLAYERS.find(x=>x.id!=null&&x.id===u.id); if(!p||seen.has(p.name))return; seen.add(p.name);
+    (window.DC_POOL||[]).forEach(u=>{ const p=matchUnit(u); if(!p||seen.has(p.name))return; seen.add(p.name);
       const v=Math.max(1,p.value||1); OUR[p.name]=Math.max(1, Math.min(myMaxBid, Math.round(v*factor))); });  // не выше макс-бида; может быть НИЖЕ value (сигнал «экономь»)
     return OUR;
   }
