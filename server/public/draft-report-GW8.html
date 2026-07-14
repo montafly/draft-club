@@ -336,7 +336,7 @@
         </div>
         <div class="seatrow">конфликты участника: <span id="seatbtns"></span> <span class="dim">клик — показать только игроков, которых участник N сейчас не может пикать; повторный клик — все игроки</span></div>
     <table id="board">
-      <colgroup><col style="width:38px"><col style="width:36px"><col style="width:104px"><col style="width:44px"><col style="width:46px"><col style="width:40px"><col style="width:88px"><col style="width:48px"><col style="width:124px"><col style="width:134px"><col style="width:42px"><col style="width:134px"><col style="width:40px"><col style="width:96px"><col style="width:46px"><col style="width:46px"><col style="width:44px"><col style="width:44px"><col style="width:48px"><col style="width:56px"><col style="width:36px"><col style="width:104px"></colgroup>
+      <colgroup><col style="width:38px"><col style="width:36px"><col style="width:104px"><col style="width:44px"><col style="width:46px"><col style="width:40px"><col style="width:88px"><col style="width:48px"><col style="width:124px"><col style="width:134px"><col style="width:42px"><col style="width:134px"><col style="width:40px"><col style="width:96px"><col style="width:46px"><col style="width:46px"><col style="width:44px"><col style="width:44px"><col style="width:44px"><col style="width:48px"><col style="width:56px"><col style="width:36px"><col style="width:104px"></colgroup>
       <thead><tr>
         <th onclick="sortBy('pos')">Поз</th>
         <th onclick="sortBy('tier')">Тир</th>
@@ -355,6 +355,7 @@
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
         <th onclick="sortBy('dynour')" title="our (live) — scarcity-worth: сколько игрок стоит В ПРИНЦИПЕ с учётом дефицита = value × (1 + 0.4·насколько реальный реплейсмент по позиции ниже). БЕЗ моего бюджета — премию за дефицит видно всегда. Последний T0 по позиции → выше Our$; глубокий пул → ≈ Our$. Мой личный кап (с бюджетом) — в карточке лота и бюджет-факторе.">our<span class="livedot"></span></th>
+        <th onclick="sortBy('dyncap')" title="кап (live) — МОЙ реальный потолок бида = our(worth) × бюджет-фактор, капнут макс-бидом. Кого могу позволить: сравнивай кап со ставкой/рынком по всем игрокам. Зависит от твоего бюджета.">кап<span class="livedot"></span></th>
         <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="livedot"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
@@ -841,6 +842,8 @@ function genSubs(seed){const out=[];for(let i=0;i<8;i++)out.push(3+((i*2+seed)%3
 function genSaves(seed){const out=[];for(let i=0;i<8;i++)out.push((seed*3+i*5)%8);return out;}
 function savesStrip(arr){return `<span class="strip">${arr.slice(-6).map(v=>`<i style="background:${heat(v/7)}" title="${v} сейвов">${v}</i>`).join('')}</span>`;}
 function l6v(p){const m=(p.matches||[]).slice(-6);if(!m.length)return null;return m.reduce((s,x)=>s+(x.pts||0),0)/m.length;}
+// мой кап на игрока = worth(scarcity) × бюджет-фактор, капнут макс-бидом. null если нет живого стейта
+function capOf(name){const w=window.DYNOUR&&window.DYNOUR[name]; if(w==null)return null; const bf=window.DC_BUDF!=null?window.DC_BUDF:1; let c=Math.round(w*bf); const mb=window.DC_MAXBID; if(mb!=null&&isFinite(mb))c=Math.min(c,mb); return Math.max(1,c);}
 function l6cell(p){const v=l6v(p);return v==null?'<span class="dim">—</span>':`<b style="color:${heat(Math.min(1,v/8))}">${v.toFixed(1)}</b>`;}
 function formStrip(p){
   return `<span class="strip">${p.matches.slice(-6).map(m=>{
@@ -1054,6 +1057,7 @@ function render(){
     case"picks":va=clubRem(a.club);vb=clubRem(b.club);break;
     case"dyn":va=(window.DYN&&window.DYN[a.name])??a.price;vb=(window.DYN&&window.DYN[b.name])??b.price;break;
     case"dynour":va=(window.DYNOUR&&window.DYNOUR[a.name])??a.value;vb=(window.DYNOUR&&window.DYNOUR[b.name])??b.value;break;
+    case"dyncap":va=capOf(a.name)??-1;vb=capOf(b.name)??-1;break;
     default:va=a[sortKey];vb=b[sortKey];}
     if(va<vb)return -1*sortDir;if(va>vb)return 1*sortDir;return 0;});
   document.getElementById("rows").innerHTML=list.map(p=>{const tm=TEAMBY[p.club];
@@ -1076,13 +1080,14 @@ function render(){
       <td>${haulCell(p)}</td>
       <td class="ctr">${p.value}</td>
       <td class="ctr">${p.price}</td>
-      <td class="ctr" title="our (live) — наш живой потолок">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="our (live) — scarcity-worth, без бюджета">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr" title="кап (live) — мой потолок бида с учётом бюджета">${capOf(p.name)!=null?`<b style="color:#e8b84b">${capOf(p.name)}</b>`:'<span class="dim">—</span>'}</td>
       <td class="ctr" title="exp (live) — живая рыночная цена">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
       <td class="num startcell"><span class="${p.start<85?'bad':''}">${p.start}%</span></td>
       <td>${pkRow(p.club)}</td>
       <td class="ctr">${markCell(p)}</td>
       <td>${tagHtml(p.tags)}</td>
-    </tr>`;}).join("")||`<tr><td colspan="22" class="sub" style="padding:16px">нет игроков под фильтр</td></tr>`;
+    </tr>`;}).join("")||`<tr><td colspan="24" class="sub" style="padding:16px">нет игроков под фильтр</td></tr>`;
 }
 
 // ---------- PLAYER CARD ----------
@@ -1180,7 +1185,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     const cu={}; mgrs.forEach(m=>(m.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;})); CLUBUSED=cu;  // ГЛОБАЛЬНЫЙ счётчик клубов — лимит ≤5 на весь драфт (все менеджеры), не на меня
     window.DYN=computeDyn(d);   // exp — рыночная цена под живой остаток пота
     window.DYNOUR=computeDynOur(d,me);   // our — scarcity-worth (без бюджета)
-    window.DC_BUDF=computeBudFactor(d,me);   // бюджет-фактор (мой кап = worth × фактор, в лоте)
+    window.DC_BUDF=computeBudFactor(d,me);   // бюджет-фактор (мой кап = worth × фактор)
+    window.DC_MAXBID=(me.maxBid!=null)?me.maxBid:Math.max(1,(me.budget!=null?me.budget:100)-Math.max(0,(12-((me.roster||[]).length))-1));  // мой макс-бид (капает кап)
     updateBudget(me); updateBar(d,mgrs,me0);
     renderSeatBtns(); render(); renderLive();
   }
