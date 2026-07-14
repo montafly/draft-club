@@ -354,7 +354,7 @@
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our $</th>
         <th onclick="sortBy('price')">Exp $</th>
-        <th onclick="sortBy('dynour')" title="our (live) — мой потолок = value × бюджет-фактор × дефицит. Бюджет-фактор = мой бюджет-на-слот ÷ средняя цена за пик по полю (профицит>1, дефицит<1). Дефицит = премия, если реальный реплейсмент по позиции сильно ниже (последний T0 → плати; глубокий пул → без премии). > Our$ = стоит платить выше старта, < Our$ = экономь.">our<span class="livedot"></span></th>
+        <th onclick="sortBy('dynour')" title="our (live) — scarcity-worth: сколько игрок стоит В ПРИНЦИПЕ с учётом дефицита = value × (1 + 0.4·насколько реальный реплейсмент по позиции ниже). БЕЗ моего бюджета — премию за дефицит видно всегда. Последний T0 по позиции → выше Our$; глубокий пул → ≈ Our$. Мой личный кап (с бюджетом) — в карточке лота и бюджет-факторе.">our<span class="livedot"></span></th>
         <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="livedot"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
@@ -1178,8 +1178,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
     MYSEAT=seatByName[me0]||1; ROSTERS=newR; MYTEAM=ROSTERS[MYSEAT]||[]; LIVEPRICE=price; viewSeat=MYSEAT; SEATINFO=seatInfo;
     const me=mgrs.find(m=>m.name===me0)||{};
     const cu={}; mgrs.forEach(m=>(m.roster||[]).forEach(u=>{cu[u.code]=(cu[u.code]||0)+1;})); CLUBUSED=cu;  // ГЛОБАЛЬНЫЙ счётчик клубов — лимит ≤5 на весь драфт (все менеджеры), не на меня
-    window.DYN=computeDyn(d);   // Dyn мкт — рыночная цена под живой остаток пота
-    window.DYNOUR=computeDynOur(d,me);   // Dyn наш — наш стадийный потолок
+    window.DYN=computeDyn(d);   // exp — рыночная цена под живой остаток пота
+    window.DYNOUR=computeDynOur(d,me);   // our — scarcity-worth (без бюджета)
+    window.DC_BUDF=computeBudFactor(d,me);   // бюджет-фактор (мой кап = worth × фактор, в лоте)
     updateBudget(me); updateBar(d,mgrs,me0);
     renderSeatBtns(); render(); renderLive();
   }
@@ -1205,17 +1206,11 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
   //  scarcity = 1 + W·max(0, 1 − replValue/value), где replValue = ценность РЕАЛЬНОГО реплейсмента (игрок, к-рого возьму
   //  вместо этого = (nComp)-й доступный по позиции после конкурентов). Реплейсмент много ниже (последний T0) → премия;
   //  глубокий пул (replValue≈value) → scarcity=1, без премии. Критерий дефицита = исчерпание ЦЕННОСТИ, не слотов.
+  // our = scarcity-worth (БЕЗ бюджета): value × scarcity. «Сколько игрок стоит в принципе с учётом дефицита».
+  // Бюджетную позицию (мой реальный кап) считаем отдельно — computeBudFactor, применяем в карточке лота.
   function computeDynOur(d, me){
     const mgrs=d.managers||[], taken=new Set(d.taken||[]);
-    const myBudget=me.budget!=null?me.budget:100;
-    const mySlots=Math.max(1, 12-((me.roster||[]).length));
-    const potLeft=mgrs.reduce((s,m)=>s+(m.budget||0),0)||myBudget;
-    const picksLeft=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0));
-    const avgPerPick=potLeft/picksLeft;
-    const factor=avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;
-    const myMaxBid=(me.maxBid!=null)?me.maxBid:Math.max(1, myBudget-(mySlots-1));
     const SCARCITY_W=0.4;
-    // доступный пул по позициям (не взят, клуб не полон), по убыв. ценности; + конкуренты, кому нужна позиция
     const availByPos={}, seenA=new Set();
     (window.DC_POOL||[]).forEach(u=>{ if(taken.has(u.id))return; const p=matchUnit(u); if(!p||seenA.has(p.name))return; seenA.add(p.name);
       if((CLUBUSED[p.club]||0)>=5)return; (availByPos[p.pos]=availByPos[p.pos]||[]).push({name:p.name,v:Math.max(1,p.value||1)}); });
@@ -1227,16 +1222,27 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       const arr=(availByPos[p.pos]||[]).filter(x=>x.name!==p.name);
       const replV=arr.length?arr[Math.min(nComp[p.pos]||0, arr.length-1)].v:1;   // реальный реплейсмент после конкурентов
       const scarcity=1+SCARCITY_W*Math.max(0, 1-replV/v);                         // дефицит ценности → премия
-      OUR[p.name]=Math.max(1, Math.min(myMaxBid, Math.round(v*factor*scarcity)));
+      OUR[p.name]=Math.max(1, Math.round(v*scarcity));                           // worth: без бюджета/макс-бида
     });
     return OUR;
+  }
+  // бюджет-фактор = мой бюджет-на-слот / средняя цена за пик по полю. >1 профицит (могу премию), <1 тесно (экономь).
+  function computeBudFactor(d, me){
+    const mgrs=d.managers||[];
+    const myBudget=me.budget!=null?me.budget:100;
+    const mySlots=Math.max(1, 12-((me.roster||[]).length));
+    const potLeft=mgrs.reduce((s,m)=>s+(m.budget||0),0)||myBudget;
+    const picksLeft=Math.max(1, mgrs.reduce((s,m)=>s+Math.max(0,12-((m.roster||[]).length)),0));
+    const avgPerPick=potLeft/picksLeft;
+    return avgPerPick>0?(myBudget/mySlots)/avgPerPick:1;
   }
   function updateBudget(me){
     const r=me.roster||[], spent=r.reduce((s,u)=>s+(u.price||0),0);
     const bud=me.budget!=null?me.budget:100-spent, left=12-r.length;
     const maxBid=me.maxBid!=null?me.maxBid:Math.max(0,bud-Math.max(0,left-1));
     const el=document.getElementById('budgetbar');
-    if(el) el.innerHTML=`<span class="muted">бюджет</span> <b>${bud}</b> <span class="muted">потрачено</span> <b>${spent}</b> <span class="muted">слотов</span> <b>${r.length}/12</b> <span class="muted">макс-бид</span> <b>${maxBid}</b>`;
+    const bf=window.DC_BUDF!=null?window.DC_BUDF:1, bfcol=bf>=1.05?'#3ddc84':bf<=0.95?'#ff8a6b':'var(--t0)';
+    if(el) el.innerHTML=`<span class="muted">бюджет</span> <b>${bud}</b> <span class="muted">потрачено</span> <b>${spent}</b> <span class="muted">слотов</span> <b>${r.length}/12</b> <span class="muted">макс-бид</span> <b>${maxBid}</b> <span class="muted" title="мой бюджет-на-слот ÷ средняя цена за пик по полю. >1 профицит (могу премии), <1 тесно (экономь). Мой кап = our × фактор">бюджет-фактор</span> <b style="color:${bfcol}">${bf.toFixed(2)}</b>`;
   }
   function bar(){ let b=document.getElementById('livebar'); if(!b){ b=document.createElement('div'); b.id='livebar';
     b.style.cssText='display:flex;flex-direction:column;gap:9px;font-size:14px;text-align:left';
@@ -1297,29 +1303,31 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
       let p=PLAYERS.find(x=>x.id!=null&&x.id===u.id);
       if(!p&&u.position==='COACH') p=PLAYERS.find(x=>x.pos==='Тренер'&&x.club===(u.code||u.club));  // коуч: id живого юнита не матчится → фолбэк по клубу (Тренер CLUB), у нас есть value/xp/цена
       p=p||{};
-      const mkt=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;              // Dyn мкт — рыночная
-      const ourCapRaw=(window.DYNOUR&&window.DYNOUR[p.name]!=null)?window.DYNOUR[p.name]:p.value; // Dyn наш — сырой
+      const mkt=(window.DYN&&window.DYN[p.name]!=null)?window.DYN[p.name]:p.price;              // exp — рыночная
+      const worth=(window.DYNOUR&&window.DYNOUR[p.name]!=null)?window.DYNOUR[p.name]:p.value;   // our — scarcity worth (без бюджета)
+      const budf=window.DC_BUDF!=null?window.DC_BUDF:1;
       const our=p.value, high=d.lot.highBid, comp=competition(mgrs,me0,u.position,u.code,high);
-      let ourCap=null;   // наш потолок, ограничен макс-бидом; null у коуча/несматченного (мы их не оцениваем) → «—», без NaN
-      if(ourCapRaw!=null&&isFinite(ourCapRaw)) ourCap=(cap!=null&&isFinite(cap))?Math.min(ourCapRaw,cap):ourCapRaw;
+      let myCap=null;   // мой реальный потолок = worth × бюджет-фактор, капнут макс-бидом; null у несматченного
+      if(worth!=null&&isFinite(worth)){ const raw=Math.round(worth*budf); myCap=(cap!=null&&isFinite(cap))?Math.min(raw,cap):raw; }
       let vshort,vcol,flag='';
       if(our==null){ vshort='—'; vcol='#8aa0b2'; flag='юнит не смэтчился с нашими данными'; }  // безопасный фолбэк для несматченного юнита (коучи матчатся по клубу выше)
       else if(!canTake(me.roster,u.position)){ vshort='ПОЗ.ЗАКРЫТА'; vcol='#c7d0d9'; }
       else if((CLUBUSED[u.code]||0)>=5){ vshort='ЛИМИТ КЛУБА'; vcol='#c7d0d9'; }
-      else if(high<=ourCap){ vshort='БЕРИ'; vcol='#3ddc84'; if(mkt>ourCap+1)flag='рынок ценит выше (~'+mkt+') — вероятно уйдёт дороже'; }  // ставка в пределах нашего потолка
+      else if(high<=myCap){ vshort='БЕРИ'; vcol='#3ddc84'; if(mkt>myCap+1)flag='рынок ценит выше (~'+mkt+') — вероятно уйдёт дороже'; }  // ставка в пределах моего капа
       else if(comp>=1 && !mustTake(me.roster,u.position)){
         const dc=Math.max(1,mkt-1);
         if(high>=dc){ vshort='ПАС'; vcol='#ff6b6b'; }              // ставка доехала до рынка — дренажить нечем
         else { vshort='ДАВИ ЦЕНУ'; vcol='#f0c05a'; flag='гони до ~'+dc+' (рынок), сам не бери — позиция не обязательна'; }
       }
-      else { vshort='ПАС'; vcol='#ff6b6b'; }                       // выше нашего потолка, дренаж нельзя
+      else { vshort='ПАС'; vcol='#ff6b6b'; }                       // выше моего капа, дренаж нельзя
+      if(!flag && worth!=null && myCap!=null && worth>myCap+1) flag='в принципе стоит ~'+worth+' (дефицит по позиции), но бюджет жмёт твой кап до '+myCap;  // разводим сигналы: worth vs мой кап
       const poscode=u.position==='COACH'?'COA':u.position;
       const nm=(p.name||u.name), nmEsc=String(nm).replace(/'/g,"\\'");
       card=`<div class="lotcard ${u.position.toLowerCase()}" ${p.name?`onclick="openCard('${nmEsc}')" style="cursor:pointer" title="открыть карточку игрока"`:''}>
         <div class="lc-top"><div class="lc-pos">${poscode}</div>
           <div class="lc-id"><div class="lc-nm">${u.name}</div><div class="lc-cl">${u.club||u.code}${p.opp&&p.opp!=='—'?' · vs '+p.opp:''}</div></div>
           <div class="lc-verdict" style="color:${vcol}">${vshort}</div></div>
-        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>exp<b>${mkt??'—'}</b></span><span>our<b>${ourCap??'—'}</b></span><span>ставка<b>${high}</b></span><span>конкур<b>${comp}</b></span></div>
+        <div class="lc-odds"><span>xP<b>${p.xp??'—'}</b></span><span>Our $<b>${our??'—'}</b></span><span>exp<b>${mkt??'—'}</b></span><span title="scarcity-worth: сколько стоит с учётом дефицита, без бюджета">our<b>${worth??'—'}</b></span><span title="мой кап = worth × бюджет-фактор, капнут макс-бидом">кап<b>${myCap??'—'}</b></span><span>ставка<b>${high}</b></span><span>конкур<b>${comp}</b></span></div>
         ${flag?`<div style="font-size:11px;opacity:.85;margin-top:5px;padding-top:5px;border-top:1px solid rgba(0,0,0,.15)">${flag}</div>`:''}
       </div>`;
     }
