@@ -239,6 +239,11 @@
   .lbox{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   /* заголовок блока — по центру, жирный */
   .bhd{text-align:center;font-weight:700;font-size:13px;color:var(--t0);letter-spacing:.02em}
+  .tgt-bhd{display:flex;align-items:center;justify-content:center;gap:8px}
+  .fclr{background:none;border:1px solid var(--line);color:var(--tx3);border-radius:5px;font-size:9px;
+    padding:2px 7px;cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap}
+  .fclr:hover:not([disabled]){border-color:var(--neg);color:var(--neg)}
+  .fclr[disabled]{opacity:.35;cursor:default}
 
   /* СОСТАВЫ УЧАСТНИКОВ (повтор карточки площадки, без камер) */
   /* --nsq = число участников (ставит renderSquads): лига не всегда пятиместная */
@@ -519,6 +524,7 @@
           <button class="fbtn" data-f="ceil" onclick="setFilter('ceil')">потолок</button>
           <button class="fbtn" id="hidetakenbtn" onclick="toggleTaken()" title="оставить только доступных к покупке">скрыть занятых</button>
           <button class="fbtn" id="favbtn" onclick="toggleFavFilter()" title="показать только избранных">★ избранное</button>
+          <button class="fbtn" id="favclr-board" onclick="clearFav()" title="снять ★ со всех игроков (с подтверждением)">сбросить ★</button>
         </div>
         <div class="panelbox">
           <div class="ph">Матчи тура</div>
@@ -549,7 +555,7 @@
       <div class="lbox">
         <div class="bhd">Составы участников</div>
         <div id="squads"></div>
-        <div class="bhd" style="margin-top:14px">Мои таргеты</div>
+        <div class="bhd tgt-bhd" style="margin-top:14px"><span>Мои таргеты</span><button class="fclr" id="favclr" onclick="clearFav()" title="снять ★ со всех игроков (с подтверждением)">сбросить ★</button></div>
         <div id="targets"></div>
       </div>
       <div class="lbox" id="livepanel">
@@ -925,6 +931,9 @@ function renderSquads(){
 // Мои таргеты (★ на борде) — колонка на позицию, ровно под блоками участников.
 // Купленные не выкидываем: важно видеть, что таргет ушёл (и к кому) — зачёркиваем и роняем вниз.
 function renderTargets(){
+  // кнопки сброса — счётчик и блокировка, когда отмечать нечего
+  ['favclr','favclr-board'].forEach(id=>{const b=document.getElementById(id); if(!b)return;
+    b.disabled=!FAV.size; b.textContent=FAV.size?`сбросить ★ (${FAV.size})`:'сбросить ★';});
   const el=document.getElementById('targets'); if(!el)return;
   const taken=window.DC_TAKEN||new Set();
   const cols=[['GK','GK'],['DEF','DEF'],['MID','MID'],['FWD','FWD'],['Тренер','COA']];
@@ -1112,6 +1121,15 @@ let FAV=new Set((()=>{try{return JSON.parse(localStorage.getItem('draftFav')||'[
 let showFav=false;
 function sq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
 function toggleFav(e,name){e.stopPropagation();if(FAV.has(name))FAV.delete(name);else FAV.add(name);try{localStorage.setItem('draftFav',JSON.stringify([...FAV]))}catch(_){}render();renderTargets();}
+// Сброс всех ★ — с подтверждением: отметки живут в localStorage, вернуть их нечем.
+function clearFav(){
+  if(!FAV.size)return;
+  if(!confirm(`Снять все таргеты (${FAV.size})? Отметки ★ будут сброшены со всех игроков — восстановить нельзя.`))return;
+  FAV.clear();
+  try{localStorage.setItem('draftFav',JSON.stringify([]))}catch(_){}
+  if(typeof showFav!=='undefined'&&showFav)toggleFavFilter();   // фильтр «только ★» оставил бы пустой борд
+  render(); renderTargets();
+}
 function toggleFavFilter(){showFav=!showFav;document.getElementById('favbtn').classList.toggle('active',showFav);render();}
 function setTier(t){curTier=(curTier===t)?null:t;document.querySelectorAll('.tbtn[data-t]').forEach(b=>b.classList.toggle('active',b.dataset.t===curTier));render();}
 const SUBTABS=[["FIELD","Все полевые"],["GK","Вратари"],["DEF","Защитники"],["MID","Полузащ."],["FWD","Нападающие"],["Тренер","Тренеры"]];
