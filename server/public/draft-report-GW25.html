@@ -339,9 +339,10 @@
   .tg-empty{font-size:10px;color:var(--tx3);padding:3px 1px}
   .tgt-list{max-height:210px}
 
-  /* МАТЧИ ТУРА — ёмко, в две колонки */
-  #fixlist{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:7px}
-  .fx{display:flex;align-items:center;gap:2px;font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* МАТЧИ ТУРА — один столбец: дом справа от центра, гость слева, пары читаются вертикально */
+  #fixlist{display:grid;grid-template-columns:1fr;gap:1px;margin-top:7px}
+  .fx{display:flex;align-items:center;gap:3px;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;padding:2px 3px;border-radius:4px}
+  .fx:hover{background:rgba(255,255,255,.04)}
   .fx-h{flex:1;text-align:right;font-weight:700;color:var(--tx2)}
   .fx-d{color:var(--tx3)}
   .fx-a{flex:1;color:var(--tx3)}
@@ -353,8 +354,13 @@
   .crow .cc{flex:0 0 30px;font-weight:700;color:var(--t0)}
   .crow .cw,.crow .cx,.crow .cs2{flex:1;text-align:right;font-variant-numeric:tabular-nums;font-size:10px}
   .crow .cn{flex:0 0 20px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:var(--t0)}
-  .crow.full{opacity:.4;background:rgba(255,255,255,.03)}
-  .crow.full .cc,.crow.full .cn{color:var(--neg)}
+  /* цвета 1:1 с площадкой (.clubs tr.sl-* в index.html драфта) */
+  .crow.sl-g{background:rgba(39,174,96,.30)}
+  .crow.sl-lg{background:rgba(39,174,96,.15)}
+  .crow.sl-y{background:rgba(232,195,114,.28)}
+  .crow.sl-lr{background:rgba(236,112,99,.20)}
+  .crow.sl-r{background:rgba(236,112,99,.42)}
+  .crow.full{opacity:.4;text-decoration:line-through}
   .chdr .cc{flex:0 0 30px}.chdr .cw,.chdr .cx,.chdr .cs2{flex:1;text-align:right}.chdr .cn{flex:0 0 20px;text-align:right}
   .chdr .srt{cursor:pointer;user-select:none;white-space:nowrap}
   .chdr .srt:hover{color:var(--tx)}
@@ -1363,12 +1369,13 @@ function renderClubs(){
     if(va<vb)return -clubDir; if(va>vb)return clubDir;   // dir=-1 → по убыванию: меньшее уходит вниз
     return (a.t.code<b.t.code?-1:1);   // тай-брейк по коду, чтобы порядок был стабильным
   });
-  // как на площадке: вся строка залита по остатку слотов ПО ШКАЛЕ красный→жёлтый→зелёный.
-  // Шкала на 1..5 (0 = клуб исчерпан → серый, не красный): 1 красный · 3 жёлтый · 5 зелёный.
+  // Подсветка строки — 1:1 с площадкой (server/public/index.html, slotCls):
+  // 0 → full (зачёркнуто) · 1 → красный · дальше по числу занятых: 0 зелёный · 1 св.-зелёный · 2 жёлтый · 3+ св.-красный
+  const slotCls=rem=>{ if(rem<=0)return'full'; if(rem===1)return'sl-r';
+    const t=5-rem; return t<=0?'sl-g':t===1?'sl-lg':t===2?'sl-y':'sl-lr'; };
   el.innerHTML=rows.map(({t,rem})=>{
-    const bg=rem>0?`background:hsl(${Math.round(((rem-1)/4)*120)},45%,15%)`:'';
     const num=v=>v==null?'—':v;
-    return `<div class="crow ${rem<=0?'full':''}" style="${bg}" title="${t.name} vs ${t.opp||'—'}${t.ven?' ('+(t.ven==='Д'?'дома':'выезд')+')':''} · шанс победы ${num(t.win)}% · xG ${num(t.xg)} · клиншит ${num(t.cs)}% · осталось ${rem} из 5">
+    return `<div class="crow ${slotCls(rem)}" title="${t.name} vs ${t.opp||'—'}${t.ven?' ('+(t.ven==='Д'?'дома':'выезд')+')':''} · шанс победы ${num(t.win)}% · xG ${num(t.xg)} · клиншит ${num(t.cs)}% · осталось ${rem} из 5">
       <span class="cc">${t.code}</span><span class="cw">${t.win!=null?t.win+'%':'—'}</span><span class="cx">${num(t.xg)}</span><span class="cs2">${t.cs!=null?t.cs+'%':'—'}</span><span class="cn">${rem}</span></div>`;
   }).join('');
 }
