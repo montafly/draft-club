@@ -106,6 +106,12 @@
   .tag.pen{color:var(--pen);border-color:#5a2846;background:#241019}
   .tag.ceil{color:var(--ceil);border-color:#6b5a13;background:#231f0e}
   .tag.risk{color:var(--risk);border-color:#6b3c13;background:#23160e}
+  /* сигналы текущего сезона: RIPE — главный (совпадение факторов), роль/форма — направление */
+  .tag.spripe{color:#0f1216;background:#e8c372;border-color:#e8c372}
+  .tag.rolegain{color:var(--cs);border-color:#1f5c2e;background:#12251a}
+  .tag.rolelost{color:#ec7063;border-color:#6b2e2e;background:#231212}
+  .tag.hot{color:#ff9f43;border-color:#6b4413;background:#231a0e}
+  .tag.cold{color:#8aa0b2;border-color:#2f3a44;background:#161b21}
   .tag.card{color:var(--card);border-color:#5a221f;background:#230f0e}
   .tag.new{color:#c9a3ff;border-color:#4a3a6b;background:#171226}
   .tag.trf{color:#6fd3c7;border-color:#1f5c56;background:#0e2320}
@@ -231,6 +237,9 @@
   .pricebox .pb .big{font-size:20px;font-weight:700}
   textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:8px;font:13px inherit;resize:vertical;min-height:56px}
   .legend{font-size:11.5px;color:var(--tx3);margin-top:6px}
+  /* легенда тегов — расшифровка чипов борда, генерится из TAGABBR/TAGLABEL (одно место правды) */
+  .taglegend{display:flex;flex-wrap:wrap;gap:4px 10px;margin:8px 0 2px;font-size:11px;color:var(--tx3);align-items:center}
+  .taglegend .li{display:flex;align-items:center;gap:4px;white-space:nowrap}
 
   /* LIVE — схема площадки: клубы слева · составы по центру · лот+очередность справа */
   .live{display:grid;grid-template-columns:minmax(178px,206px) minmax(0,1fr) minmax(300px,350px);gap:12px;align-items:start}
@@ -455,6 +464,7 @@
           <input id="search" placeholder="поиск игрока / клуба…" oninput="render()">
           <span class="legend">Our $ = наша ценность · Exp $ = ожид. цена аукциона · клик по строке — карточка</span>
         </div>
+        <div class="taglegend" id="taglegend"></div>
         <div class="seatrow">конфликты участника: <span id="seatbtns"></span> <span class="dim">клик — показать только игроков, которых участник N сейчас не может пикать; повторный клик — все игроки</span></div>
     <table id="board">
       <colgroup><col style="width:38px"><col style="width:36px"><col style="width:104px"><col style="width:44px"><col style="width:46px"><col style="width:40px"><col style="width:88px"><col style="width:48px"><col style="width:124px"><col style="width:134px"><col style="width:42px"><col style="width:134px"><col style="width:40px"><col style="width:96px"><col style="width:46px"><col style="width:46px"><col style="width:44px"><col style="width:44px"><col style="width:44px"><col style="width:48px"><col style="width:56px"><col style="width:36px"><col style="width:104px"></colgroup>
@@ -1260,7 +1270,9 @@ function setFilter(f){curFilter=(curFilter===f&&f!=='all')?'all':f;document.quer
 let hideTaken=false;
 function toggleTaken(){hideTaken=!hideTaken;document.getElementById('hidetakenbtn').classList.toggle('active',hideTaken);render();}
 function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=(k==='tier'||k==='name'||k==='match'||k==='tags'||k==='pos'||k==='club')?1:-1;}render();}
-const TAGABBR={cs:"CS",spd:"CK",sph:"AER",sp:"SP",diff:"DIFF",sell:"FADE",pen:"PEN",ceil:"CEIL",risk:"RISK",card:"CARD",new:"NEW",trf:"TRF"};
+const TAGABBR={cs:"CS",spd:"CK",sph:"AER",sp:"SP",diff:"DIFF",sell:"FADE",pen:"PEN",ceil:"CEIL",risk:"RISK",card:"CARD",new:"NEW",trf:"TRF",spripe:"RIPE",rolegain:"ROLE+",rolelost:"ROLE−",hot:"HOT",cold:"COLD"};
+function renderTagLegend(){const el=document.getElementById("taglegend"); if(!el)return;
+  el.innerHTML=Object.keys(TAGABBR).map(t=>`<span class="li"><span class="tag ${t}">${TAGABBR[t]}</span>${TAGLABEL[t]||t}</span>`).join("");}
 function tagHtml(tags){return `<span class="tags">${tags.map(t=>`<span class="tag ${t}" title="${TAGLABEL[t]||t}">${TAGABBR[t]||TAGLABEL[t]||t}</span>`).join("")}</span>`;}
 function haulCell(p){return `<span class="haulgrid">${[p.h6,p.h8,p.h10,p.h12,p.h14].map(v=>v?`<span style="color:${heat(v/100)}">${v}</span>`:'<span class="dim">·</span>').join('')}</span>`;}
 function render(){
@@ -1399,7 +1411,7 @@ function renderClubs(){
 }
 
 // init
-renderTeams(); renderMatches(); renderGksaves(); renderSubtabs(); renderFixtures(); renderMiniTable(); renderSeatBtns(); render(); renderLive();
+renderTeams(); renderMatches(); renderGksaves(); renderSubtabs(); renderFixtures(); renderMiniTable(); renderSeatBtns(); renderTagLegend(); render(); renderLive();
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeCard();});
 
 // ---------- LIVE ADAPTER (живой стейт драфта через BroadcastChannel 'dc_live') ----------
