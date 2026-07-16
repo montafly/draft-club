@@ -1363,9 +1363,10 @@ function renderClubs(){
     if(va<vb)return -clubDir; if(va>vb)return clubDir;   // dir=-1 → по убыванию: меньшее уходит вниз
     return (a.t.code<b.t.code?-1:1);   // тай-брейк по коду, чтобы порядок был стабильным
   });
-  // как на площадке: цветом залита ВСЯ строка по остатку слотов (значения — нейтральные, без heat)
+  // как на площадке: вся строка залита по остатку слотов ПО ШКАЛЕ красный→жёлтый→зелёный.
+  // Шкала на 1..5 (0 = клуб исчерпан → серый, не красный): 1 красный · 3 жёлтый · 5 зелёный.
   el.innerHTML=rows.map(({t,rem})=>{
-    const bg=rem>0?`background:rgba(61,220,132,${(0.05+0.14*(rem/5)).toFixed(3)})`:'';
+    const bg=rem>0?`background:hsl(${Math.round(((rem-1)/4)*120)},45%,15%)`:'';
     const num=v=>v==null?'—':v;
     return `<div class="crow ${rem<=0?'full':''}" style="${bg}" title="${t.name} vs ${t.opp||'—'}${t.ven?' ('+(t.ven==='Д'?'дома':'выезд')+')':''} · шанс победы ${num(t.win)}% · xG ${num(t.xg)} · клиншит ${num(t.cs)}% · осталось ${rem} из 5">
       <span class="cc">${t.code}</span><span class="cw">${t.win!=null?t.win+'%':'—'}</span><span class="cx">${num(t.xg)}</span><span class="cs2">${t.cs!=null?t.cs+'%':'—'}</span><span class="cn">${rem}</span></div>`;
