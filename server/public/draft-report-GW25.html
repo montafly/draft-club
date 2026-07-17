@@ -490,9 +490,9 @@
         <th onclick="sortBy('ceil')">P90</th>
         <th onclick="sortBy('haulPct')"><span class="haulgrid"><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span></span></th>
         <th onclick="sortBy('value')">Our</th>
-        <th onclick="sortBy('price')">Exp</th>
         <th onclick="sortBy('dynour')" title="our (live) — scarcity-worth: сколько игрок стоит В ПРИНЦИПЕ с учётом дефицита = value × (1 + 0.4·насколько реальный реплейсмент по позиции ниже). БЕЗ моего бюджета — премию за дефицит видно всегда. Последний T0 по позиции → выше Our$; глубокий пул → ≈ Our$. Мой личный кап (с бюджетом) — в карточке лота и бюджет-факторе.">our<span class="livedot"></span></th>
         <th onclick="sortBy('dyncap')" title="кап (live) — МОЙ реальный потолок бида = our(worth) × бюджет-фактор, капнут макс-бидом. Кого могу позволить: сравнивай кап со ставкой/рынком по всем игрокам. Зависит от твоего бюджета.">кап<span class="livedot"></span></th>
+        <th onclick="sortBy('price')">Exp</th>
         <th onclick="sortBy('dyn')" title="exp (live) — живая рыночная цена: сколько за игрока заплатит поле под текущий остаток пота. Живая версия Exp$.">exp<span class="livedot"></span></th>
         <th onclick="sortBy('start')">Старт</th>
         <th onclick="sortBy('picks')">Пики</th>
@@ -1360,9 +1360,9 @@ function render(){
       <td class="ctr">${p.p90!=null?`<span style="color:${heat(p.p90/16)};font-weight:600">${p.p90}</span>`:'<span class="dim">—</span>'}</td>
       <td>${haulCell(p)}</td>
       <td class="ctr">${p.value}</td>
-      <td class="ctr">${priceCell(p)}</td>
       <td class="ctr" title="our (live) — scarcity-worth, без бюджета">${window.DYNOUR&&window.DYNOUR[p.name]!=null?`<b style="color:#3ddc84">${window.DYNOUR[p.name]}</b>`:'<span class="dim">—</span>'}</td>
       <td class="ctr" title="кап (live) — мой потолок бида с учётом бюджета">${capOf(p.name)!=null?`<b style="color:#e8b84b">${capOf(p.name)}</b>`:'<span class="dim">—</span>'}</td>
+      <td class="ctr">${priceCell(p)}</td>
       <td class="ctr" title="exp (live) — живая рыночная цена">${window.DYN&&window.DYN[p.name]!=null?`<b style="color:#4aa8ff">${window.DYN[p.name]}</b>`:'<span class="dim">—</span>'}</td>
       <td class="num startcell"><span class="${p.start<85?'bad':''}">${p.start}%</span></td>
       <td>${pkRow(p.club)}</td>
