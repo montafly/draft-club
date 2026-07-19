@@ -29,9 +29,19 @@ const FT_HEADERS = {
   origin: 'https://fanteam.com', referer: 'https://fanteam.com/',
   'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
 };
+// 429 от FanTeam отдаёт Retry-After (сек) — показываем это админу вместо голого кода статуса.
+function ftThrow(r, ctx) {
+  if (r.status === 429) {
+    const ra = parseInt(r.headers.get('retry-after'), 10);
+    throw new Error(ra > 0
+      ? `FanTeam временно ограничил запросы — попробуйте через ${ra >= 60 ? Math.ceil(ra / 60) + ' мин' : ra + ' сек'}`
+      : 'FanTeam временно ограничил запросы — попробуйте чуть позже');
+  }
+  throw new Error('FanTeam ' + r.status + (ctx ? ' ' + ctx : ''));
+}
 async function ftMatches(season, round) {
   const r = await fetch(`${FT_API}/real_matches?season_id=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}`, { headers: FT_HEADERS });
-  if (!r.ok) throw new Error('FanTeam ' + r.status);
+  if (!r.ok) ftThrow(r);
   const d = await r.json();
   const teams = {};
   for (const t of d.realTeams || []) teams[t.id] = { name: t.name || String(t.id), abbr: t.abbr || '' };
@@ -48,7 +58,7 @@ async function ftMatches(season, round) {
 
 async function ftGet(path) {
   const r = await fetch(`${FT_API}/${path}`, { headers: FT_HEADERS });
-  if (!r.ok) throw new Error('FanTeam ' + r.status + ' ' + path);
+  if (!r.ok) ftThrow(r, path);
   return r.json();
 }
 // деталь матча с кэшем 60с (для скоринга/просмотра — не дёргать FanTeam на каждый клик)
