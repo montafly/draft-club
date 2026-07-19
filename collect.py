@@ -21,6 +21,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import db
 
@@ -248,9 +249,13 @@ def collect_auto(season_ids: list[int], window_hours: int = 6):
     # hi = окно вперёд: ловим pending заранее, чтобы поймать выход составов (~T-60).
     lo, hi = now - timedelta(hours=window_hours), now + timedelta(minutes=PREMATCH_MINUTES)
     iso = now.isoformat()
-    # 1) перепроверка незавершённых из нашей БД
+    # 1) перепроверка незавершённых из нашей БД — только уже НАЧАВШИЕСЯ (start_time<=now),
+    # иначе при заранее забитом календаре сезона (все матчи pending за недели вперёд)
+    # этот шаг долбит FanTeam по 200 будущих матчей каждый цикл (поймали 429 на season 2004
+    # после бэкфилла всех 38 туров — recheck хватал их наравне с реально зависшими).
     try:
-        pend = db.select("dc_matches", "select=match_id&and=(status.neq.confirmed,status.neq.cancelled)&limit=200")
+        now_q = quote(iso, safe="")
+        pend = db.select("dc_matches", f"select=match_id&and=(status.neq.confirmed,status.neq.cancelled,start_time.lte.{now_q})&limit=200")
         for r in pend:
             try:
                 collect_match(r["match_id"])
