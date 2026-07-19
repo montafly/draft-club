@@ -627,7 +627,11 @@ function onWsMessage(e){const m=JSON.parse(e.data);
     {const w=document.getElementById('who');if(w)w.textContent=m.you?`${myName} · место ${m.you}`:(VOICE?`${myName} · голосовой режим`:`${myName} · зритель`);}
     if(me!=null&&!VOICE&&!RTC.on)setTimeout(()=>{if(!RTC.on)rtcStart();},400);} // мик по умолчанию включён при входе игрока (на iOS первый getUserMedia потребует тапа — поймаем в catch)
   else if(m.type==='reconnect'){location.reload();} // админ нажал «переподключить всех» — перезагрузка с ?room в URL → авто-вход обратно
-  else if(m.type==='error'){const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);}
+  else if(m.type==='error'){
+    const dc=document.getElementById('dCreateMsg');   // «Тестовый рум (соло)»/создание драфта из админки шлёт ошибку сюда же — иначе она уходит в #lerr/#err, которые в этот момент не видны, и панель выглядит «зависшей»
+    if(dc&&/^(собираю пул|сохраняю)/.test(dc.textContent))dc.textContent='ошибка: '+m.message;
+    const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);
+  }
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
   else if(m.type==='state'){const prev=S;S=m.state;if(typeof m.ver==='number')wsLastVer=m.ver;lastStateAt=Date.now();render();soundsFromState(prev,S);updateAmbient(S);}}
 // WS keepalive + авто-reconnect: раньше сокет создавался один раз и не переподключался (упал → клиент мёртв до ручного F5). Теперь watchdog рвёт мёртвый half-open сокет, reconnect с backoff поднимает заново и пере-входит в комнату. RTC (медиа) идёт P2P и переживает флап — восстанавливается только сигнальный канал (по нему же ходит сигналинг RTC).
