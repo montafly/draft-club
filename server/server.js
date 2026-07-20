@@ -614,6 +614,11 @@ const WARM_MS = 10 * 60 * 1000;
 setTimeout(warmUpcomingOdds, 15000);     // ~через 15с после старта/деплоя — прогреть ближайшие туры
 setInterval(warmUpcomingOdds, WARM_MS);  // и периодически держать кэш тёплым
 
+// Эфемерные реакции комнаты (эмодзи, как в Google Meet): белый список — сервер отбрасывает всё, что вне него
+// (защита клиентов от инъекции произвольной строки в innerHTML). Пул дублируется в public/index.html (REACTIONS).
+const REACTIONS = ['🔥', '❤️', '👏', '😂', '😮', '💰', '😱', '👎', '🎉', '🐐', '🤝', '🤡'];
+const REACT_THROTTLE_MS = 400;           // антиспам: не чаще одной реакции на сокет за этот интервал (лишнее молча дропаем)
+
 // Авто-уборка несобравшихся драфтов: если назначено время старта, а через час после него состав так и не
 // финализирован (драфт завис в recruiting) — удаляем его (жёстко, как ручная кнопка «Удалить»; заявки уходят
 // каскадом on delete cascade). finalized/live/done и драфты без starts_at не трогаем.
@@ -1263,6 +1268,16 @@ wss.on('connection', (ws) => {
         if (msg.type === 'rtc') { // сигналинг WebRTC: точечно пересылаем целевому пиру по rtcId (игроки и зрители), без рассылки стейта
           const target = [...e.clients].find((c) => c.rtcId === msg.to);
           if (target && target.readyState === 1) target.send(JSON.stringify({ type: 'rtc', from: ws.rtcId, data: msg.data }));
+          return;
+        }
+        if (msg.type === 'reaction') { // эфемерная реакция-эмодзи: фанаут всем в комнате, без записи в стейт и без bump версии (поток «выстрелил-исчез», не история)
+          if (!ws.user) throw new Error('войдите в комнату');   // залогинен и в комнате — как чат/микрофон (игроки и зрители)
+          if (!REACTIONS.includes(msg.emoji)) return;           // не из белого списка — молча отбрасываем
+          const now = Date.now();
+          if (now - (ws.lastReact || 0) < REACT_THROTTLE_MS) return; // антиспам на сокет
+          ws.lastReact = now;
+          const out = JSON.stringify({ type: 'reaction', seat: ws.seatId || null, name: ws.name, emoji: msg.emoji });
+          for (const c of e.clients) if (c.readyState === 1) c.send(out);
           return;
         }
         if (msg.type === 'resync') { // клиент просит свежий полный стейт (возврат на вкладку / кнопка «Синхронизировать») — без пере-входа в комнату

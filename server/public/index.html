@@ -8,6 +8,14 @@
   header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
   #draftbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px;background:#13202c;border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0}.sp{flex:1}.mut{color:var(--mut)}
+  #draftbar .btn.ic{padding:6px 9px;display:inline-flex;align-items:center;justify-content:center;line-height:0}
+  #draftbar .btn.ic svg{width:16px;height:16px}
+  #draftbar .btn.ic.off{opacity:.42}
+  #draftbar .btn.ic.active{border-color:var(--gold);color:var(--gold)}
+  .delegslot{display:inline-flex;align-items:center;gap:6px}
+  .delegslot .dgsel{font-size:12px;padding:5px 8px;max-width:180px}
+  .delegslot .dgchip{font-size:11px;font-weight:700;color:#7ee0a0;background:#16351f;border:1px solid #2e7d32;border-radius:7px;padding:4px 9px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+  .delegslot .btn.sm{font-size:11.5px;padding:5px 9px}
   .pill{background:#22303d;padding:3px 9px;border-radius:10px}.pill.me{background:var(--acc)}.pill.coin{background:#2a2410;color:var(--gold);font-weight:700}
   .btn{background:#22303d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn.p{background:var(--acc);border-color:var(--acc)}.btn.r{background:#c0392b;border-color:#c0392b}.btn:disabled{opacity:.4;cursor:default}
   .btn.flash{box-shadow:0 0 0 2px var(--gold),0 0 12px var(--gold);transition:box-shadow .05s}
@@ -82,7 +90,7 @@
   .pcol.prelobby{flex:0 0 calc((100% - 32px)/5);max-width:calc((100% - 32px)/5)}
   .pcol.act{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}.pcol.me{outline:1px solid #2e7d3266}
   .pcol.done{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}.pcol.done .cam{border-color:var(--gold)}
-  .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden}
+  .cam{height:190px;border-radius:7px;background:#0a0f14;border:1px dashed #34495e;display:flex;align-items:center;justify-content:center;color:#5d7488;font-size:11px;margin-bottom:6px;overflow:hidden;position:relative}
   .phead{display:flex;align-items:center;gap:6px}
   .phead .nm{font-weight:800}
   .ptimer{margin-left:auto;font-variant-numeric:tabular-nums;font-size:11px;color:var(--mut);background:#22303d;border:1px solid var(--line);border-radius:6px;padding:1px 6px;white-space:nowrap}
@@ -124,6 +132,18 @@
   .rtcbar .cbtn.undo.ready{border-color:var(--gold);color:var(--gold);box-shadow:0 0 7px rgba(232,195,114,.5)} /* доступна — жёлтая */
   .rtcbar .cbtn:disabled{opacity:.55;cursor:default}
   .rtcbar .cbtn:disabled:hover{background:#ffffff08}
+  /* полоска реакций-эмодзи под баром мик/камера (видна всем в комнате) */
+  .rtcreact{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-top:8px}
+  .rtcreact .rbtn{width:100%;min-width:0;min-height:34px;font-size:19px;line-height:1;border:1px solid var(--line);background:#ffffff08;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .08s,background .12s;padding:0}
+  .rtcreact .rbtn:hover{background:#ffffff18}
+  .rtcreact .rbtn:active{transform:scale(.82)}
+  /* прилетевшая реакция: всплеск (fixed-слой над плитками) + бейдж в углу камеры */
+  #reactLayer{position:fixed;inset:0;pointer-events:none;z-index:58;overflow:hidden}
+  .rfloat{position:fixed;transform:translate(-50%,0);font-size:34px;text-align:center;will-change:transform,opacity;animation:rfloat 1.8s ease-out forwards;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+  .rfloat .rnm{display:block;font-size:11px;color:#fff;font-weight:700;text-shadow:0 1px 3px #000;margin-top:-3px}
+  @keyframes rfloat{0%{opacity:0;transform:translate(-50%,12px) scale(.5)}14%{opacity:1;transform:translate(-50%,0) scale(1.18)}30%{transform:translate(-50%,-12px) scale(1)}100%{opacity:0;transform:translate(-50%,-140px) scale(1)}}
+  .rbadge{position:absolute;top:5px;right:5px;font-size:26px;z-index:3;pointer-events:none;animation:rbadge 1.1s ease-out forwards;filter:drop-shadow(0 1px 3px rgba(0,0,0,.7))}
+  @keyframes rbadge{0%{opacity:0;transform:scale(.3)}20%{opacity:1;transform:scale(1.28)}45%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1)}}
   .avbox{width:150px;height:142px;background:#0a0f14;border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
   .avstage{position:relative;width:264px;height:248px;margin:0 auto;overflow:hidden;border-radius:8px;border:1px solid var(--line);background:#000;touch-action:none;cursor:grab}
   .avstage:active{cursor:grabbing}
@@ -528,7 +548,7 @@
     <button class="btn" id="callPhoneBtn" onclick="openVoiceInvite()" style="display:none" title="Подключить телефон только для голоса (ваше место не занимается)">Позвать телефон</button>
     <button class="btn" id="syncBtn" onclick="wsKick()" style="background:#2f81f7;color:#fff;border-color:#2f81f7;font-weight:700" title="Принудительно пересинхронизировать состояние с сервером, если рум подтупливает (без перезахода)">⟳ Синхронизировать</button>
     <button class="btn r" id="leaveRoomBtn" onclick="leaveRoom()" style="display:none" title="Покинуть комнату. После выхода F5 больше не вернёт тебя в драфт автоматически — заходи заново из «Мои драфты»">Выйти</button>
-    <span class="sp"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn" id="soundBtn" onclick="toggleSound()">Звук: вкл</button><button class="btn" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок">Озвучка: вкл</button><button class="btn" onclick="toggleHist()">История пиков</button><span id="err" class="err"></span>
+    <span class="sp"></span><span id="delegSlot" class="delegslot"></span><span id="timer" class="pill" style="display:none;font-variant-numeric:tabular-nums" title="Время драфта"></span><button class="btn" id="autoBtn" onclick='send({type:"autoplay"})' style="display:none">⚡ Авто-доиграть (тест)</button><button class="btn ic" id="soundBtn" onclick="toggleSound()" title="Звук событий"></button><button class="btn ic" id="ttsBtn" onclick="toggleTts()" title="Голосовые объявления номинаций и покупок"></button><button class="btn ic" id="histBtn2" onclick="toggleHist()" title="История пиков"></button><span id="err" class="err"></span>
   </div>
   <main><div class="wrap">
     <div class="ribbon" id="ribbon"></div>
@@ -633,6 +653,7 @@ function onWsMessage(e){const m=JSON.parse(e.data);
     const l=document.getElementById('landing');if(document.getElementById('draft').style.display==='none')document.getElementById('lerr').textContent=m.message;else showErr(m.message);
   }
   else if(m.type==='rtc'){onRtcSignal(m.from,m.data);}
+  else if(m.type==='reaction'){onReaction(m);}
   else if(m.type==='state'){const prev=S;S=m.state;if(typeof m.ver==='number')wsLastVer=m.ver;lastStateAt=Date.now();render();soundsFromState(prev,S);updateAmbient(S);}}
 // WS keepalive + авто-reconnect: раньше сокет создавался один раз и не переподключался (упал → клиент мёртв до ручного F5). Теперь watchdog рвёт мёртвый half-open сокет, reconnect с backoff поднимает заново и пере-входит в комнату. RTC (медиа) идёт P2P и переживает флап — восстанавливается только сигнальный канал (по нему же ходит сигналинг RTC).
 function wsStartPing(){ // app-watchdog: шлём ping (с версией стейта), ждём pong; нет ответа за 5с → сокет мёртв → close → reconnect (ловит half-open, который onclose сам не покажет). Раньше было 20с/8с (до 28с фриза рума) — ускорено до 10с/5с, чтобы мёртвый сокет ловился за секунды и idle не дотягивал до порога прокси (VPN/судовой интернет)
@@ -686,7 +707,12 @@ const IC={
   micSm:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>',
   micSmOff:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9v3a3 3 0 0 0 5 2.2"/><path d="M15 11V5a3 3 0 0 0-5.5-1.7"/><path d="M5 10v1a7 7 0 0 0 11 5.5"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>',
   // отмена последнего действия — круговая стрелка против часовой
-  undo:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
+  undo:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+  // компактные иконки тулбара: звук событий / голосовые объявления / история пиков / передача хода
+  snd:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>',
+  tts:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+  hist:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  deleg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>'
 };
 function rtcList(){return (S&&S.lobby&&S.lobby.rtc)||[];}                               // [{id,name,seat}] всех в комнате (игроки+зрители)
 function seatToRtc(seat){const p=rtcList().find(x=>x.seat===seat);return p?String(p.id):null;}
@@ -920,11 +946,46 @@ function updateRtcBtns(){
     h+=`<button class="cbtn ${camOn?'on':'off'}" onclick="rtcCamClick()" title="${!RTC.on?'Включить камеру':(camOn?'Камера включена':'Камера выключена')}">${camOn?IC.cam:IC.camOff}<span>Камера</span></button>`;
   }
   box.innerHTML=h;
+  updateReactBar(); // полоска реакций живёт рядом (#rtcReactBar), обновляем вместе с баром
+}
+// --- Реакции-эмодзи (как в Google Meet): полоска отправки под мик/камерой + всплеск/бейдж на приём ---
+const REACTIONS=['🔥','❤️','👏','😂','😮','💰','😱','👎','🎉','🐐','🤝','🤡']; // дублирует белый список сервера (server.js REACTIONS)
+function updateReactBar(){
+  const box=document.getElementById('rtcReactBar');if(!box)return; // полоска существует только в кокпите/лобби (рядом с #rtcCtlBar)
+  if(myRtc==null){box.innerHTML='';return;} // не в комнате — нечего слать
+  box.innerHTML=REACTIONS.map(e=>`<button class="rbtn" title="Отправить реакцию" onclick="sendReaction('${e}')">${e}</button>`).join('');
+}
+let _lastReactAt=0;
+function sendReaction(emoji){
+  const now=Date.now();if(now-_lastReactAt<400)return;_lastReactAt=now; // клиентский дебаунс (совпадает с серверным троттлом)
+  send({type:'reaction',emoji});
+}
+function reactLayer(){let l=document.getElementById('reactLayer');if(!l){l=document.createElement('div');l.id='reactLayer';document.body.appendChild(l);}return l;}
+function onReaction(m){ // m={seat,name,emoji}; свои реакции тоже показываем (подтверждение отправки)
+  if(!REACTIONS.includes(m.emoji))return; // страховка от чужого (сервер уже фильтрует)
+  if(m.seat!=null){
+    const cam=document.querySelector(`#cols .cam[data-seat="${m.seat}"]`);
+    if(cam){reactBadge(cam,m.emoji);const r=cam.getBoundingClientRect();reactFloat(m.emoji,r.left+r.width/2,r.bottom-8,null);return;}
+  }
+  // зритель (нет места) или плитка вне видимости → всплеск снизу по центру с подписью имени
+  reactFloat(m.emoji,window.innerWidth/2,window.innerHeight-70,m.name);
+}
+function reactFloat(emoji,x,y,name){
+  const el=document.createElement('div');el.className='rfloat';
+  el.style.left=(x+(Math.random()*36-18))+'px';el.style.top=y+'px'; // рандомный сдвиг по X, чтобы серия не слипалась в столбик
+  el.innerHTML=name?`${emoji}<span class="rnm">${esc(name)}</span>`:emoji;
+  const layer=reactLayer();layer.appendChild(el);
+  if(layer.childElementCount>24)layer.removeChild(layer.firstElementChild); // cap летящих узлов на экране
+  setTimeout(()=>{if(el.parentNode)el.parentNode.removeChild(el);},1900);
+}
+function reactBadge(cam,emoji){
+  const b=document.createElement('div');b.className='rbadge';b.textContent=emoji;
+  cam.appendChild(b);setTimeout(()=>{if(b.parentNode)b.parentNode.removeChild(b);},1150);
 }
 // --- Озвучка покупок (TTS): новые покупки детектим по стейту → очередь → проигрывание (синтез на сервере, Alena/good) ---
 let TTS_MUTE=(()=>{try{const v=localStorage.getItem('dcTtsMute');return v===null?false:v==='1';}catch(e){return false;}})(); // по умолчанию ВКЛ
 let SEEN_PICKS=null,SEEN_LOT=null; const TTSQ=[]; let ttsPlaying=false;
-function updateTtsBtn(){const b=document.getElementById('ttsBtn');if(b){b.textContent='Озвучка: '+(TTS_MUTE?'выкл':'вкл');b.classList.toggle('r',TTS_MUTE);}}
+function updateTtsBtn(){const b=document.getElementById('ttsBtn');if(b){b.innerHTML=IC.tts;b.classList.toggle('off',TTS_MUTE);b.title='Голосовые объявления: '+(TTS_MUTE?'выкл':'вкл');}}
 function toggleTts(){TTS_MUTE=!TTS_MUTE;try{localStorage.setItem('dcTtsMute',TTS_MUTE?'1':'0');}catch(e){}if(TTS_MUTE)TTSQ.length=0;updateTtsBtn();}
 function announcePicks(){
   if(!S||!S.started||!S.draft||!S.draft.managers){SEEN_PICKS=null;SEEN_LOT=null;return;}
@@ -2324,7 +2385,7 @@ function onSvol(k,v){setSvol(k,v);const s=document.getElementById('svv_'+k);if(s
 function buildSoundPanel(){const el=document.getElementById('soundVolPanel');if(!el)return;
   el.innerHTML=Object.keys(SND_LABELS).map(k=>{const cur=(SVOL[k]==null?1:SVOL[k]);const test=k==='master'?'':`<button class="btn" style="padding:3px 9px" onclick="${k==='ambient'?'ambientPreview()':`sndCtx();sndPreload();sfx('${k}')`}">▶</button>`;
     return `<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:210px;font-size:12.5px">${SND_LABELS[k]}</span><input type="range" min="0" max="1.5" step="0.05" value="${cur}" oninput="onSvol('${k}',this.value)" style="width:180px"><span class="mut" id="svv_${k}" style="width:42px;font-size:12px">${Math.round(cur*100)}%</span>${test}</div>`;}).join('');}
-function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b)b.textContent='Звук: '+(SND.enabled?'вкл':'выкл');}
+function updateSoundBtn(){const b=document.getElementById('soundBtn');if(b){b.innerHTML=IC.snd;b.classList.toggle('off',!SND.enabled);b.title='Звук событий: '+(SND.enabled?'вкл':'выкл');}}
 function toggleSound(){SND.enabled=!SND.enabled;localStorage.setItem('dcSound',SND.enabled?'1':'0');updateSoundBtn();if(SND.enabled){sndCtx();sndPreload();sfx('turnBid');}else ambientStop();if(typeof S!=='undefined'&&S)updateAmbient(S);}
 window.addEventListener('pointerdown',()=>{if(SND.enabled){sndCtx();sndPreload();}},{once:true}); // праймим контекст + предзагрузка сэмплов на первом клике (автоплей-политика)
 // --- эмбиент твоего хода выставления: непрерывный мягкий пад, играет пока твоя очередь номинировать (точечный сигнал можно пропустить, эмбиент — нет) ---
@@ -2402,7 +2463,7 @@ function render(){
   {const ph=document.getElementById('phase');if(ph)ph.textContent=S.started?'фаза: '+d.phase:'лобби';}
   const t=document.getElementById('turn');
   if(t){if(S.started&&d.actor){const an=d.managers.find(x=>x.id===d.actor)?.name;t.textContent='ход: '+an;t.className='pill'+(d.actor===me?' me':'');}else t.textContent='';}
-  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();chatNotify();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();loadSeasonStats();
+  renderRibbon();renderParts();renderCols();renderRoundStatus();renderBottom();renderClubs();renderFixtures();renderLog();renderChat();chatNotify();renderDraw();placeVideos();fetchSeatAvatars();if(RTC.on)connectPeers();applyCompanionMute();updateRtcBtns();announcePicks();updateTtsBtn();updateDelegSlot();loadSeasonStats();
   const ab=document.getElementById('autoBtn');if(ab)ab.style.display=((S.isTest||(PROFILE.role==='admin'&&AUTOPLAY_ON))&&(!S.started||(S.draft&&S.draft.phase!=='done')))?'inline-block':'none';
   if(document.getElementById('hist').style.display==='block')renderHist();
 }
@@ -2616,16 +2677,23 @@ function delegOf(seat){return (S.draft&&S.draft.delegates)?S.draft.delegates[sea
 function iActFor(seat){return seat===me||delegOf(seat)===me;}          // могу ли я действовать за это место
 function actMine(){const d=S.draft;return !!(d&&d.actor!=null&&iActFor(d.actor));}  // управляю текущим ходом (свой ход ИЛИ мне делегирован ходящий)
 function delegName(id){const m=(S.draft.managers||[]).find(x=>x.id===id);return m?m.name:('#'+id);}
-// панель передачи хода: кому я отдал / за кого играю / отдать другому
+// панель передачи хода — компактная, живёт в тулбаре (#delegSlot справа): кому я отдал / за кого играю / отдать другому
 function delegBar(d){
   if(me==null)return '';                                                // зритель
   const dl=d.delegates||{};
-  if(dl[me]!=null) return `<div class="delegbar"><span>Вы передали ход: <b>${delegName(dl[me])}</b> играет за вас.</span> <button class="btn" onclick='send({type:"reclaimTurn"})'>Вернуть ход</button></div>`;
+  if(dl[me]!=null) return `<span class="dgchip" title="Ваш ход сейчас играет ${esc(delegName(dl[me]))}">→ ${esc(delegName(dl[me]))}</span><button class="btn sm" onclick='send({type:"reclaimTurn"})' title="Забрать ход обратно">Вернуть ход</button>`;
   const forMe=Object.keys(dl).filter(o=>String(dl[o])===String(me)).map(o=>delegName(+o));
-  const forMeTxt=forMe.length?`<div class="delegbar acc">Вы играете за: <b>${forMe.join(', ')}</b></div>`:'';
+  const forMeChip=forMe.length?`<span class="dgchip" title="Вы играете за: ${esc(forMe.join(', '))}">за: ${esc(forMe.join(', '))}</span>`:'';
   const others=(d.managers||[]).filter(m=>m.id!==me);
-  const sel=`<div class="delegbar"><select class="dgsel" onchange='if(this.value)send({type:"delegateTurn",toSeatId:+this.value});this.value="";'><option value="">Передать ход…</option>${others.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select> <span class="mut" style="font-size:11px">на случай проблем с соединением — вернёте кнопкой</span></div>`;
-  return forMeTxt+sel;
+  const sel=`<select class="dgsel" title="Передать свой ход другому участнику — на случай проблем с соединением; вернёте кнопкой" onchange='if(this.value)send({type:"delegateTurn",toSeatId:+this.value});this.value="";'><option value="">Передать ход…</option>${others.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>`;
+  return forMeChip+sel;
+}
+// заполняем тулбарные слоты (передача хода + иконка истории со стейтом open) — зовётся из render()
+function updateDelegSlot(){
+  const slot=document.getElementById('delegSlot');
+  if(slot)slot.innerHTML=(S&&S.started&&S.draft&&me!=null&&S.draft.phase!=='done')?delegBar(S.draft):'';
+  const hb=document.getElementById('histBtn2');
+  if(hb){hb.innerHTML=IC.hist;const hp=document.getElementById('hist');hb.classList.toggle('active',!!hp&&hp.style.display==='block');}
 }
 // заранее-пас (#10): для не-ходящего, ещё участвующего в лоте
 function preFoldBox(d){
@@ -2658,7 +2726,7 @@ function renderBottom(){
     const ms=S.lobby.seats.find(s=>s.id===me);
     const seats=S.lobby.seats||[];const rdy=seats.filter(s=>s.ready).length;const need=S.lobby.need;
     const wait=need?`<p class="mut">В комнате ${seats.length}/${need}, готовы ${rdy}/${seats.length}.${seats.length<need?' Ждём остальных участников.':(rdy<seats.length?' Ждём готовности всех.':'')}</p>`:'';
-    el.innerHTML=`<div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
+    el.innerHTML=`<div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div id="rtcReactBar" class="rtcreact" style="margin-bottom:10px"></div><div class="panel"><h3>Лобби</h3><p class="mut">Все заходят, жмут «Готов», затем «Жеребьёвка».</p>${wait}`+
       (me?`<button class="btn" onclick='send({type:"ready",ready:${!(ms&&ms.ready)}})'>${ms&&ms.ready?'Не готов':'Готов'}</button>
       <button class="btn p" onclick='send({type:"draw"})' ${S.lobby.startable?'':'disabled'}>Жеребьёвка</button>`+
       (S.isTest?` <button class="btn" onclick='send({type:"start"})' ${S.lobby.startable?'':'disabled'}>Старт (тест)</button>`+testOrderPanel():'')
@@ -2666,7 +2734,7 @@ function renderBottom(){
     updateRtcBtns(); // контролы мик/камера доступны и в предруме (#: лобби)
     return;
   }
-  if(d.phase==='done'){el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div></div>';updateRtcBtns();return;} // #4: сохраняем бар мик/камеры после финиша (раньше #rtcCtlBar пропадал → кнопки исчезали у всех)
+  if(d.phase==='done'){el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar" style="margin-bottom:10px"></div><div id="rtcReactBar" class="rtcreact" style="margin-bottom:10px"></div><div class="panel"><h3>Аукцион</h3><b>Драфт завершён.</b> Очки и итоги — в разделе «Мои драфты» → «Смотреть» (обновляются по ходу матчей).</div></div>';updateRtcBtns();return;} // #4: сохраняем бар мик/камеры после финиша (раньше #rtcCtlBar пропадал → кнопки исчезали у всех)
   // лот + ставки
   let lotH='<div class="panel"><h3>'+(d.phase==='substitutes'?'Фаза замен':'Текущий лот · ставки')+'</h3>';
   if(d.lot){const u=d.lot.unit;const od=(CLUBODDS||[]).find(o=>o.club===u.club)||{};const st=SEASON_STATS[u.id];
@@ -2687,7 +2755,7 @@ function renderBottom(){
   lotH+='</div>';
   const myPick=actMine()&&(d.phase==='nominating'||d.phase==='substitutes');
   const np=nomPanel(d);const nomH=np?`<div class="panel ${myPick?'pickactive':'pickro'}">`+np+'</div>':'';
-  el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar"></div>'+delegBar(d)+lotH+nomH+'</div>';
+  el.innerHTML='<div class="bottom"><div id="rtcCtlBar" class="rtcbar"></div><div id="rtcReactBar" class="rtcreact"></div>'+lotH+nomH+'</div>';
   updateRtcBtns(); // бар пересоздаётся вместе с #bottom на каждый ререндер — заполняем заново
   if(actMine()&&(d.phase==='nominating'||d.phase==='substitutes')) renderNom(d.phase==='nominating'?'nominate':'sub',false);
   else if(d.phase==='nominating'||d.phase==='substitutes'||d.phase==='bidding') renderNom('browse',true);
@@ -2822,7 +2890,7 @@ function confirmNominate(id){
   if(wouldAutoGrab(u,open)&&!confirm(`Внимание: соперники не могут перебить ${u.name} (${u.club}) — при подтверждении игрок сразу ваш за $${open}. Точно выставляем?`))return;
   send({type:'nominate',unitId:id,openingBid:open});
 }
-function toggleHist(){const el=document.getElementById('hist');const open=el.style.display==='none'||!el.style.display;el.style.display=open?'block':'none';if(open)renderHist();}
+function toggleHist(){const el=document.getElementById('hist');const open=el.style.display==='none'||!el.style.display;el.style.display=open?'block':'none';const hb=document.getElementById('histBtn2');if(hb)hb.classList.toggle('active',open);if(open)renderHist();}
 function renderHist(){const b=document.getElementById('histBody');if(!S||!S.started){b.innerHTML='<p>Драфт не начат</p>';return;}
   const p=S.draft.picks||[];
   b.innerHTML=p.length?'<table style="width:auto;margin-top:6px"><thead><tr><th>#</th><th>поз</th><th style="padding-right:12px">игрок</th><th style="padding-right:12px">клуб</th><th style="padding-right:6px">купил</th><th style="padding-right:12px">цена</th><th style="padding-right:10px">ставок</th><th>время</th></tr></thead><tbody>'+p.map(x=>`<tr><td>${x.sub?'зам':'#'+x.no}</td><td class="${x.position.toLowerCase()}">${posShort(x.position)}</td><td style="padding-right:12px">${x.unitName}</td><td style="padding-right:12px">${x.club}</td><td style="padding-right:6px">${x.winnerName}</td><td style="padding-right:12px">$${x.price}</td><td style="padding-right:10px">${x.sub?'—':(x.bids??'—')}</td><td>${x.sub?'—':mmss(x.durationMs)}</td></tr>`).join('')+'</tbody></table>':'<p>Пока пусто</p>';}

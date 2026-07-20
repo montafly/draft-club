@@ -7,3 +7,5 @@ node_modules/
 bot/state/
 bot/bot.txt
 bot/root.txt
+
+.ttscache/
