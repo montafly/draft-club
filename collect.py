@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -26,7 +27,7 @@ from urllib.parse import quote
 import db
 
 REQUEST_DELAY = 0.5   # пауза между запросами к FanTeam (вежливый троттлинг)
-MAX_RETRIES = 6       # ретраи на 429 с нарастающим бэкоффом
+MAX_RETRIES = 8       # ретраи на 429 и сетевые обрывы с нарастающим бэкоффом
 # За сколько минут до старта начинать поллить pending-матч в auto-режиме.
 # Составы FanTeam вывешивает за ~60 мин; берём запас, чтобы поймать момент выхода.
 PREMATCH_MINUTES = int(os.environ.get("PREMATCH_MINUTES", "100"))
@@ -57,6 +58,16 @@ def fetch(path: str) -> dict:
             if e.code == 429 and attempt < MAX_RETRIES - 1:
                 wait = 5 * (attempt + 1)  # 5,10,15,20,25с
                 print(f"  429, жду {wait}с и повторяю...")
+                time.sleep(wait)
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError) as e:
+            # сетевой обрыв/таймаут/SSL EOF (нестабильный инет) — ретраим с бэкоффом,
+            # чтобы одна икота не убивала прогон из сотен запросов (сид/скоринг тура)
+            if attempt < MAX_RETRIES - 1:
+                wait = 5 * (attempt + 1)  # 5,10,...,35с — переживаем и более длинные обрывы
+                reason = getattr(e, "reason", e)
+                print(f"  сеть ({reason}), жду {wait}с и повторяю...")
                 time.sleep(wait)
                 continue
             raise
@@ -104,6 +115,12 @@ def compute_points(s: dict, pos: str) -> float:
 
 def _pname(p: dict):
     return p.get("lastName") or p.get("firstName") or p.get("name")
+
+
+def _pfirst(p: dict):
+    # Имя (для инициала/дизамбигуации в драфте) — только когда есть И фамилия, И имя.
+    # Иначе player_name уже держит имя (у безымянного фамилии нет), и «инициал» не нужен.
+    return p.get("firstName") if (p.get("lastName") and p.get("firstName")) else None
 
 
 def score_match(match_id: int) -> dict:
@@ -164,6 +181,8 @@ def validate():
 def player_rows(match_id: int, status: str, detail: dict, now: str) -> list[dict]:
     names = {x["realPlayerId"]: _pname(x.get("realPlayer", {}))
              for x in detail.get("realTeamMemberships", [])}
+    firsts = {x["realPlayerId"]: _pfirst(x.get("realPlayer", {}))
+              for x in detail.get("realTeamMemberships", [])}
     rows = []
     for r in detail.get("realPlayerMatchStats", []):
         st = r.get("stats", {}) or {}
@@ -172,6 +191,7 @@ def player_rows(match_id: int, status: str, detail: dict, now: str) -> list[dict
             "match_id": match_id,
             "player_id": r["realPlayerId"],
             "player_name": names.get(r["realPlayerId"]),
+            "player_first": firsts.get(r["realPlayerId"]),
             "team_id": r["realTeamId"],
             "position": pos,
             "minutes": r.get("minutesPlayed", 0),

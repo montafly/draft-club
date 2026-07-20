@@ -59,6 +59,21 @@ def upsert(table: str, rows: list[dict], on_conflict: str | None = None) -> int:
     return len(rows)
 
 
+def delete(table: str, query: str) -> None:
+    """Удаление строк по PostgREST-фильтру (напр. 'status=eq.not_started&match_id=in.(1,2)').
+    Требует непустой query — защита от случайного полного стирания таблицы."""
+    if not query:
+        raise ValueError("delete без фильтра запрещён")
+    url, key = _creds()
+    endpoint = f"{url}/rest/v1/{table}?{query}"
+    req = urllib.request.Request(endpoint, method="DELETE", headers={
+        "apikey": key,
+        "authorization": f"Bearer {key}",
+        "prefer": "return=minimal",
+    })
+    _open(req)
+
+
 def select(table: str, query: str = "") -> list[dict]:
     url, key = _creds()
     endpoint = f"{url}/rest/v1/{table}"

@@ -165,14 +165,14 @@ async function buildDraftPool(seasonId, round, matchIds) {
   for (const tid of expected) {
     if ((ftCount[tid] || 0) >= MIN_ROSTER) continue;
     let rows;
-    try { rows = await svcGet(`dc_player_match?team_id=eq.${intId(tid, 'team_id')}&select=player_id,player_name,position`); }
+    try { rows = await svcGet(`dc_player_match?team_id=eq.${intId(tid, 'team_id')}&select=player_id,player_name,player_first,position`); }
     catch (e) { console.error('buildDraftPool: фолбэк состава team_id=' + tid + ' —', e.message); continue; }
     let added = 0;
     for (const r of rows) {
       const pid = r.player_id; if (pid == null || seen.has(pid)) continue;
       const pos = POSMAP[r.position]; if (!pos) continue;
       seen.add(pid); involved.add(tid); added++;
-      units.push({ id: pid, name: r.player_name || String(pid), first: '', club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
+      units.push({ id: pid, name: r.player_name || String(pid), first: r.player_first || '', club: teams[tid] || String(tid), code: abbr[tid] || '', position: pos });
     }
     if (added) console.log(`buildDraftPool: фолбэк состава ${teams[tid] || tid} — добрано ${added} игроков из dc_player_match (FanTeam отдал ${ftCount[tid] || 0})`);
   }
